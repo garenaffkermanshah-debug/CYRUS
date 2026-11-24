@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1600">
+<defs>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#050a16"/><stop offset=".55" stop-color="#18202a"/><stop offset="1" stop-color="#080b10"/></linearGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#75501e"/><stop offset=".45" stop-color="#f1c66b"/><stop offset="1" stop-color="#855b27"/></linearGradient>
+ <radialGradient id="light"><stop stop-color="#e0a94c" stop-opacity=".4"/><stop offset="1" stop-color="#080b12" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="900" height="1600" fill="url(#sky)"/>
+<circle cx="450" cy="470" r="440" fill="url(#light)"/>
+<g fill="none" stroke="#b88b43" opacity=".45">
+ <circle cx="450" cy="470" r="245" stroke-width="3"/>
+ <circle cx="450" cy="470" r="270"/>
+ <path d="M450 140V800 M120 470H780 M215 235L685 705 M685 235L215 705"/>
+</g>
+<!-- ستون‌های هخامنشی -->
+<g fill="#4c3b29" stroke="url(#gold)" stroke-width="8" opacity=".85">
+ <path d="M25 790H120V1460H25Z M5 780H140V820H5Z M0 1450H145V1490H0Z"/>
+ <path d="M780 790H875V1460H780Z M760 780H895V820H760Z M755 1450H900V1490H755Z"/>
+ <path d="M10 770L45 710H100L135 770Z M765 770L800 710H855L890 770Z"/>
+</g>
+<!-- نماد بال‌دار کامل -->
+<g transform="translate(450 440)" fill="url(#gold)" stroke="#d9ad60" stroke-width="4">
+ <path d="M-35 -20C-150 -145 -300 -150 -410 -70C-300 -95 -205 -55 -115 10C-230 -15 -315 20 -385 90C-255 65 -175 105 -70 145L-35 65Z"/>
+ <path d="M35 -20C150 -145 300 -150 410 -70C300 -95 205 -55 115 10C230 -15 315 20 385 90C255 65 175 105 70 145L35 65Z"/>
+ <g fill="none" stroke="#48301a" stroke-width="6">
+  <path d="M-390 -65L-115 10 M-350 -10L-90 70 M-300 45L-70 120 M390 -65L115 10 M350 -10L90 70 M300 45L70 120"/>
+ </g>
+ <circle r="82" fill="#111a25" stroke-width="9"/>
+ <circle r="62" fill="none" stroke-width="4"/>
+ <path d="M-18 -45L0 -100L18 -45L14 12L42 42L0 68L-42 42L-14 12Z"/>
+ <path d="M-20 -92L0 -125L20 -92" fill="none" stroke-width="8"/>
+ <path d="M-35 120Q0 175 35 120L20 230L0 260L-20 230Z"/>
+</g>
+<!-- آرامگاه کوروش -->
+<g transform="translate(170 950)" fill="#786044" stroke="#d3a65d" stroke-width="7">
+ <path d="M0 390H290V350H250V310H215V270H180V230H145V190H110V150H75V110H40V70H0Z"/>
+ <path d="M25 70L110 0L195 70Z"/>
+ <rect x="45" y="70" width="130" height="280" fill="#554532"/>
+ <path d="M65 95H155V325H65Z" fill="none"/>
+</g>
+<!-- پیکره شاه هخامنشی -->
+<g transform="translate(755 760)" fill="#745634" stroke="#d7a958" stroke-width="8">
+ <path d="M-35 85Q-80 125 -75 270L-65 650H55L70 270Q70 120 30 85Z"/>
+ <path d="M-55 95Q-95 20 -50 -40L-20 -90L30 -65L60 5L35 95Z"/>
+ <path d="M-45 -55L-60 -130L-15 -170L45 -125L35 -45Z"/>
+ <path d="M-35 -155L-5 -205L35 -155L50 -115L-40 -115Z"/>
+ <path d="M-35 160L-120 330L-95 360L-5 220 M40 150L110 320L80 350L0 220" fill="none"/>
+</g>
+<!-- منشور کوروش -->
+<g transform="translate(400 1300) rotate(-10)" opacity=".95">
+ <path d="M0 20Q25 -25 85 -20L360 15Q390 35 380 95L345 250Q330 280 280 270L25 235Q-10 220 -10 170Z" fill="#806442" stroke="#d8ad63" stroke-width="8"/>
+ <g fill="none" stroke="#34291d" stroke-width="6">
+  <path d="M20 30L350 70M15 65L345 105M10 100L340 140M5 135L335 175M0 170L330 210M-5 205L320 245"/>
+  <path d="M75 5L55 240M125 10L105 245M175 15L155 250M225 20L205 255M275 25L255 260"/>
+ </g>
+</g>
+<!-- بافت کتیبه -->
+<g fill="#e0b45e" opacity=".22" font-size="42">
+ <text x="40" y="900">𐎠 𐎱 𐎭 𐎹 𐎺 𐎢</text>
+ <text x="40" y="970">𐎧 𐏁 𐎠 𐎹 𐎰 𐎡</text>
+</g>
+<rect width="900" height="1600" fill="#030711" opacity=".35"/>
+</svg>

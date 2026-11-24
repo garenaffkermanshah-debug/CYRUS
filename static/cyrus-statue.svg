@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 150">
+<defs>
+<linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+<stop stop-color="#ffe39a"/>
+<stop offset=".5" stop-color="#d8a442"/>
+<stop offset="1" stop-color="#81551d"/>
+</linearGradient>
+</defs>
+<g fill="url(#g)" stroke="#f4cf7b" stroke-width="1.5" stroke-linejoin="round">
+<!-- تاج -->
+<path d="M34 22L30 5L42 13L50 1L58 13L70 5L66 22Z"/>
+<path d="M35 22H65V29H35Z"/>
+<!-- سر و ریش -->
+<path d="M36 27Q50 20 64 27L63 49Q60 58 50 60Q40 58 37 49Z"/>
+<path d="M38 43L34 54L40 62L45 53L50 65L55 53L60 62L66 54L62 43Z"/>
+<!-- لباس شاهانه -->
+<path d="M35 56L23 65L27 91L35 91L33 112L67 112L65 91L73 91L77 65L65 56L59 62L50 67L41 62Z"/>
+<!-- نقش لباس -->
+<path d="M50 65L50 108M35 76L65 76M35 91L65 91" fill="none" stroke="#70491d"/>
+<!-- دست‌ها و عصا -->
+<path d="M28 66L16 92L22 97L39 77M72 66L82 92L76 97L61 77"/>
+<path d="M80 40V112" fill="none" stroke="url(#g)" stroke-width="4"/>
+<path d="M75 39H85L80 31Z"/>
+<!-- پاها -->
+<path d="M37 109L35 137L46 137L50 111L54 137L65 137L63 109Z"/>
+<path d="M30 137H47V144H27ZM53 137H70V144H53Z"/>
+<!-- جزئیات -->
+<path d="M40 32H45M55 32H60M43 44Q50 49 57 44" fill="none" stroke="#70491d"/>
+</g>
+</svg>
