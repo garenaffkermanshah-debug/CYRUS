@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#05080d">
+<title>CYRUS</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #03060b;
+  color: #f5d47a;
+  font-family: sans-serif;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at center, #102b4b, #03060b 75%);
+}
+
+.art {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 5%;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.art.loaded {
+  opacity: 1;
+}
+
+.loading {
+  position: absolute;
+  bottom: 8%;
+  width: 76%;
+  max-width: 340px;
+  text-align: center;
+  z-index: 2;
+}
+
+.caption {
+  font-size: 14px;
+  margin-bottom: 14px;
+  color: #f5d47a;
+  text-shadow: 0 0 12px #d8a846;
+}
+
+.track {
+  height: 5px;
+  background: #ffffff20;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #b58a3b;
+}
+
+.bar {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #087cff, #f5d47a);
+  transition: width 0.7s ease;
+}
+
+.percent {
+  font-size: 11px;
+  color: #c5b58d;
+  margin-top: 9px;
+}
+
+.welcome {
+  position: absolute;
+  top: 12%;
+  left: 7%;
+  right: 7%;
+  z-index: 3;
+  text-align: center;
+  color: #f5d47a;
+  text-shadow: 0 0 12px #d8a846, 0 2px 8px #000;
+  font-family: serif;
+  line-height: 1.9;
+  opacity: 0;
+  transform: translateY(18px);
+  animation: welcomeReveal 5s ease forwards;
+}
+
+.welcome .greeting {
+  font-size: 22px;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.welcome .message {
+  font-size: 16px;
+}
+
+@keyframes welcomeReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(18px);
+    clip-path: inset(0 0 0 100%);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+
+.welcome {
+  position: absolute;
+  top: 13%;
+  left: 7%;
+  right: 7%;
+  z-index: 3;
+  text-align: center;
+  color: #f5d47a;
+  text-shadow: 0 0 12px #d8a846, 0 2px 8px #000;
+  font-family: serif;
+  line-height: 1.9;
+  min-height: 130px;
+}
+
+.welcome-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transition: opacity 450ms ease;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.welcome-line.active {
+  opacity: 1;
+}
+
+</style>
+</head>
+
+<body>
+<div class="screen">
+
+  <img
+    id="splashImage"
+    class="art"
+    src="/static/splash.png"
+    alt="CYRUS"
+  >
+
+
+  <div class="welcome" id="welcome">
+    <div class="welcome-line active">درود بر تو، هم‌میهنِ پارسی!</div>
+    <div class="welcome-line">به بارگاهِ نیاکانِ خویش خوش آمدی؛</div>
+    <div class="welcome-line">اینجا پیوندِ پارسیان، یادگارِ شکوهِ هخامنشی است.</div>
+    <div class="welcome-line">باشد که مهر و خرد، همواره همراهت باد.</div>
+  </div>
+
+  <div class="loading">
+    <div class="caption">در حال آماده‌سازی بارگاه...</div>
+
+    <div class="track">
+      <div id="bar" class="bar"></div>
+    </div>
+
+    <div id="percent" class="percent">در حال بارگذاری تصویر</div>
+  </div>
+
+</div>
+
+<script>
+const img = document.getElementById("splashImage");
+const bar = document.getElementById("bar");
+const percent = document.getElementById("percent");
+const lines = document.querySelectorAll(".welcome-line");
+
+const totalDuration = 14000;
+const lineDuration = 3500;
+const pauseAfterComplete = 2000;
+const startTime = performance.now();
+
+img.onload = () => img.classList.add("loaded");
+img.onerror = () => {
+  percent.textContent = "تصویر بارگذاری نشد";
+};
+
+if (img.complete && img.naturalWidth > 0) {
+  img.classList.add("loaded");
+}
+
+function update(now) {
+  const elapsed = now - startTime;
+  const progress = Math.min(100, elapsed / totalDuration * 100);
+
+  bar.style.width = progress + "%";
+  percent.textContent = Math.floor(progress).toLocaleString("fa-IR") + "٪";
+
+  const index = Math.min(
+    lines.length - 1,
+    Math.floor(elapsed / lineDuration)
+  );
+
+  lines.forEach((line, i) => {
+    line.classList.toggle("active", i === index);
+  });
+
+  if (elapsed < totalDuration) {
+    requestAnimationFrame(update);
+  } else {
+    bar.style.width = "100%";
+    percent.textContent = "۱۰۰٪";
+    lines.forEach(line => line.classList.remove("active"));
+
+    setTimeout(() => {
+      window.location.replace("/welcome");
+    }, pauseAfterComplete);
+  }
+}
+
+bar.style.width = "0%";
+percent.textContent = "۰٪";
+requestAnimationFrame(update);
+</script>
+</body>
+</html>

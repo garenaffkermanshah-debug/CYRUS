@@ -1,10 +1,62 @@
-import os, secrets, requests, html, uuid
+import os, secrets, requests, html, uuid, time
+from pathlib import Path
+from datetime import timedelta
 from dotenv import load_dotenv
-from flask import Flask, request, session, redirect, url_for, render_template_string
+from flask import Flask, request, session, redirect, url_for, render_template, render_template_string
 
 load_dotenv()
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", secrets.token_hex(32))
+# CYRUS_PERSISTENT_SESSION_FIX
+_session_key = os.getenv("SECRET_KEY")
+if not _session_key:
+    _key_file = Path.home() / ".cyrus_session_secret"
+    if not _key_file.exists():
+        _key_file.write_text(secrets.token_hex(32))
+        try:
+            _key_file.chmod(0o600)
+        except OSError:
+            pass
+    _session_key = _key_file.read_text().strip()
+
+app.secret_key = _session_key
+app.permanent_session_lifetime = timedelta(days=365)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+@app.before_request
+def cyrus_refresh_auth_session():
+    if not session.get("access_token"):
+        return
+
+    expires_at = float(session.get("token_expires_at", 0) or 0)
+    if expires_at > time.time() + 300:
+        return
+
+    refresh_token = session.get("refresh_token")
+    if not refresh_token:
+        return
+
+    try:
+        response = requests.post(
+            URL + "/auth/v1/token?grant_type=refresh_token",
+            json={"refresh_token": refresh_token},
+            headers={"apikey": KEY, "Content-Type": "application/json"},
+            timeout=20
+        )
+        data = response.json()
+        if response.status_code == 200 and data.get("access_token"):
+            session["access_token"] = data["access_token"]
+            session["refresh_token"] = data.get("refresh_token", "")
+            session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
+            session.permanent = True
+            session["refresh_token"] = data.get("refresh_token", refresh_token)
+            session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
+            session.permanent = True
+        else:
+            session["token_expires_at"] = time.time() + 60
+    except Exception:
+        session["token_expires_at"] = time.time() + 60
+
 URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
 
@@ -71,6 +123,112 @@ body {
  background-repeat: no-repeat !important;
 }
 
+
+/* CYRUS Rubika-like compact messenger layout */
+.top {
+  height: 60px;
+  padding: 8px 14px;
+  background: rgba(5,12,22,.96);
+  border-bottom: 1px solid #203b59;
+}
+.brand { gap: 9px; }
+.emblem {
+  width: 40px;
+  height: 40px;
+  font-size: 21px;
+  border-color: #287fc2;
+  box-shadow: none;
+}
+.logo {
+  font-size: 21px;
+  letter-spacing: 2px;
+  color: #e5bd69;
+}
+.sub { display: none; }
+.top-actions { gap: 18px; font-size: 25px; }
+.container {
+  max-width: 650px;
+  padding-bottom: 80px;
+}
+.welcome { display: none; }
+.searchbar {
+  margin: 10px 12px;
+  padding: 11px 15px;
+  border: 0;
+  border-radius: 12px;
+  background: #101d2c;
+  color: #b7c7d8;
+}
+.searchbar span { color: #5ba8e8; }
+.tabs {
+  gap: 0;
+  padding: 0 12px 8px;
+  border-bottom: 1px solid #20364b;
+}
+.tab {
+  flex: 1;
+  padding: 11px 5px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #aab9c8;
+  font-size: 12px;
+}
+.tab.active {
+  color: #69b9f7;
+  background: transparent;
+  border-bottom: 2px solid #3297df;
+  box-shadow: none;
+}
+.chat-list { min-height: 220px; }
+.chat-row {
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(7,15,25,.94);
+  border-bottom: 1px solid #1c2b3b;
+}
+.avatar {
+  width: 50px;
+  height: 50px;
+  border: 0;
+  background: #18324b;
+  color: #78bdf0;
+  font-size: 22px;
+}
+.chat-name {
+  color: #e5edf5;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+.chat-preview { color: #8ea2b5; font-size: 12px; }
+.empty {
+  margin: 16px 12px;
+  padding: 25px 18px;
+  background: #0d1927;
+  border: 1px solid #20364b;
+  border-radius: 14px;
+}
+.empty h3 { color: #7dbce9; }
+.bottom {
+  height: 65px;
+  background: #07111d;
+  border-top: 1px solid #20364b;
+}
+.bottom a {
+  gap: 4px;
+  color: #8fa5b8;
+  font-size: 10px;
+}
+.bottom a span { font-size: 23px; }
+.bottom a.current {
+  color: #65b9f5;
+  border-bottom: 2px solid #3297df;
+  background: transparent;
+}
+body {
+  background-image: linear-gradient(rgba(0,0,0,.42),rgba(0,0,0,.58)),url('/static/cyrus-tomb.jpg') !important;
+}
+
 </style>
 </head>
 <body>
@@ -95,15 +253,15 @@ def page(content):
     if session.get("access_token"):
         current = request.path
         items = [
-            ("/", "𓆃", "بارگاه"),
-            ("/contacts", "𓅃", "خویشان"),
-            ("/search", "⌕", "کاوش"),
-            ("/profile", "♙", "نگاره"),
-            ("/settings", "𓊹", "فرمان")
+            ("/home", "▣", "پیام‌ها"),
+            ("/contacts", "♧", "مخاطبین"),
+            ("/search", "⌕", "جستجو"),
+            ("/profile", "◉", "پروفایل"),
+            ("/settings", "⚙", "تنظیمات")
         ]
         links = ""
         for href, icon, label in items:
-            active = "current" if current == href else ""
+            active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}"><span>{icon}</span>{label}</a>'
         nav = f'<nav class="bottom">{links}</nav>'
     return render_template_string(BASE, content=content, nav=nav)
@@ -118,6 +276,12 @@ def auth_request(path, data):
 
 
 @app.route("/")
+def splash():
+    if session.get("access_token"):
+        return redirect(url_for("home"))
+    return render_template("splash.html")
+
+@app.route("/home")
 def home():
     if not session.get("access_token"):
         return redirect(url_for("login"))
@@ -203,7 +367,7 @@ def home():
         error = "دریافت گفتگوها انجام نشد؛ اتصال یا دسترسی دیتابیس را بررسی کنید"
 
     tabs = "".join(
-        f'<a class="tab {"active" if key == selected else ""}" href="/?type={key}">{item[0]}</a>'
+        f'<a class="tab {"active" if key == selected else ""}" href="/home?type={key}">{item[0]}</a>'
         for key, item in categories.items()
     )
 
@@ -250,16 +414,33 @@ def home():
 
     content = f"""
     <div class="container">
-      <section class="welcome">
-        <h2>درود، به قلمرو CYRUS خوش آمدید</h2>
-        <p>بارگاه ارتباطات پارسی</p>
-      </section>
-      <a class="searchbar" href="/search"><span>⌕</span> جستجوی کاربران و گفتگوها</a>
+
       <div class="tabs">{tabs}</div>
 
       <div class="chat-list">{rows}</div>
       <p class="error">{html.escape(error)}</p>
     </div>
+    """
+    return page(content)
+
+
+@app.route("/welcome")
+def welcome():
+    if session.get("access_token"):
+        return redirect(url_for("home"))
+    content = """
+    <main class="container">
+      <div class="card" style="text-align:center">
+        <h2>به CYRUS خوش آمدید</h2>
+        <p class="muted">پیوند پارسیان · شکوه هخامنشی</p>
+        <a class="button" href="/register" style="display:block;text-decoration:none;margin:22px 0">
+          ثبت‌نام
+        </a>
+        <p class="muted">
+          <a class="form-link" href="/login">ورود به حساب قبلی</a>
+        </p>
+      </div>
+    </main>
     """
     return page(content)
 
@@ -276,13 +457,16 @@ def register():
             code, data = auth_request("/auth/v1/signup", {"email":email,"password":password})
             if code in (200,201) and data.get("access_token"):
                 session["access_token"] = data["access_token"]
+                session["refresh_token"] = data.get("refresh_token", "")
+                session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
+                session.permanent = True
                 session["user_id"] = data["user"]["id"]
                 requests.post(URL + "/rest/v1/cyrus_profiles",
                     json={"id":data["user"]["id"],"username":username,"display_name":username},
                     headers={"apikey":KEY,"Authorization":"Bearer "+data["access_token"],
                     "Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
                     timeout=20)
-                return redirect("/")
+                return redirect(url_for("home"))
             error = data.get("msg",data.get("message","ثبت‌نام انجام نشد؛ تنظیمات تأیید ایمیل را بررسی کنید"))
     content = f"""
     <main class="container"><div class="card">
@@ -297,39 +481,244 @@ def register():
     </div></main>"""
     return page(content)
 
-@app.route("/login", methods=["GET","POST"])
+
+@app.route("/login", methods=["GET", "POST"])
 def login():
     error = ""
     if request.method == "POST":
-        code, data = auth_request("/auth/v1/token?grant_type=password",
-            {"email":request.form.get("email","").strip(),"password":request.form.get("password","")})
-        if code == 200 and data.get("access_token"):
-            session["access_token"] = data["access_token"]
-            session["user_id"] = data["user"]["id"]
-            return redirect("/")
-        error = "ایمیل یا رمز عبور صحیح نیست"
+        email = request.form.get("email", "").strip()
+        if not email:
+            error = "ایمیل را وارد کنید"
+        else:
+            session["cyrus_login_email"] = email
+            return redirect(url_for("login_password"))
+
     content = f"""
     <main class="container"><div class="card">
-    <h2>ورود به شاهنشاهی CYRUS</h2><p class="muted">درود بر شما</p>
-    <p class="error">{html.escape(error)}</p>
-    <form method="post">
-    <input name="email" type="email" placeholder="ایمیل" required>
-    <input name="password" type="password" placeholder="رمز عبور" required>
-    <button>ورود</button></form>
-    <p class="muted"><a class="form-link" href="/register">ساخت حساب جدید</a></p>
-    </div></main>"""
+      <h2>ورود به CYRUS</h2>
+      <p class="muted">ابتدا ایمیل حساب خود را وارد کنید</p>
+      <p class="error">{html.escape(error)}</p>
+      <form method="post">
+        <input name="email" type="email" placeholder="ایمیل" required autocomplete="email">
+        <button>ادامه</button>
+      </form>
+      <p class="muted"><a class="form-link" href="/register">ساخت حساب جدید</a></p>
+    </div></main>
+    """
     return page(content)
+
+
+@app.route("/login/password", methods=["GET", "POST"])
+def login_password():
+    email = session.get("cyrus_login_email")
+    if not email:
+        return redirect(url_for("login"))
+
+    error = ""
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        code, data = auth_request(
+            "/auth/v1/token?grant_type=password",
+            {"email": email, "password": password}
+        )
+        if code == 200 and data.get("access_token"):
+            session["access_token"] = data["access_token"]
+            session["refresh_token"] = data.get("refresh_token", "")
+            session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
+            session.permanent = True
+            session["user_id"] = data["user"]["id"]
+            session.pop("cyrus_login_email", None)
+            return redirect(url_for("home"))
+        error = "رمز عبور صحیح نیست؛ دوباره تلاش کنید"
+
+    content = f"""
+    <main class="container"><div class="card">
+      <h2>رمز عبور</h2>
+      <p class="muted">{html.escape(email)}</p>
+      <p class="error">{html.escape(error)}</p>
+      <form method="post">
+        <input name="password" type="password" placeholder="رمز عبور" required autocomplete="current-password">
+        <button>ورود به حساب</button>
+      </form>
+      <p class="muted"><a class="form-link" href="/login">بازگشت و تغییر ایمیل</a></p>
+    </div></main>
+    """
+    return page(content)
+
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect("/login")
 
-@app.route("/search")
+
+@app.route("/search", methods=["GET"])
 def search():
     if not session.get("access_token"):
-        return redirect("/login")
-    return redirect(url_for("contacts", q=request.args.get("q","")))
+        return redirect(url_for("login"))
+
+    raw_query = request.args.get("q", "").strip()
+    query = "".join(
+        ch for ch in raw_query
+        if ch.isalnum() or ch in " _-@."
+    )[:60].strip()
+
+    people = []
+    rooms = []
+    joined_ids = set()
+    error = ""
+
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"]
+    }
+
+    if query:
+        try:
+            # جستجوی افراد
+            people_response = requests.get(
+                URL + "/rest/v1/cyrus_profiles",
+                params={
+                    "select": "id,username,display_name,bio",
+                    "id": "neq." + str(session.get("user_id", "")),
+                    "or": "(username.ilike.*" + query + "*,display_name.ilike.*" + query + "*)",
+                    "limit": "50"
+                },
+                headers=headers,
+                timeout=20
+            )
+
+            if people_response.ok:
+                people = people_response.json()
+
+            # جستجوی گروه‌ها و کانال‌ها
+            room_response = requests.get(
+                URL + "/rest/v1/cyrus_conversations",
+                params={
+                    "select": "id,title,type,created_by",
+                    "type": "in.(group,channel)",
+                    "title": "ilike.*" + query + "*",
+                    "order": "created_at.desc",
+                    "limit": "100"
+                },
+                headers=headers,
+                timeout=20
+            )
+
+            if room_response.ok:
+                rooms = room_response.json()
+
+            # تشخیص اینکه کاربر عضو کدام گفتگوهاست
+            membership_response = requests.get(
+                URL + "/rest/v1/cyrus_members",
+                params={
+                    "select": "conversation_id",
+                    "user_id": "eq." + str(session.get("user_id", ""))
+                },
+                headers=headers,
+                timeout=20
+            )
+
+            if membership_response.ok:
+                joined_ids = {
+                    str(item.get("conversation_id"))
+                    for item in membership_response.json()
+                }
+
+        except Exception:
+            error = "جستجو با مشکل اتصال روبه‌رو شد"
+
+    people_rows = ""
+    for person in people:
+        uid = str(person.get("id") or "")
+        username = str(person.get("username") or "")
+        name = str(person.get("display_name") or username or "کاربر")
+
+        try:
+            uuid.UUID(uid)
+        except ValueError:
+            continue
+
+        people_rows += f"""
+        <div class="chat-row">
+          <div class="avatar">𓅃</div>
+          <div class="chat-info">
+            <div class="chat-name">{html.escape(name)}</div>
+            <div class="chat-preview">@{html.escape(username)}</div>
+          </div>
+          <form method="post" action="/start-chat/{html.escape(uid, quote=True)}">
+            <button type="submit">گفتگو</button>
+          </form>
+        </div>
+        """
+
+    room_rows = ""
+    for room in rooms:
+        rid = str(room.get("id") or "")
+        title = str(room.get("title") or "بدون نام")
+        room_type = str(room.get("type") or "")
+        is_joined = rid in joined_ids
+
+        try:
+            uuid.UUID(rid)
+        except ValueError:
+            continue
+
+        if room_type == "channel":
+            icon = "𓆃"
+            label = "کانال"
+            if is_joined:
+                action = f'<a class="action" href="/chat/{rid}">باز کردن</a>'
+            else:
+                action = f'<a class="action" href="/channels/join/{rid}">پیوستن</a>'
+        else:
+            icon = "𓅃"
+            label = "گروه"
+            if is_joined:
+                action = f'<a class="action" href="/chat/{rid}">باز کردن</a>'
+            else:
+                action = '<span class="muted">گروه</span>'
+
+        room_rows += f"""
+        <div class="chat-row">
+          <div class="avatar">{icon}</div>
+          <div class="chat-info">
+            <div class="chat-name">{html.escape(title)}</div>
+            <div class="chat-preview">{label}</div>
+          </div>
+          {action}
+        </div>
+        """
+
+    if query and not people_rows and not room_rows and not error:
+        empty = '<div class="empty"><h3>نتیجه‌ای پیدا نشد</h3></div>'
+    else:
+        empty = ""
+
+    content = f"""
+    <div class="container">
+      <form class="searchbar" method="get" action="/search"
+            style="display:flex;align-items:center;gap:8px;margin:12px 16px;padding:4px 12px;border-radius:14px;background:rgba(12,22,38,.92);border:1px solid rgba(190,151,82,.45)">
+        <input name="q" value="{html.escape(query, quote=True)}"
+               placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
+               autocomplete="off" autofocus
+               style="flex:1;min-width:0;background:transparent;border:0;outline:0;box-shadow:none;padding:12px 4px;color:#fff">
+        <button type="submit" aria-label="جستجو"
+                style="margin:0;padding:8px 10px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#d6b36a">⌕</button>
+      </form>
+
+      <p class="error">{html.escape(error)}</p>
+
+      <div class="section-title">𓅃 · افراد و مخاطبین</div>
+      <div class="chat-list">{people_rows}</div>
+
+      <div class="section-title">𓆃 · گروه‌ها و کانال‌ها</div>
+      <div class="chat-list">{room_rows}</div>
+
+      {empty}
+    </div>
+    """
+    return page(content)
 
 
 @app.route("/contacts")
@@ -473,7 +862,7 @@ def chat(conversation_id):
         room = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,title,type,created_by",
+                "select": "id,title,type,created_by,description,avatar_url",
                 "id": "eq." + conversation_id
             },
             headers=headers,
@@ -522,6 +911,23 @@ def chat(conversation_id):
 
     room_data = room.json()[0]
     room_title = html.escape(str(room_data.get("title") or "گفتگو"))
+    room_description = html.escape(str(room_data.get("description") or ""))
+    room_avatar_url = html.escape(str(room_data.get("avatar_url") or ""), quote=True)
+    room_type_label = {"group": "گروه", "channel": "کانال", "private": "گفتگوی خصوصی"}.get(str(room_data.get("type") or ""), "گفتگو")
+    room_avatar = (
+        f'<img src="{room_avatar_url}" alt="">'
+        if room_avatar_url else '<div class="room-avatar-symbol">𓊹</div>'
+    )
+    room_header = f"""
+    <section class="room-header">
+      <div class="room-avatar">{room_avatar}</div>
+      <div class="room-info">
+        <h2>{room_title}</h2>
+        <span class="room-type">{room_type_label} · CYRUS</span>
+        <p>{room_description}</p>
+      </div>
+    </section>"""
+
     room_type = str(room_data.get("type") or "")
     channel_can_post = True
     if room_type == "channel":
@@ -560,11 +966,17 @@ def chat(conversation_id):
 
     content = f"""
     <div class="container">
-      <section class="welcome">
-        <h2>{room_title}</h2>
-        <p>پیام‌رسان CYRUS</p>
-      </section>
+      {room_header}
       <style>
+        .room-header{{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:14px;border:1px solid #987039;border-radius:16px;background:rgba(9,15,25,.94)}}
+        .room-avatar{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:1px solid #987039;background:#111b2b;display:flex;align-items:center;justify-content:center}}
+        .room-avatar img{{width:100%;height:100%;object-fit:cover}}
+        .room-avatar-symbol{{font-size:27px;color:#d8b46a}}
+        .room-info{{min-width:0}}
+        .room-info h2{{margin:0 0 5px;font-size:19px;overflow-wrap:anywhere}}
+        .room-type{{font-size:11px;color:#d8b46a}}
+        .room-info p{{margin:6px 0 0;color:#c4c6cc;font-size:13px;overflow-wrap:anywhere}}
+
         .messages-area{{display:flex;flex-direction:column;gap:12px;padding:12px 0}}
         .message{{max-width:85%;padding:12px 15px;border:1px solid #987039;border-radius:14px;background:rgba(9,15,25,.92);overflow-wrap:anywhere}}
         .message small{{display:block;color:#b0b2b7;font-size:10px;margin-top:7px}}
@@ -573,10 +985,7 @@ def chat(conversation_id):
         .send-box{{position:sticky;bottom:75px;background:rgba(9,15,25,.95);padding:12px;border:1px solid #987039;border-radius:12px}}
       </style>
       <div class="card messages-area">{message_rows}</div>
-      <form class="send-box" method="post" action="/chat/{conversation_id}/send">
-        <input name="content" maxlength="4000" placeholder="پیام خود را بنویسید..." required>
-        <button type="submit">ارسال پیام</button>
-      </form>
+      {send_box}
       {room_manage_link}
       <p><a href="/contacts">بازگشت به خویشان</a></p>
     </div>"""
@@ -604,12 +1013,75 @@ def send_message(conversation_id):
         "Prefer": "return=minimal"
     }
 
+    current_user = str(session.get("user_id") or "")
+
     try:
+        room_response = requests.get(
+            URL + "/rest/v1/cyrus_conversations",
+            params={
+                "select": "id,type,created_by",
+                "id": "eq." + conversation_id,
+                "limit": "1"
+            },
+            headers=headers,
+            timeout=20
+        )
+
+        if not room_response.ok or not room_response.json():
+            return "گفتگو پیدا نشد یا دسترسی ندارید", 403
+
+        room = room_response.json()[0]
+
+        # برای گفتگوهای غیرکانال، فرستنده باید عضو گفتگو باشد.
+        if room.get("type") != "channel":
+            membership = requests.get(
+                URL + "/rest/v1/cyrus_members",
+                params={
+                    "select": "user_id",
+                    "conversation_id": "eq." + conversation_id,
+                    "user_id": "eq." + current_user,
+                    "limit": "1"
+                },
+                headers=headers,
+                timeout=20
+            )
+            if not membership.ok or not membership.json():
+                return "شما عضو این گفتگو نیستید", 403
+
+        if room.get("type") == "channel":
+            is_owner = str(room.get("created_by") or "") == current_user
+            is_admin = False
+
+            if not is_owner:
+                member_response = requests.get(
+                    URL + "/rest/v1/cyrus_members",
+                    params={
+                        "select": "role",
+                        "conversation_id": "eq." + conversation_id,
+                        "user_id": "eq." + current_user,
+                        "limit": "1"
+                    },
+                    headers=headers,
+                    timeout=20
+                )
+
+                if not member_response.ok:
+                    return "بررسی مجوز ارسال ناموفق بود", 403
+
+                member_rows = member_response.json()
+                is_admin = bool(
+                    member_rows and
+                    member_rows[0].get("role") in ("admin", "owner")
+                )
+
+            if not is_owner and not is_admin:
+                return "در این کانال فقط مالک یا مدیر اجازه انتشار دارد", 403
+
         response = requests.post(
             URL + "/rest/v1/cyrus_messages",
             json={
                 "conversation_id": conversation_id,
-                "sender_id": session["user_id"],
+                "sender_id": current_user,
                 "content": message,
                 "message_type": "text"
             },
@@ -618,13 +1090,18 @@ def send_message(conversation_id):
         )
 
         if not response.ok:
-            return page('<div class="container card"><p>ارسال پیام انجام نشد؛ ممکن است عضو این گفتگو نباشید</p><a href="/contacts">بازگشت</a></div>'), 403
+            return page(
+                '<div class="container card"><p>ارسال پیام انجام نشد؛ '
+                'ممکن است عضو این گفتگو نباشید</p>'
+                '<a href="/contacts">بازگشت</a></div>'
+            ), 403
 
     except Exception:
-        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'), 502
+        return page(
+            '<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'
+        ), 502
 
     return redirect(url_for("chat", conversation_id=conversation_id))
-
 
 
 
@@ -721,28 +1198,34 @@ def manage_room(conversation_id):
         "Authorization": "Bearer " + session["access_token"],
         "Content-Type": "application/json"
     }
+    current = str(session.get("user_id") or "")
 
     try:
         rr = requests.get(
             URL + "/rest/v1/cyrus_conversations",
-            params={"select": "id,title,type,created_by",
-                    "id": "eq." + conversation_id},
+            params={
+                "select": "id,title,type,created_by,description,avatar_url,invite_code,reactions_enabled",
+                "id": "eq." + conversation_id,
+                "limit": "1"
+            },
             headers=headers, timeout=20
         )
         if not rr.ok or not rr.json():
             return "گروه یا کانال پیدا نشد", 404
 
         room = rr.json()[0]
-        if room.get("type") not in ("group", "channel"):
+        room_type = room.get("type")
+        if room_type not in ("group", "channel"):
             return "این گفتگو گروه یا کانال نیست", 400
 
-        current = str(session.get("user_id") or "")
         owner = str(room.get("created_by") or "") == current
 
         mr = requests.get(
             URL + "/rest/v1/cyrus_members",
-            params={"select": "user_id,role",
-                    "conversation_id": "eq." + conversation_id},
+            params={
+                "select": "user_id,role",
+                "conversation_id": "eq." + conversation_id
+            },
             headers=headers, timeout=20
         )
         if not mr.ok:
@@ -758,15 +1241,42 @@ def manage_room(conversation_id):
 
         if request.method == "POST":
             action = request.form.get("action", "")
-            rpc = None
             data = {"p_conversation_id": conversation_id}
+            rpc = None
 
-            if action == "add":
+            if action == "save_settings":
+                title = request.form.get("title", "").strip()
+                description = request.form.get("description", "").strip()
+                avatar_url = request.form.get("avatar_url", "").strip()
+                reactions = request.form.get("reactions_enabled") == "on"
+
+                if not 2 <= len(title) <= 60:
+                    return "نام باید بین ۲ تا ۶۰ حرف باشد", 400
+                if len(description) > 500:
+                    return "توضیحات حداکثر ۵۰۰ حرف باشد", 400
+                if len(avatar_url) > 500:
+                    return "آدرس تصویر بیش از حد طولانی است", 400
+
+                rpc = "cyrus_manage_update_room_settings"
+                data.update({
+                    "p_title": title,
+                    "p_description": description,
+                    "p_avatar_url": avatar_url or None,
+                    "p_reactions_enabled": reactions
+                })
+
+            elif action == "rotate_invite":
+                rpc = "cyrus_manage_rotate_invite"
+
+            elif action == "add":
                 username = request.form.get("username", "").strip()
                 pr = requests.get(
                     URL + "/rest/v1/cyrus_profiles",
-                    params={"select": "id,username",
-                            "username": "eq." + username, "limit": "1"},
+                    params={
+                        "select": "id,username",
+                        "username": "eq." + username,
+                        "limit": "1"
+                    },
                     headers=headers, timeout=20
                 )
                 if not pr.ok or not pr.json():
@@ -780,6 +1290,7 @@ def manage_room(conversation_id):
                     uuid.UUID(uid)
                 except ValueError:
                     return "شناسه عضو نامعتبر است", 400
+
                 data["p_user_id"] = uid
                 if action == "remove":
                     rpc = "cyrus_manage_remove_member"
@@ -798,7 +1309,7 @@ def manage_room(conversation_id):
 
             elif action == "leave":
                 if owner:
-                    return "مالک فعلاً نمی‌تواند خارج شود؛ ابتدا باید مالکیت منتقل شود", 400
+                    return "مالک فعلاً نمی‌تواند خارج شود؛ ابتدا مالکیت منتقل شود", 400
                 rpc = "cyrus_manage_leave_room"
 
             elif action == "delete":
@@ -816,22 +1327,37 @@ def manage_room(conversation_id):
             if not result.ok:
                 return page(
                     '<div class="container card"><h3>عملیات انجام نشد</h3><p>'
-                    + html.escape(result.text[:500])
+                    + html.escape(result.text[:400])
                     + '</p><a href="' + request.url + '">بازگشت</a></div>'
                 ), 400
 
             if action in ("delete", "leave"):
                 return redirect("/")
+
             return redirect(request.url)
+
+        title = html.escape(str(room.get("title") or ""))
+        description = html.escape(str(room.get("description") or ""))
+        avatar_url = html.escape(str(room.get("avatar_url") or ""), quote=True)
+        invite_code = str(room.get("invite_code") or "")
+        invite_url = request.host_url.rstrip("/") + "/invite/" + invite_code if invite_code else ""
+        invite_safe = html.escape(invite_url, quote=True)
+        reactions_checked = "checked" if room.get("reactions_enabled", True) else ""
+        kind = "گروه" if room_type == "group" else "کانال"
+        subtitle = (
+            "گفتگوی اعضا و مدیریت گروه"
+            if room_type == "group"
+            else "انتشار محتوا برای دنبال‌کنندگان کانال"
+        )
 
         rows = ""
         for m in members:
             uid = str(m.get("user_id") or "")
             role = str(m.get("role") or "member")
-            safe_uid = html.escape(uid)
+            safe_uid = html.escape(uid, quote=True)
             safe_role = html.escape(role)
-            controls = ""
 
+            controls = ""
             if uid != str(room.get("created_by") or ""):
                 if owner and role == "member":
                     controls += (
@@ -859,36 +1385,70 @@ def manage_room(conversation_id):
             )
 
         if not rows:
-            rows = "<p>هنوز عضوی وجود ندارد</p>"
+            rows = '<p class="muted">هنوز عضوی وجود ندارد</p>'
 
-        title = html.escape(str(room.get("title") or ""))
-        kind = "گروه" if room.get("type") == "group" else "کانال"
+        content = f"""
+        <div class="container">
+          <section class="welcome">
+            <h2>تنظیمات {kind}</h2>
+            <p>{title}</p>
+            <p class="muted">{subtitle}</p>
+          </section>
 
-        content = (
-            '<div class="container"><section class="welcome"><h2>مدیریت '
-            + kind + '</h2><p>' + title + '</p></section>'
-            + '<div class="card"><h3>افزودن عضو</h3>'
-            + '<form method="post"><input type="hidden" name="action" value="add">'
-            + '<input name="username" placeholder="نام کاربری عضو" required>'
-            + '<button>افزودن عضو</button></form></div>'
-            + '<div class="card"><h3>تغییر نام</h3>'
-            + '<form method="post"><input type="hidden" name="action" value="rename">'
-            + '<input name="title" minlength="2" maxlength="60" value="' + title + '" required>'
-            + '<button>ذخیره نام جدید</button></form></div>'
-            + '<h3>اعضا (' + str(len(members)) + ')</h3>' + rows
-            + '<div class="card"><h3>خروج از مجموعه</h3>'
-            + '<form method="post" onsubmit="return confirm(\'خارج می‌شوید؟\')">'
-            + '<input type="hidden" name="action" value="leave">'
-            + '<button>خروج از مجموعه</button></form></div>'
-        )
+          <form class="card" method="post">
+            <h3>اطلاعات {kind}</h3>
+            <input type="hidden" name="action" value="save_settings">
+            <label>نام</label>
+            <input name="title" minlength="2" maxlength="60" value="{title}" required>
+            <label>توضیحات</label>
+            <textarea name="description" maxlength="500" rows="4">{description}</textarea>
+            <label>آدرس تصویر (اختیاری)</label>
+            <input name="avatar_url" maxlength="500" value="{avatar_url}" placeholder="https://...">
+            <label><input type="checkbox" name="reactions_enabled" {reactions_checked}> فعال بودن واکنش‌ها</label>
+            <button type="submit">ذخیره تنظیمات</button>
+          </form>
+
+          <div class="card">
+            <h3>لینک دعوت</h3>
+            <input id="invite-link" readonly value="{invite_safe}">
+            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value).then(()=>alert('لینک کپی شد'))">کپی لینک</button>
+            <form method="post" onsubmit="return confirm('لینک قبلی از کار می‌افتد. ادامه می‌دهید؟')">
+              <input type="hidden" name="action" value="rotate_invite">
+              <button>ساخت لینک جدید</button>
+            </form>
+          </div>
+
+          <div class="card">
+            <h3>افزودن عضو</h3>
+            <form method="post">
+              <input type="hidden" name="action" value="add">
+              <input name="username" placeholder="نام کاربری عضو" required>
+              <button>افزودن عضو</button>
+            </form>
+          </div>
+
+          <h3>اعضا ({len(members)})</h3>
+          {rows}
+
+          <div class="card">
+            <h3>خروج از مجموعه</h3>
+            <form method="post" onsubmit="return confirm('خارج می‌شوید؟')">
+              <input type="hidden" name="action" value="leave">
+              <button>خروج از مجموعه</button>
+            </form>
+          </div>
+        """
 
         if owner:
-            content += (
-                '<div class="card"><h3>حذف کامل مجموعه</h3>'
-                '<form method="post" onsubmit="return confirm(\'تمام پیام‌ها و اعضا حذف می‌شوند. مطمئن هستید؟\')">'
-                '<input type="hidden" name="action" value="delete">'
-                '<button>حذف گروه یا کانال</button></form></div>'
-            )
+            content += """
+            <div class="card">
+              <h3>حذف کامل مجموعه</h3>
+              <form method="post" onsubmit="return confirm('تمام پیام‌ها و اعضا حذف می‌شوند. مطمئن هستید؟')">
+                <input type="hidden" name="action" value="delete">
+                <button>حذف گروه یا کانال</button>
+              </form>
+            </div>
+            """
 
         content += (
             '<p><a href="/chat/' + conversation_id + '">بازگشت به گفتگو</a></p></div>'
@@ -900,8 +1460,6 @@ def manage_room(conversation_id):
             '<div class="container card"><p>ارتباط با سرور برقرار نشد</p>'
             '<a href="/">بازگشت</a></div>'
         ), 502
-
-
 
 
 @app.route("/channels")
@@ -1025,6 +1583,50 @@ def join_public_channel(conversation_id):
 
     except Exception:
         return "ارتباط با سرور برقرار نشد", 502
+
+
+@app.route("/invite/<invite_code>", methods=["GET"])
+def join_by_invite(invite_code):
+    if not session.get("access_token"):
+        return redirect("/login")
+
+    if not invite_code or len(invite_code) > 100:
+        return "لینک دعوت نامعتبر است", 400
+
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Content-Type": "application/json"
+    }
+
+    try:
+        result = requests.post(
+            URL + "/rest/v1/rpc/cyrus_join_by_invite",
+            json={"p_invite_code": invite_code},
+            headers=headers,
+            timeout=20
+        )
+        if not result.ok:
+            return page(
+                '<div class="container card"><p>عضویت با این لینک انجام نشد؛ '
+                'ممکن است لینک منقضی یا نامعتبر باشد.</p>'
+                '<a href="/">بازگشت به بارگاه</a></div>'
+            ), 400
+
+        value = result.json()
+        if isinstance(value, list) and value:
+            value = value[0]
+        if isinstance(value, dict):
+            value = value.get("cyrus_join_by_invite") or value.get("id")
+
+        room_id = str(uuid.UUID(str(value)))
+        return redirect(url_for("chat", conversation_id=room_id))
+
+    except Exception:
+        return page(
+            '<div class="container card"><p>پیوستن به مجموعه ناموفق بود</p>'
+            '<a href="/">بازگشت</a></div>'
+        ), 502
 
 
 @app.route("/profile")
