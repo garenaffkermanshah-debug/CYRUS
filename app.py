@@ -888,10 +888,7 @@ def search():
 
       <p class="error">{html.escape(error)}</p>
 
-      <div class="section-title">𓅃 · افراد و مخاطبین</div>
       <div class="chat-list">{people_rows}</div>
-
-      <div class="section-title">𓆃 · گروه‌ها و کانال‌ها</div>
       <div class="chat-list">{room_rows}</div>
 
       {empty}
