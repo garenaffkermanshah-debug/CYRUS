@@ -1154,7 +1154,7 @@ def chat(conversation_id):
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
             params={
-                "select": "id,sender_id,content,message_type,created_at,edited_at",
+                "select": "id,sender_id,content,message_type,created_at,edited_at,metadata",
                 "conversation_id": "eq." + conversation_id,
                 "order": "created_at.asc",
                 "limit": "200"
@@ -1170,7 +1170,25 @@ def chat(conversation_id):
     except Exception:
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'), 502
 
-    current_user = session.get("user_id", "")
+    current_user = str(session.get("user_id", "") or "")
+    forward_options = '<option value="">مقصد انتقال را انتخاب کنید</option>'
+    try:
+        fm = requests.get(URL + "/rest/v1/cyrus_members",
+            params={"select":"conversation_id","user_id":"eq."+current_user},
+            headers=headers,timeout=15)
+        fids = list(dict.fromkeys(str(x.get("conversation_id") or "") for x in fm.json()
+            if x.get("conversation_id") and str(x.get("conversation_id")) != conversation_id)) if fm.ok else []
+        if fids:
+            fr = requests.get(URL + "/rest/v1/cyrus_conversations",
+                params={"select":"id,title,type","id":"in.("+",".join(fids)+")"},
+                headers=headers,timeout=15)
+            if fr.ok:
+                for dest in fr.json():
+                    did=html.escape(str(dest.get("id") or ""),quote=True)
+                    dtitle=html.escape(str(dest.get("title") or "گفتگو"))
+                    forward_options += f'<option value="{did}">{dtitle}</option>'
+    except Exception:
+        pass
     message_rows = ""
 
     for msg in messages:
@@ -1182,17 +1200,30 @@ def chat(conversation_id):
         raw_content = html.escape(str(msg.get("content") or ""), quote=True)
         edited_label = " · ویرایش‌شده" if msg.get("edited_at") else ""
 
-        controls = ""
+        meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
+        reply_source = html.escape(str(meta.get("reply_to_content") or ""))
+        reply_preview = f'<div class="reply-preview">↪ پاسخ به: {reply_source}</div>' if reply_source else ""
+        forwarded_label = '<small class="forwarded-label">↗ پیام انتقال‌یافته</small>' if meta.get("forwarded_from_message_id") else ""
+        pinned_label = '<small class="pinned-label">📌 سنجاق‌شده</small>' if meta.get("pinned") else ""
+        controls = (
+            '<div class="message-actions">'
+            f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}">پاسخ</button>'
+            f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}">کپی</button>'
+            '<button type="button" onclick="cyrusShowForward(this)">انتقال</button>'
+            f'<form class="forward-form" method="post" action="/chat/message/{msg_id}/forward" style="display:none">'
+            f'<select name="conversation_id" required>{forward_options}</select><button type="submit">ارسال</button></form>'
+            + (f'<form method="post" action="/chat/message/{msg_id}/pin">'
+               f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
+               f'<button type="submit">{"برداشتن سنجاق" if meta.get("pinned") else "سنجاق"}</button></form>' if mine else "")
+            + (f'<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
+               f'<form method="post" action="/chat/message/{msg_id}/delete" '
+               'onsubmit="return confirm(\\'این پیام برای هر دو طرف حذف شود؟\\')">'
+               f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
+               '<button type="submit">حذف</button></form>' if mine else "")
+            + '</div>'
+        )
         edit_form = ""
         if mine:
-            controls = (
-                '<div class="message-actions">'
-                '<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
-                f'<form method="post" action="/chat/message/{msg_id}/delete" '
-                'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
-                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
-                '<button type="submit">حذف</button></form></div>'
-            )
             edit_form = (
                 f'<form class="edit-form" method="post" '
                 f'action="/chat/message/{msg_id}/edit" style="display:none">'
@@ -1203,6 +1234,7 @@ def chat(conversation_id):
 
         message_rows += f"""
         <div class="message {css_class}" data-content="{raw_content}">
+          {reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           <small>{stamp}{edited_label}</small>
           {controls}
@@ -1256,6 +1288,9 @@ def chat(conversation_id):
 
     send_box = (
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
+        '<div id="cyrusReplyBar" style="display:none;padding:8px;border-right:3px solid #d8b46a;margin-bottom:8px">'
+        '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">لغو پاسخ</button></div>'
+        '<input type="hidden" name="reply_to_id" id="cyrusReplyId" value="">'
         '<input name="content" maxlength="4000" placeholder="پیام خود را بنویسید..." required>'
         '<button type="submit">ارسال</button></form>'
         if room_type != "channel" or channel_can_post else
@@ -1285,6 +1320,11 @@ def chat(conversation_id):
         .message .message-body{{color:#55b7ff}}
         .message small{{display:block;color:#b0b2b7;font-size:10px;margin-top:7px}}
         .message-actions{{display:flex;gap:8px;margin-top:8px;align-items:center}}
+        .message-actions{{display:flex;flex-wrap:wrap}}
+        .message-actions form{{display:flex;gap:4px;align-items:center;margin:0}}
+        .message-actions select{{max-width:130px;background:#0b1422;color:#fff;border:1px solid #80643b;border-radius:6px}}
+        .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
+        .forwarded-label,.pinned-label{{color:#d8b46a}}
         .message-actions form{{margin:0}}
         .message-actions button{{width:auto;margin:0;padding:5px 10px;font-size:11px;background:#17283a;color:#c6d9e8;border:1px solid #34516a}}
         .message.mine{{align-self:flex-start;border-color:#278bdc}}
@@ -1293,6 +1333,25 @@ def chat(conversation_id):
       </style>
       <div class="card messages-area">{message_rows}</div>
       <script>
+      function cyrusReply(button) {{
+        document.getElementById("cyrusReplyId").value=button.dataset.id||"";
+        document.getElementById("cyrusReplyText").textContent="پاسخ به: "+(button.dataset.content||"").slice(0,120);
+        document.getElementById("cyrusReplyBar").style.display="block";
+        document.querySelector('.send-box input[name="content"]').focus();
+      }}
+      function cyrusCancelReply() {{
+        document.getElementById("cyrusReplyId").value="";
+        document.getElementById("cyrusReplyBar").style.display="none";
+      }}
+      async function cyrusCopy(button) {{
+        const value=button.dataset.content||"";
+        try {{ await navigator.clipboard.writeText(value); button.textContent="کپی شد"; }}
+        catch(e) {{ window.prompt("متن پیام را کپی کنید:",value); }}
+      }}
+      function cyrusShowForward(button) {{
+        const form=button.parentElement.querySelector(".forward-form");
+        if(form)form.style.display=form.style.display==="none"?"flex":"none";
+      }}
       function cyrusEdit(button) {{
         const message = button.closest('.message');
         const value = prompt('متن پیام را ویرایش کنید:', message.dataset.content);
