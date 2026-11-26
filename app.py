@@ -567,14 +567,18 @@ def home():
                 pass
 
         rows += f"""
-        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}">
+        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
+             role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
+             onclick="if(!event.target.closest('.cyrus-remove-chat'))window.location.href='/chat/{room_id}'"
+             onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();window.location.href='/chat/{room_id}'}}"
+             style="cursor:pointer">
           {avatar_html}
-          <div class="chat-info" onclick="location.href='/chat/{room_id}'" style="cursor:pointer">
+          <div class="chat-info">
             <div class="chat-name">{html.escape(str(room_title))}</div>
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
           {unread_badge}
-          <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onsubmit='return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
+          <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
             <button type="submit">حذف گفتگو</button>
           </form>
         </div>"""
@@ -594,7 +598,9 @@ def home():
         .top-actions a[href="/search"]{{font-size:29px;padding:8px}}
         .cyrus-real-avatar{{overflow:hidden;padding:0}}
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
-        .cyrus-chat-row .avatar{{font-weight:bold;color:#fff}}
+        .cyrus-chat-row .avatar{{font-weight:bold;color:#fff;cursor:pointer}}
+        .cyrus-chat-row:focus-visible{{outline:2px solid #3297df;outline-offset:-2px}}
+        .cyrus-chat-row .chat-info{{cursor:pointer}}
       </style>
       <input id="cyrusChatSearch" type="search" placeholder="جست‌وجوی گفتگو، نام یا شناسه..." style="width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border-radius:12px;background:#0b1422;color:#fff;border:1px solid #80643b">
       <div class="tabs">{tabs}</div>
@@ -2644,16 +2650,24 @@ def profile():
     content = f"""
     <main class="container cyrus-profile-page">
       <style>
-        .cyrus-profile-page{{padding:14px 14px 25px}}
-        .profile-hero{{text-align:center;padding:24px 14px 20px;background:#111e2b;border:1px solid #263b50;border-radius:18px;margin-bottom:12px}}
-        .profile-hero img,.profile-hero .avatar{{width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 12px;border:2px solid #2d8ecb}}
-        .profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
-        .profile-hero .username{{color:#78b8e6;font-size:13px;direction:ltr}}
-        .profile-hero .bio{{color:#c3cfda;font-size:13px;line-height:1.9;white-space:pre-wrap;margin:12px 0 0}}
-        .profile-edit{{padding:16px;background:#101d2a;border:1px solid #263b50;border-radius:16px}}
+        .cyrus-profile-page{{padding:12px 12px 90px;max-width:560px}}
+        .profile-hero{{text-align:center;padding:25px 16px 22px;background:#111e2b;border:1px solid #263b50;border-radius:18px;margin-bottom:12px}}
+        .profile-hero img,.profile-hero .avatar{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center}}
+        .profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px;font-weight:500}}
+        .profile-hero .username{{color:#78b8e6;font-size:13px;direction:ltr;margin-top:5px}}
+        .profile-hero .bio{{color:#c3cfda;font-size:14px;line-height:1.9;white-space:pre-wrap;margin:14px 0 0}}
+        .profile-row{{display:flex;align-items:center;gap:14px;padding:15px 16px;margin:0;background:#111e2b;border-bottom:1px solid #24374a;color:#e5edf5;font-size:14px}}
+        .profile-row:first-of-type{{border-radius:14px 14px 0 0}}
+        .profile-row:last-of-type{{border-radius:0 0 14px 14px;border-bottom:0}}
+        .profile-row .row-icon{{width:28px;text-align:center;color:#7ebbe8;font-size:20px}}
+        .profile-row .row-sub{{display:block;color:#8fa5b8;font-size:11px;margin-top:5px}}
+        .profile-edit-details{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:14px;overflow:hidden}}
+        .profile-edit-details summary{{list-style:none;cursor:pointer;padding:16px;color:#80c1f0;text-align:center;font-size:14px}}
+        .profile-edit-details summary::-webkit-details-marker{{display:none}}
+        .profile-edit{{padding:14px;border-top:1px solid #263b50}}
         .profile-edit h3{{margin:0 0 12px;color:#d7b56c;font-size:15px;font-weight:normal}}
         .profile-edit label{{display:block;color:#9fb1c1;font-size:12px;margin-top:10px}}
-        .profile-edit input,.profile-edit textarea{{background:#0a1521;border:1px solid #2a4054;border-radius:10px;padding:11px 12px;margin:5px 0;font-size:14px}}
+        .profile-edit input,.profile-edit textarea{{background:#0a1521;border:1px solid #2a4054;border-radius:10px;padding:11px 12px;margin:5px 0;font-size:14px;color:white;width:100%;box-sizing:border-box}}
         .profile-edit button{{background:#258bd0;color:white;margin-top:12px}}
         .profile-link{{display:block;text-align:center;color:#87bfe8;padding:13px}}
       </style>
@@ -2663,24 +2677,35 @@ def profile():
         <div class="username">@{username}</div>
         <p class="bio">{bio or "بیوگرافی اضافه نشده است"}</p>
       </section>
-      <section class="profile-edit">
-        <h3>ویرایش اطلاعات پروفایل</h3>
-        <p class="error">{avatar_error}</p>
-        <form method="post" action="/profile/avatar" enctype="multipart/form-data">
-          <label>تصویر پروفایل</label>
-          <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
-          <button type="submit">تغییر تصویر</button>
-        </form>
-        <p class="error">{html.escape(error)}</p>
-        <form method="post">
-          <label>نام نمایشی</label>
-          <input name="display_name" maxlength="40" minlength="2" value="{display_name}" required>
-          <label>بیوگرافی</label>
-          <textarea name="bio" maxlength="250" rows="3">{bio}</textarea>
-          <button type="submit">ذخیره تغییرات</button>
-        </form>
-      </section>
-      <a class="profile-link" href="/settings">ویرایش نام کاربری</a>
+      <div class="profile-menu">
+        <a class="profile-row" href="/settings">
+          <span class="row-icon">♙</span><span>نام کاربری<span class="row-sub">@{username}</span></span>
+        </a>
+        <a class="profile-row" href="/settings">
+          <span class="row-icon">⚙</span><span>تنظیمات حساب و حریم خصوصی</span>
+        </a>
+      </div>
+      <details class="profile-edit-details">
+        <summary>ویرایش پروفایل</summary>
+        <section class="profile-edit">
+          <h3>ویرایش اطلاعات</h3>
+          <p class="error">{avatar_error}</p>
+          <form method="post" action="/profile/avatar" enctype="multipart/form-data">
+            <label>تصویر پروفایل</label>
+            <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
+            <button type="submit">تغییر تصویر</button>
+          </form>
+          <p class="error">{html.escape(error)}</p>
+          <form method="post">
+            <label>نام نمایشی</label>
+            <input name="display_name" maxlength="40" minlength="2" value="{display_name}" required>
+            <label>بیوگرافی</label>
+            <textarea name="bio" maxlength="250" rows="3">{bio}</textarea>
+            <button type="submit">ذخیره تغییرات</button>
+          </form>
+        </section>
+      </details>
+      <a class="profile-link" href="/home">بازگشت به بارگاه</a>
     </main>
     """
     return page(content)
