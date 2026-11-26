@@ -410,6 +410,10 @@ def home():
         except ValueError:
             continue
 
+        # گفتگوی خصوصیِ خالی تا ارسال اولین پیام در بارگاه نمایش داده نشود.
+        if room_type == "private" and room_id not in latest_messages:
+            continue
+
         if room_type == "group":
             icon = "𓅃"
             room_title = room.get("title") or "گروه جدید"
@@ -428,14 +432,17 @@ def home():
         unread = int(unread_counts.get(room_id, 0))
         unread_badge = f'<span class="unread-badge">{unread}</span>' if unread else ""
         rows += f"""
-        <a class="chat-row" href="/chat/{room_id}">
+        <div class="chat-row cyrus-chat-row">
           <div class="avatar">{icon}</div>
-          <div class="chat-info">
+          <div class="chat-info" onclick="location.href='/chat/{room_id}'" style="cursor:pointer">
             <div class="chat-name">{html.escape(str(room_title))}</div>
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
           {unread_badge}
-        </a>"""
+          <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onsubmit='return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
+            <button type="submit">حذف گفتگو</button>
+          </form>
+        </div>"""
 
     if not rows and not error:
         rows = '<div class="empty"><h3>هیچ گفتگویی موجود نیست</h3></div>'
@@ -446,6 +453,26 @@ def home():
       <div class="tabs">{tabs}</div>
 
       <div class="chat-list">{rows}</div>
+      <style>
+        .cyrus-chat-row{{position:relative;touch-action:pan-y}}
+        .cyrus-remove-chat{{display:none;margin:0}}
+        .cyrus-remove-chat button{{width:auto;margin:0;padding:7px 10px;font-size:12px;background:#48252a;border:1px solid #a34a55;color:#ffd9dd}}
+        .cyrus-chat-row.remove-open .cyrus-remove-chat{{display:block}}
+      </style>
+      <script>
+      (()=>{{
+        document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
+          let timer=null;
+          const start=()=>{{timer=setTimeout(()=>{{row.classList.add('remove-open');}},600);}};
+          const cancel=()=>{{if(timer)clearTimeout(timer);timer=null;}};
+          row.addEventListener('touchstart',start,{{passive:true}});
+          row.addEventListener('touchend',cancel);
+          row.addEventListener('touchmove',cancel,{{passive:true}});
+          row.addEventListener('contextmenu',e=>{{e.preventDefault();row.classList.add('remove-open');}});
+          row.addEventListener('click',e=>{{if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-remove-chat')){{e.preventDefault();row.classList.remove('remove-open');}}}});
+        }});
+      }})();
+      </script>
       <p class="error">{html.escape(error)}</p>
     </div>
     """
@@ -1065,6 +1092,37 @@ def chat(conversation_id):
       <p><a href="/contacts">بازگشت به خویشان</a></p>
     </div>"""
     return page(content)
+
+
+@app.route("/chat/<conversation_id>/remove", methods=["POST"])
+def remove_chat_from_list(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Prefer": "return=minimal"
+    }
+    try:
+        response = requests.delete(
+            URL + "/rest/v1/cyrus_members",
+            params={
+                "conversation_id": "eq." + conversation_id,
+                "user_id": "eq." + str(session.get("user_id") or "")
+            },
+            headers=headers,
+            timeout=20
+        )
+        if not response.ok:
+            return page('<div class="container card"><p>حذف گفتگو انجام نشد؛ دسترسی پایگاه داده را بررسی کنید.</p><a href="/">بازگشت</a></div>'), 400
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
+    return redirect(url_for("home"))
 
 
 @app.route("/chat/<conversation_id>/send", methods=["POST"])
