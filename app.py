@@ -319,8 +319,7 @@ def page(content):
             ("/home", '<path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.5V21h13V9.5M9.5 21v-6h5v6"/>', "بارگاه"),
             ("/contacts", '<path d="M16 21v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V21"/><circle cx="9.5" cy="7" r="4"/><path d="M17 3.5a4 4 0 0 1 0 7.5M21 21v-1.5a4 4 0 0 0-3-3.87"/>', "خویشان"),
             ("/search", '<circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.2 16.2 5 5"/>', "کاوش"),
-            ("/profile", '<circle cx="12" cy="7.5" r="4"/><path d="M4 21v-2.2a7.8 7.8 0 0 1 15.6 0V21z"/>', "نگاره"),
-            ("/settings", '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/>', "فرمان")
+            ("/settings", '<path d="M12 2.8v2.1m0 14.2v2.1M4.9 4.9l1.5 1.5m11.2 11.2 1.5 1.5M2.8 12h2.1m14.2 0h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/><circle cx="12" cy="12" r="5.2"/>', "تنظیمات")
         ]
         links = ""
         for href, icon, label in items:
@@ -2630,14 +2629,14 @@ def upload_profile_avatar():
         return redirect("/login")
     file = request.files.get("avatar")
     if not file or not file.filename:
-        return redirect("/profile?avatar_error=فایلی%20انتخاب%20نشده")
+        return redirect("/settings?avatar_error=فایلی%20انتخاب%20نشده")
     mime = (file.mimetype or "").lower()
     extensions = {"image/jpeg":"jpg", "image/png":"png", "image/webp":"webp"}
     if mime not in extensions:
-        return redirect("/profile?avatar_error=فقط%20JPG%20،%20PNG%20یا%20WebP")
+        return redirect("/settings?avatar_error=فقط%20JPG%20،%20PNG%20یا%20WebP")
     data = file.read(5 * 1024 * 1024 + 1)
     if not data or len(data) > 5 * 1024 * 1024:
-        return redirect("/profile?avatar_error=حجم%20عکس%20باید%20حداکثر%205%20مگابایت%20باشد")
+        return redirect("/settings?avatar_error=حجم%20عکس%20باید%20حداکثر%205%20مگابایت%20باشد")
     uid = str(session.get("user_id") or "")
     key_path = uid + "/profile." + extensions[mime]
     headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"true"}
@@ -2653,20 +2652,21 @@ def upload_profile_avatar():
             if detail:
                 message += " (" + detail[:180] + ")"
             from urllib.parse import quote
-            return redirect("/profile?avatar_error=" + quote(message))
+            return redirect("/settings?avatar_error=" + quote(message))
         public_url = URL + "/storage/v1/object/public/cyrus-avatars/" + key_path + "?v=" + str(int(time.time()))
         saved = requests.patch(URL + "/rest/v1/cyrus_profiles", params={"id":"eq."+uid}, json={"avatar_url":public_url}, headers={**cyrus_profile_headers(),"Prefer":"return=minimal"}, timeout=20)
         if not saved.ok:
-            return redirect("/profile?avatar_error=عکس%20بارگذاری%20شد%20اما%20ذخیره%20پروفایل%20ناموفق%20بود")
-        return redirect("/profile?avatar_success=1")
+            return redirect("/settings?avatar_error=عکس%20بارگذاری%20شد%20اما%20ذخیره%20پروفایل%20ناموفق%20بود")
+        return redirect("/settings?avatar_success=1")
     except Exception:
-        return redirect("/profile?avatar_error=ارتباط%20با%20سرور%20برقرار%20نشد")
+        return redirect("/settings?avatar_error=ارتباط%20با%20سرور%20برقرار%20نشد")
 
 
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
     if not session.get("access_token"):
         return redirect("/login")
+    return redirect("/settings")
 
     error = ""
     if request.method == "POST":
@@ -2856,7 +2856,7 @@ def settings():
         .setting-info:active{{transform:scale(.99)}}
         .setting-info .info{{grid-column:1/2;font-size:15px;text-align:right;align-self:center;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
         .smal-title{{grid-column:2/3;grid-row:1/2;align-self:center;font-size:12px;padding:0 8px;color:#8fa4b7;white-space:nowrap}}
-        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}
+        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}.setting-avatar-form{{grid-template-columns:42px minmax(0,1fr) auto;gap:8px}}.setting-avatar-form .button-title{{cursor:pointer}}.setting-avatar-form input[type=file]{{grid-column:2/4;grid-row:2;font-size:11px;max-width:100%;color:#b7c8d8}}.setting-avatar-form .avatar-submit{{grid-column:3;grid-row:1;background:#d8b45f;color:#17120a;border:0;border-radius:8px;padding:8px 10px;font:inherit;font-size:12px}}
         .s-button{{display:grid;align-items:center;border-radius:12px;grid-template-columns:42px minmax(0,1fr) 20px;transition:.2s;cursor:pointer;background:#0e1b29;border:1px solid #1d3042;color:#edf2f7;text-align:right;text-decoration:none;padding:6px 12px;font:inherit}}
         .button-title{{font-size:14px;text-align:right;align-self:center;padding:0 12px;grid-column:2/3;grid-row:1/2}}
         .buttons-icons{{height:34px;width:34px;border-radius:10px;align-self:center;grid-column:1/2;background:#152b3e;color:#d6ad5b;display:grid;place-items:center}}
@@ -2891,7 +2891,7 @@ def settings():
           </button>
         </section>
         <section class="setting-buttons">
-          <a class="s-button" href="/profile"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2z"/></svg></span><span class="button-title">ویرایش تصویر پروفایل</span><span>‹</span></a>
+          <form class="s-button setting-avatar-form" method="post" action="/profile/avatar" enctype="multipart/form-data"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg></span><label class="button-title" for="setting-avatar-file">تغییر تصویر پروفایل</label><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required><button type="submit" class="avatar-submit">بارگذاری</button></form>
           <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
           <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
           <a class="s-button" href="/logout"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg></span><span class="button-title">خروج از حساب</span><span>‹</span></a>
