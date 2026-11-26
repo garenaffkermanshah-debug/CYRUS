@@ -322,7 +322,6 @@ def home():
 
     conversations = []
     latest_messages = {}
-    unread_counts = {}
     error = ""
 
     try:
