@@ -996,11 +996,68 @@ def public_user_profile(user_id):
     bio = html.escape(str(p.get("bio") or ""))
     avatar = str(p.get("avatar_url") or "")
     avatar_html = ('<img src="' + html.escape(avatar, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:2px solid #3297df">') if avatar else '<div class="avatar" style="width:110px;height:110px;margin:auto;font-size:42px">𓅃</div>'
-    content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>
-      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}">
+    own_id = str(session.get("user_id") or "")
+    blocked_by_me = False
+    if user_id != own_id:
+        try:
+            block_check = requests.get(
+                URL + "/rest/v1/cyrus_user_blocks",
+                params={"select":"blocker_user_id", "blocker_user_id":"eq."+own_id,
+                        "blocked_user_id":"eq."+user_id, "limit":"1"},
+                headers=headers, timeout=15
+            )
+            blocked_by_me = bool(block_check.ok and block_check.json())
+        except Exception:
+            blocked_by_me = False
+    block_label = "رفع مسدودیت" if blocked_by_me else "مسدود کردن کاربر"
+    block_form = (
+        f'<form method="post" action="/user/{html.escape(user_id, quote=True)}/block" '
+        'onsubmit="return confirm(\'وضعیت مسدودسازی این کاربر تغییر کند؟\')">'
+        f'<button type="submit" style="background:#24384b;color:#e6c36d">{block_label}</button></form>'
+        if user_id != own_id else ""
+    )
+    blocked_notice = '<p class="error">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
+    send_form_style = 'style="display:none"' if blocked_by_me else ""
+    content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>{block_form}{blocked_notice}
+      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
         <textarea name="content" maxlength="4000" rows="4" required placeholder="پیام خود را بنویسید..." style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"></textarea>
         <button type="submit">ارسال پیام</button></form><p class="muted"><a href="/contacts">بازگشت به مخاطبین</a></p></div></main>"""
     return page(content)
+
+
+@app.route("/user/<user_id>/block", methods=["POST"])
+def toggle_user_block(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id = str(session.get("user_id") or "")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است", 400
+    if user_id == own_id:
+        return redirect("/profile")
+    headers = {
+        "apikey": KEY, "Authorization": "Bearer " + session["access_token"],
+        "Content-Type": "application/json", "Prefer": "return=minimal"
+    }
+    params = {"blocker_user_id":"eq."+own_id, "blocked_user_id":"eq."+user_id}
+    try:
+        existing = requests.get(URL + "/rest/v1/cyrus_user_blocks",
+            params={**params, "select":"blocker_user_id"}, headers=headers, timeout=20)
+        if not existing.ok:
+            return page('<div class="container card"><p>بررسی مسدودسازی ناموفق بود؛ دسترسی پایگاه داده را بررسی کنید.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
+        if existing.json():
+            changed = requests.delete(URL + "/rest/v1/cyrus_user_blocks",
+                params=params, headers=headers, timeout=20)
+        else:
+            changed = requests.post(URL + "/rest/v1/cyrus_user_blocks",
+                json={"blocker_user_id":own_id, "blocked_user_id":user_id},
+                headers=headers, timeout=20)
+        if not changed.ok:
+            return page('<div class="container card"><p>تغییر وضعیت مسدودسازی انجام نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 400
+        return redirect("/user/" + user_id)
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
 
 
 @app.route("/message-to/<user_id>", methods=["POST"])
@@ -1014,6 +1071,17 @@ def message_to_user(user_id):
     content = request.form.get("content", "").strip()
     if not content or len(content) > 4000:
         return redirect("/user/" + user_id)
+    own_id = str(session.get("user_id") or "")
+    try:
+        blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
+            params={"select":"id", "blocker_user_id":"eq."+own_id,
+                    "blocked_user_id":"eq."+user_id, "limit":"1"},
+            headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
+            timeout=15)
+        if blocked.ok and blocked.json():
+            return redirect("/user/" + user_id)
+    except Exception:
+        pass
     headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"], "Content-Type": "application/json", "Prefer": "return=minimal"}
     try:
         created = requests.post(URL + "/rest/v1/rpc/create_direct_conversation", json={"other_user":user_id}, headers=headers, timeout=20)
@@ -1306,6 +1374,26 @@ def send_message(conversation_id):
             return "گفتگو پیدا نشد یا دسترسی ندارید", 403
 
         room = room_response.json()[0]
+
+        # اگر کاربر، عضو دیگر گفتگوی خصوصی را مسدود کرده باشد، پیام جدید نپذیر.
+        if room.get("type") == "private":
+            members_check = requests.get(
+                URL + "/rest/v1/cyrus_members",
+                params={"select":"user_id", "conversation_id":"eq."+conversation_id},
+                headers=headers, timeout=20
+            )
+            if members_check.ok:
+                other_ids = [str(m.get("user_id") or "") for m in members_check.json()
+                             if str(m.get("user_id") or "") != current_user]
+                for other_id in other_ids:
+                    block_check = requests.get(
+                        URL + "/rest/v1/cyrus_user_blocks",
+                        params={"select":"id", "blocker_user_id":"eq."+current_user,
+                                "blocked_user_id":"eq."+other_id, "limit":"1"},
+                        headers=headers, timeout=15
+                    )
+                    if block_check.ok and block_check.json():
+                        return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.", 403
 
         # برای گفتگوهای غیرکانال، فرستنده باید عضو گفتگو باشد.
         if room.get("type") != "channel":
