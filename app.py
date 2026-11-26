@@ -1121,6 +1121,67 @@ def start_chat(user_id):
     return redirect("/user/" + user_id)
 
 
+@app.route("/conversation/<conversation_id>/profile")
+def conversation_profile(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    try:
+        response = requests.get(
+            URL + "/rest/v1/cyrus_conversations",
+            params={"select":"id,title,type,created_by,description,avatar_url","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=20
+        )
+        if not response.ok or not response.json():
+            return page('<main class="container"><div class="empty">پروفایل مجموعه پیدا نشد</div></main>'),404
+        room=response.json()[0]
+        members_response=requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"user_id,role","conversation_id":"eq."+conversation_id},
+            headers=headers,timeout=20
+        )
+        members=members_response.json() if members_response.ok else []
+    except Exception:
+        return page('<main class="container"><div class="empty">ارتباط با سرور برقرار نشد</div></main>'),502
+    title=html.escape(str(room.get("title") or "گفتگو"))
+    desc=html.escape(str(room.get("description") or ""))
+    avatar=str(room.get("avatar_url") or "")
+    avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="">') if avatar else '<div class="profile-room-symbol">𓊹</div>'
+    kind={"group":"گروه","channel":"کانال"}.get(str(room.get("type") or ""),"گفتگوی خصوصی")
+    uid=str(session.get("user_id") or "")
+    owner=str(room.get("created_by") or "")==uid
+    role=next((str(m.get("role") or "") for m in members if str(m.get("user_id") or "")==uid),"")
+    manage_link=f'<a class="profile-room-action" href="/rooms/{conversation_id}/manage">مدیریت {kind}</a>' if owner or role in ("admin","owner") else ""
+    content=f"""
+    <main class="container cyrus-room-profile">
+      <style>
+        .cyrus-room-profile{{padding:14px}}
+        .room-profile-hero{{text-align:center;padding:24px 16px;background:#111e2b;border:1px solid #263b50;border-radius:18px}}
+        .room-profile-hero img,.profile-room-symbol{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px;color:#d8b46a}}
+        .room-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
+        .room-profile-kind{{color:#7eb8e2;font-size:13px}}
+        .room-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:14px 0;white-space:pre-wrap}}
+        .room-profile-action{{display:block;margin:10px 0;padding:13px;border-radius:24px;text-align:center;background:#20384d;color:#eaf3fa}}
+        .room-profile-actions{{margin-top:12px}}
+      </style>
+      <section class="room-profile-hero">
+        {avatar_html}
+        <h2>{title}</h2>
+        <div class="room-profile-kind">{kind} · {len(members)} عضو</div>
+        <p class="room-profile-bio">{desc or "توضیحی اضافه نشده است"}</p>
+      </section>
+      <div class="room-profile-actions">
+        <a class="profile-room-action" href="/chat/{conversation_id}">بازگشت به گفتگو</a>
+        {manage_link}
+      </div>
+    </main>"""
+    return page(content)
+
+
 @app.route("/chat/<conversation_id>")
 def chat(conversation_id):
     if not session.get("access_token"):
@@ -2521,30 +2582,45 @@ def profile():
     avatar_error = html.escape(request.args.get("avatar_error", ""))
 
     content = f"""
-    <main class="container">
-      <div class="card">
-        <h2>نگاره</h2>
-        <p class="muted">پروفایل کاربری CYRUS</p>
+    <main class="container cyrus-profile-page">
+      <style>
+        .cyrus-profile-page{{padding:14px 14px 25px}}
+        .profile-hero{{text-align:center;padding:24px 14px 20px;background:#111e2b;border:1px solid #263b50;border-radius:18px;margin-bottom:12px}}
+        .profile-hero img,.profile-hero .avatar{{width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 12px;border:2px solid #2d8ecb}}
+        .profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
+        .profile-hero .username{{color:#78b8e6;font-size:13px;direction:ltr}}
+        .profile-hero .bio{{color:#c3cfda;font-size:13px;line-height:1.9;white-space:pre-wrap;margin:12px 0 0}}
+        .profile-edit{{padding:16px;background:#101d2a;border:1px solid #263b50;border-radius:16px}}
+        .profile-edit h3{{margin:0 0 12px;color:#d7b56c;font-size:15px;font-weight:normal}}
+        .profile-edit label{{display:block;color:#9fb1c1;font-size:12px;margin-top:10px}}
+        .profile-edit input,.profile-edit textarea{{background:#0a1521;border:1px solid #2a4054;border-radius:10px;padding:11px 12px;margin:5px 0;font-size:14px}}
+        .profile-edit button{{background:#258bd0;color:white;margin-top:12px}}
+        .profile-link{{display:block;text-align:center;color:#87bfe8;padding:13px}}
+      </style>
+      <section class="profile-hero">
         {avatar_html}
+        <h2>{html.escape(str(data.get("display_name") or data.get("username") or "کاربر"))}</h2>
+        <div class="username">@{username}</div>
+        <p class="bio">{bio or "بیوگرافی اضافه نشده است"}</p>
+      </section>
+      <section class="profile-edit">
+        <h3>ویرایش اطلاعات پروفایل</h3>
         <p class="error">{avatar_error}</p>
         <form method="post" action="/profile/avatar" enctype="multipart/form-data">
-          <label>عکس پروفایل (JPG، PNG یا WebP، حداکثر ۵ مگابایت)</label>
+          <label>تصویر پروفایل</label>
           <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
-          <button type="submit">بارگذاری عکس پروفایل</button>
+          <button type="submit">تغییر تصویر</button>
         </form>
         <p class="error">{html.escape(error)}</p>
         <form method="post">
           <label>نام نمایشی</label>
-          <input name="display_name" maxlength="40" minlength="2"
-                 value="{display_name}" required>
+          <input name="display_name" maxlength="40" minlength="2" value="{display_name}" required>
           <label>بیوگرافی</label>
-          <textarea name="bio" maxlength="250" rows="4"
-            style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white">{bio}</textarea>
-          <button type="submit">ذخیره پروفایل</button>
+          <textarea name="bio" maxlength="250" rows="3">{bio}</textarea>
+          <button type="submit">ذخیره تغییرات</button>
         </form>
-        <p class="muted"><a class="form-link" href="/settings">تنظیمات و نام کاربری</a></p>
-        <p class="muted"><a class="form-link" href="/">بازگشت به بارگاه</a></p>
-      </div>
+      </section>
+      <a class="profile-link" href="/settings">ویرایش نام کاربری</a>
     </main>
     """
     return page(content)
