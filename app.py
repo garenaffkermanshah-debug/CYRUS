@@ -954,9 +954,9 @@ def search():
     content = f"""
     <div class="container">
       <style>
-        .cyrus-explore-search{display:flex;align-items:center;gap:8px;margin:10px 12px 14px;padding:2px 12px;border-radius:22px;background:#101d2c;border:1px solid #263b50;min-height:42px}
-        .cyrus-explore-search input{flex:1;min-width:0;width:auto;margin:0;background:transparent;border:0;outline:0;box-shadow:none;padding:8px 4px;color:#fff;font-size:13px}
-        .cyrus-explore-search button{width:auto;margin:0;padding:6px 9px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#6fb9ef}
+        .cyrus-explore-search{{display:flex;align-items:center;gap:8px;margin:10px 12px 14px;padding:2px 12px;border-radius:22px;background:#101d2c;border:1px solid #263b50;min-height:42px}}
+        .cyrus-explore-search input{{flex:1;min-width:0;width:auto;margin:0;background:transparent;border:0;outline:0;box-shadow:none;padding:8px 4px;color:#fff;font-size:13px}}
+        .cyrus-explore-search button{{width:auto;margin:0;padding:6px 9px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#6fb9ef}}
       </style>
       <form class="cyrus-explore-search" method="get" action="/search">
         <input name="q" value="{html.escape(query, quote=True)}"
