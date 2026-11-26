@@ -2738,12 +2738,10 @@ def settings():
     error = ""
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-
         valid = (
             3 <= len(username) <= 24
             and all(ch.isalnum() or ch in "_-" for ch in username)
         )
-
         if not valid:
             error = "نام کاربری باید ۳ تا ۲۴ حرف و فقط شامل حروف، عدد، خط تیره یا زیرخط باشد"
         else:
@@ -2761,36 +2759,101 @@ def settings():
             except Exception:
                 error = "ارتباط با سرور برقرار نشد"
 
-    data = cyrus_ensure_profile(session.get("cyrus_login_email", ""))
-    if not data:
-        data = {"username": "", "display_name": "", "bio": ""}
-
-    username = html.escape(str(data.get("username") or ""), quote=True)
-    share_text = html.escape("@" + str(data.get("username") or ""), quote=True)
+    data = cyrus_ensure_profile(session.get("cyrus_login_email", "")) or {
+        "username": "", "display_name": "", "bio": "", "avatar_url": ""
+    }
+    username_raw = str(data.get("username") or "")
+    display_raw = str(data.get("display_name") or username_raw or "کاربر")
+    bio_raw = str(data.get("bio") or "")
+    username = html.escape(username_raw, quote=True)
+    display_name = html.escape(display_raw, quote=True)
+    bio = html.escape(bio_raw, quote=True)
+    share_text = html.escape("@" + username_raw, quote=True)
+    avatar_url = str(data.get("avatar_url") or "")
+    if avatar_url:
+        avatar_html = '<img class="setting-profile-image" src="' + html.escape(avatar_url, quote=True) + '" alt="تصویر پروفایل">'
+    else:
+        avatar_html = '<div class="setting-profile-image setting-profile-fallback">𓅃</div>'
 
     content = f"""
-    <main class="container">
-      <div class="card">
-        <h2>فرمان</h2>
-        <p class="muted">تنظیمات حساب CYRUS</p>
-        <p class="error">{html.escape(error)}</p>
-        <form method="post">
-          <label>نام کاربری شما</label>
-          <input name="username" value="{username}" minlength="3"
-                 maxlength="24" required>
-          <p class="muted">این نام را دیگران برای پیدا کردن شما جستجو می‌کنند.</p>
-          <button type="submit">ذخیره نام کاربری</button>
-        </form>
-        <div class="card">
-          <p class="muted">نام کاربری برای ارسال به دوستان</p>
-          <input id="cyrus-username" readonly value="{share_text}">
-          <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-username').value).then(()=>alert('نام کاربری کپی شد'))">کپی نام کاربری</button>
-          <button type="button" onclick="if(navigator.share){{navigator.share({{title:'CYRUS',text:document.getElementById('cyrus-username').value}})}}else{{navigator.clipboard.writeText(document.getElementById('cyrus-username').value).then(()=>alert('کپی شد؛ برای دوستان ارسال کنید'))}}">اشتراک‌گذاری نام کاربری</button>
-        </div>
-        <p class="muted"><a class="form-link" href="/profile">ویرایش پروفایل و بیوگرافی</a></p>
-        <p class="muted"><a class="form-link" href="/logout">خروج از حساب</a></p>
-        <p class="muted"><a class="form-link" href="/">بازگشت به بارگاه</a></p>
-      </div>
+    <main class="container cyrus-settings-page">
+      <style>
+        .cyrus-settings-page{{width:100%;max-width:430px;margin:0 auto;padding:0 0 78px;color:#f1e7d2}}
+        .setting-container{{position:relative;display:grid;grid-template-rows:60px 240px 8px auto 60px auto;width:100%;min-height:calc(100dvh - 65px);text-align:center;background:rgba(7,15,25,.97);color:#f1e7d2;transform:none;transition:.3s ease;z-index:1;overflow-y:auto;border-inline:1px solid #27394a}}
+        .setting-header{{display:grid;grid-template-columns:60px 1fr 50px 20px;align-items:center;border-bottom:1px solid #26394b}}
+        .setting-delete{{background:linear-gradient(135deg,#8c642b,#d8b15b);color:#17120a;line-height:60px;font-size:23px;font-weight:bold}}
+        .setting-title{{align-self:center;text-align:start;padding-left:8px;font-size:20px;color:#e5bd69}}
+        .close-setting{{display:grid;place-items:center;border-radius:50%;width:38px;height:38px;scale:.8;border:1px solid #66502e;background:#101d2c;color:#e5bd69;cursor:pointer;font-size:22px}}
+        .setting-img-container{{grid-row:2/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(rgba(5,12,22,.22),rgba(5,12,22,.8)),url('/static/cyrus-tomb.jpg') center/cover no-repeat;padding:18px}}
+        .setting-profile-image{{width:100px;height:100px;border-radius:50%;object-fit:cover;border:2px solid #d5ad5b;box-shadow:0 0 0 5px #151e29aa}}
+        .setting-profile-fallback{{display:grid;place-items:center;background:#14283b;color:#d9b45f;font-size:42px}}
+        .setting-profile-name{{font-size:20px;color:#f3d48a;text-shadow:0 2px 7px #000}}
+        .setting-profile-user{{font-size:13px;color:#e4e9ee;direction:ltr}}
+        .setting-divider{{grid-row:3/4;background:#a37a3d55}}
+        .setting-information-container{{grid-row:4/5;display:grid;grid-gap:3px;grid-template-rows:repeat(3,minmax(68px,auto));padding:8px 2px}}
+        .setting-info{{border-radius:10px;display:grid;grid-template-columns:10px 50px minmax(0,1fr) 90px;transition:.3s all;cursor:pointer;background:#0e1b29;border-bottom:1px solid #1d3042;text-align:right}}
+        .setting-info:hover,.s-button:hover{{background:#1a2c3e}}
+        .info-icons{{height:46px;width:46px;border-radius:50%;background:#152b3e;color:#d6ad5b;grid-column:2/3;grid-row:1/2;align-self:center;display:grid;place-items:center;font-size:22px}}
+        .setting-info .info{{grid-column:3/4;font-size:15px;text-align:right;align-self:center;padding:0 12px;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
+        .smal-title{{grid-column:4/5;grid-row:1/2;align-self:center;font-size:11px;padding:0 8px;color:#8fa4b7}}
+        .setting-buttons{{grid-row:6/7;display:grid;grid-gap:6px;grid-template-rows:repeat(5,minmax(58px,auto));padding:8px 9px 18px}}
+        .s-button{{display:grid;align-items:center;border-radius:10px;grid-template-columns:10px 50px minmax(0,1fr) 35px;transition:.3s all;cursor:pointer;background:#0e1b29;border:1px solid #1d3042;color:#edf2f7;text-align:right;text-decoration:none}}
+        .button-title{{font-size:15px;text-align:right;align-self:center;padding:0 14px;grid-column:3/4;grid-row:1/2}}
+        .buttons-icons{{height:46px;width:46px;border-radius:50%;align-self:center;grid-column:2/3;background:#152b3e;color:#d6ad5b;display:grid;place-items:center;font-size:21px}}
+        .setting-username-form{{margin:8px 9px 0;padding:12px;background:#0e1b29;border:1px solid #26394b;border-radius:12px;text-align:right}}
+        .setting-username-form label{{display:block;font-size:12px;color:#aab8c7;margin-bottom:5px}}
+        .setting-username-form input{{width:100%;margin:0;background:#08121d;border:1px solid #31475b;border-radius:9px;color:#fff;padding:11px;font-size:14px}}
+        .setting-username-form button{{margin-top:8px;background:linear-gradient(100deg,#98702e,#e3bf69);color:#181208}}
+        .setting-error{{color:#ff9b8f;font-size:12px;line-height:1.8;margin:5px 0}}
+        @media(max-width:430px){{.cyrus-settings-page{{max-width:100%}}.setting-container{{border-inline:0}}}}
+      </style>
+      <section class="setting-container">
+        <header class="setting-header">
+          <div class="setting-delete">𓊹</div>
+          <div class="setting-title">فرمان</div>
+          <a class="close-setting" href="/home" aria-label="بازگشت">×</a>
+          <span></span>
+        </header>
+        <section class="setting-img-container">
+          {avatar_html}
+          <div class="setting-profile-name">{display_name}</div>
+          <div class="setting-profile-user">@{username}</div>
+        </section>
+        <div class="setting-divider"></div>
+        <section class="setting-information-container">
+          <div class="setting-info">
+            <span class="info-icons">♙</span>
+            <span class="info">{display_name}</span>
+            <span class="smal-title">نام نمایشی</span>
+          </div>
+          <div class="setting-info">
+            <span class="info-icons">⌕</span>
+            <span class="info" dir="ltr">@{username}</span>
+            <span class="smal-title">شناسه</span>
+          </div>
+          <div class="setting-info">
+            <span class="info">{bio or "بیوگرافی ثبت نشده"}</span>
+            <span class="info-icons">𓆃</span>
+            <span class="smal-title">درباره</span>
+          </div>
+        </section>
+        <section class="setting-username-form">
+          <form method="post">
+            <label for="cyrus-settings-username">نام کاربری</label>
+            <input id="cyrus-settings-username" name="username" value="{username}" minlength="3" maxlength="24" required>
+            <p class="setting-error">{html.escape(error)}</p>
+            <button type="submit">ذخیره نام کاربری</button>
+          </form>
+        </section>
+        <section class="setting-buttons">
+          <a class="s-button" href="/profile"><span class="buttons-icons">♙</span><span class="button-title">ویرایش پروفایل و تصویر</span><span>‹</span></a>
+          <a class="s-button" href="/contacts"><span class="buttons-icons">𓅃</span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
+          <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons">⧉</span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
+          <a class="s-button" href="/logout"><span class="buttons-icons">⇥</span><span class="button-title">خروج از حساب</span><span>‹</span></a>
+          <a class="s-button" href="/home"><span class="buttons-icons">𓆃</span><span class="button-title">بازگشت به بارگاه</span><span>‹</span></a>
+        </section>
+        <input id="cyrus-settings-share" type="hidden" value="{share_text}">
+      </section>
     </main>
     """
     return page(content)
