@@ -602,7 +602,6 @@ def home():
         .cyrus-chat-row:focus-visible{{outline:2px solid #3297df;outline-offset:-2px}}
         .cyrus-chat-row .chat-info{{cursor:pointer}}
       </style>
-      <input id="cyrusChatSearch" type="search" placeholder="جست‌وجوی گفتگو، نام یا شناسه..." style="width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border-radius:12px;background:#0b1422;color:#fff;border:1px solid #80643b">
       <div class="tabs">{tabs}</div>
 
       <div class="chat-list">{rows}</div>
@@ -612,22 +611,6 @@ def home():
         .cyrus-remove-chat button{{width:auto;margin:0;padding:7px 10px;font-size:12px;background:#48252a;border:1px solid #a34a55;color:#ffd9dd}}
         .cyrus-chat-row.remove-open .cyrus-remove-chat{{display:block}}
       </style>
-      <script>
-      (()=>{{
-        const search=document.getElementById("cyrusChatSearch");
-        if(search)search.addEventListener("input",()=>{{const q=search.value.trim().toLowerCase();document.querySelectorAll(".cyrus-chat-row").forEach(row=>{{row.style.display=(row.dataset.search||"").includes(q)?"":"none";}});}});
-        document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
-          let timer=null;
-          const start=()=>{{timer=setTimeout(()=>{{row.classList.add('remove-open');}},600);}};
-          const cancel=()=>{{if(timer)clearTimeout(timer);timer=null;}};
-          row.addEventListener('touchstart',start,{{passive:true}});
-          row.addEventListener('touchend',cancel);
-          row.addEventListener('touchmove',cancel,{{passive:true}});
-          row.addEventListener('contextmenu',e=>{{e.preventDefault();row.classList.add('remove-open');}});
-          row.addEventListener('click',e=>{{if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-remove-chat')){{e.preventDefault();row.classList.remove('remove-open');}}}});
-        }});
-      }})();
-      </script>
       <p class="error">{html.escape(error)}</p>
     </div>
     """
@@ -909,14 +892,16 @@ def search():
 
     content = f"""
     <div class="container">
-      <form class="searchbar" method="get" action="/search"
-            style="display:flex;align-items:center;gap:6px;margin:6px 12px 12px;padding:2px 10px;border-radius:22px;background:#101d2c;border:1px solid #263b50;min-height:42px">
+      <style>
+        .cyrus-explore-search{display:flex;align-items:center;gap:8px;margin:10px 12px 14px;padding:2px 12px;border-radius:22px;background:#101d2c;border:1px solid #263b50;min-height:42px}
+        .cyrus-explore-search input{flex:1;min-width:0;width:auto;margin:0;background:transparent;border:0;outline:0;box-shadow:none;padding:8px 4px;color:#fff;font-size:13px}
+        .cyrus-explore-search button{width:auto;margin:0;padding:6px 9px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#6fb9ef}
+      </style>
+      <form class="cyrus-explore-search" method="get" action="/search">
         <input name="q" value="{html.escape(query, quote=True)}"
                placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
-               autocomplete="off" autofocus
-               style="flex:1;min-width:0;background:transparent;border:0;outline:0;box-shadow:none;padding:8px 4px;color:#fff;font-size:13px">
-        <button type="submit" aria-label="جستجو"
-                style="margin:0;padding:8px 10px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#d6b36a">⌕</button>
+               type="search" autocomplete="off" autofocus>
+        <button type="submit" aria-label="جستجو">⌕</button>
       </form>
 
       <p class="error">{html.escape(error)}</p>
