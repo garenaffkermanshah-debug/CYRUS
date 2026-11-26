@@ -299,17 +299,17 @@ def page(content):
         </header>"""
     if session.get("access_token") and not is_chat:
         items = [
-            ("/home", "𓆃", "بارگاه"),
-            ("/contacts", "𓅃", "خویشان"),
-            ("/search", "⌕", "کاوش"),
-            ("/profile", "♙", "نگاره"),
-            ("/settings", "𓊹", "فرمان")
+            ("/home", '<path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.5V21h13V9.5M9.5 21v-6h5v6"/>', "بارگاه"),
+            ("/contacts", '<path d="M16 21v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V21"/><circle cx="9.5" cy="7" r="4"/><path d="M17 3.5a4 4 0 0 1 0 7.5M21 21v-1.5a4 4 0 0 0-3-3.87"/>', "خویشان"),
+            ("/search", '<circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.2 16.2 5 5"/>', "کاوش"),
+            ("/profile", '<circle cx="12" cy="7.5" r="4"/><path d="M4 21v-2.2a7.8 7.8 0 0 1 15.6 0V21z"/>', "نگاره"),
+            ("/settings", '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/>', "فرمان")
         ]
         links = ""
         for href, icon, label in items:
             active = "current" if current == href or (href == "/home" and current == "/") else ""
-            links += f'<a class="{active}" href="{href}"><span>{icon}</span>{label}</a>'
-        nav = f'<nav class="bottom">{links}</nav>'
+            links += f'<a class="{active}" href="{href}" aria-label="{label}"><svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg><span>{label}</span></a>'
+        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom .nav-svg{{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-svg{{color:#e5bd69;transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
     return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
@@ -2736,26 +2736,44 @@ def settings():
         return redirect("/login")
 
     error = ""
+    edit_field = ""
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        valid = (
-            3 <= len(username) <= 24
-            and all(ch.isalnum() or ch in "_-" for ch in username)
-        )
-        if not valid:
-            error = "نام کاربری باید ۳ تا ۲۴ حرف و فقط شامل حروف، عدد، خط تیره یا زیرخط باشد"
+        edit_field = request.form.get("edit_field", "").strip()
+        field_value = request.form.get("field_value", "").strip()
+        if edit_field == "username":
+            valid = (
+                3 <= len(field_value) <= 24
+                and all(ch.isalnum() or ch in "_-" for ch in field_value)
+            )
+            if not valid:
+                error = "نام کاربری باید ۳ تا ۲۴ حرف و فقط شامل حروف، عدد، خط تیره یا زیرخط باشد"
+            else:
+                patch_data = {"username": field_value}
+        elif edit_field == "display_name":
+            if not 2 <= len(field_value) <= 40:
+                error = "نام نمایشی باید بین ۲ تا ۴۰ حرف باشد"
+            else:
+                patch_data = {"display_name": field_value}
+        elif edit_field == "bio":
+            if len(field_value) > 250:
+                error = "بیوگرافی حداکثر ۲۵۰ حرف باشد"
+            else:
+                patch_data = {"bio": field_value}
         else:
+            error = "بخش ویرایش نامعتبر است"
+
+        if not error:
             try:
                 r = requests.patch(
                     URL + "/rest/v1/cyrus_profiles",
                     params={"id": "eq." + str(session.get("user_id"))},
-                    json={"username": username},
+                    json=patch_data,
                     headers=cyrus_profile_headers(),
                     timeout=20
                 )
                 if r.ok:
                     return redirect("/settings")
-                error = "این نام کاربری احتمالاً قبلاً انتخاب شده است"
+                error = "ذخیره انجام نشد؛ دوباره تلاش کنید"
             except Exception:
                 error = "ارتباط با سرور برقرار نشد"
 
@@ -2773,87 +2791,112 @@ def settings():
     if avatar_url:
         avatar_html = '<img class="setting-profile-image" src="' + html.escape(avatar_url, quote=True) + '" alt="تصویر پروفایل">'
     else:
-        avatar_html = '<div class="setting-profile-image setting-profile-fallback">𓅃</div>'
+        avatar_html = '<div class="setting-profile-image setting-profile-fallback">♙</div>'
+    avatar_error = html.escape(request.args.get("avatar_error", ""))
 
     content = f"""
     <main class="container cyrus-settings-page">
       <style>
-        .cyrus-settings-page{{width:100%;max-width:430px;margin:0 auto;padding:0 0 78px;color:#f1e7d2}}
-        .setting-container{{position:relative;display:grid;grid-template-rows:60px 240px 8px auto auto 1fr;width:100%;min-height:calc(100dvh - 65px);text-align:center;background:rgba(7,15,25,.97);color:#f1e7d2;transform:none;transition:.3s ease;z-index:1;overflow-y:auto;border-inline:1px solid #27394a}}
-        .setting-header{{display:grid;grid-template-columns:60px 1fr 50px 20px;align-items:center;border-bottom:1px solid #26394b}}
-        .setting-delete{{background:linear-gradient(135deg,#8c642b,#d8b15b);color:#17120a;line-height:60px;font-size:23px;font-weight:bold}}
-        .setting-title{{align-self:center;text-align:start;padding-left:8px;font-size:20px;color:#e5bd69}}
-        .close-setting{{display:grid;place-items:center;border-radius:50%;width:38px;height:38px;scale:.8;border:1px solid #66502e;background:#101d2c;color:#e5bd69;cursor:pointer;font-size:22px}}
-        .setting-img-container{{grid-row:2/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:linear-gradient(rgba(5,12,22,.22),rgba(5,12,22,.8)),url('/static/cyrus-tomb.jpg') center/cover no-repeat;padding:18px}}
+        .cyrus-settings-page{{width:100%;max-width:430px;margin:0 auto;padding:0 0 82px;color:#f1e7d2}}
+        .setting-container{{position:relative;display:grid;grid-template-rows:240px 7px auto auto 1fr;width:100%;min-height:calc(100dvh - 76px);text-align:center;background:rgba(7,15,25,.97);color:#f1e7d2;z-index:1;overflow:visible;border-inline:1px solid #27394a}}
+        .setting-img-container{{grid-row:1/2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;background:linear-gradient(rgba(5,12,22,.18),rgba(5,12,22,.82)),url('/static/cyrus-tomb.jpg') center/cover no-repeat;padding:18px;position:relative}}
         .setting-profile-image{{width:100px;height:100px;border-radius:50%;object-fit:cover;border:2px solid #d5ad5b;box-shadow:0 0 0 5px #151e29aa}}
-        .setting-profile-fallback{{display:grid;place-items:center;background:#14283b;color:#d9b45f;font-size:42px}}
-        .setting-profile-name{{font-size:20px;color:#f3d48a;text-shadow:0 2px 7px #000}}
-        .setting-profile-user{{font-size:13px;color:#e4e9ee;direction:ltr}}
-        .setting-divider{{grid-row:3/4;background:#a37a3d55}}
-        .setting-information-container{{grid-row:4/5;display:grid;grid-gap:3px;grid-template-rows:repeat(3,minmax(68px,auto));padding:8px 2px}}
-        .setting-info{{border-radius:10px;display:grid;grid-template-columns:10px 50px minmax(0,1fr) 90px;transition:.3s all;cursor:pointer;background:#0e1b29;border-bottom:1px solid #1d3042;text-align:right}}
-        .setting-info:hover,.s-button:hover{{background:#1a2c3e}}
-        .info-icons{{height:46px;width:46px;border-radius:50%;background:#152b3e;color:#d6ad5b;grid-column:2/3;grid-row:1/2;align-self:center;display:grid;place-items:center;font-size:22px}}
-        .setting-info .info{{grid-column:3/4;font-size:15px;text-align:right;align-self:center;padding:0 12px;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
-        .smal-title{{grid-column:4/5;grid-row:1/2;align-self:center;font-size:11px;padding:0 8px;color:#8fa4b7}}
-        .setting-buttons{{grid-row:6/7;display:grid;grid-gap:6px;grid-template-rows:repeat(5,minmax(58px,auto));padding:8px 9px 18px}}
-        .s-button{{display:grid;align-items:center;border-radius:10px;grid-template-columns:10px 50px minmax(0,1fr) 35px;transition:.3s all;cursor:pointer;background:#0e1b29;border:1px solid #1d3042;color:#edf2f7;text-align:right;text-decoration:none}}
-        .button-title{{font-size:15px;text-align:right;align-self:center;padding:0 14px;grid-column:3/4;grid-row:1/2}}
-        .buttons-icons{{height:46px;width:46px;border-radius:50%;align-self:center;grid-column:2/3;background:#152b3e;color:#d6ad5b;display:grid;place-items:center;font-size:21px}}
-        .setting-username-form{{margin:8px 9px 0;padding:12px;background:#0e1b29;border:1px solid #26394b;border-radius:12px;text-align:right}}
-        .setting-username-form label{{display:block;font-size:12px;color:#aab8c7;margin-bottom:5px}}
-        .setting-username-form input{{width:100%;margin:0;background:#08121d;border:1px solid #31475b;border-radius:9px;color:#fff;padding:11px;font-size:14px}}
-        .setting-username-form button{{margin-top:8px;background:linear-gradient(100deg,#98702e,#e3bf69);color:#181208}}
+        .setting-profile-fallback{{display:grid;place-items:center;background:#14283b;color:#d9b45f;font-size:40px}}
+        .setting-profile-name{{font-size:20px;color:#f3d48a;text-shadow:0 2px 7px #000;cursor:pointer}}
+        .setting-profile-user{{font-size:13px;color:#e4e9ee;direction:ltr;cursor:pointer;max-width:100%;overflow-wrap:anywhere;text-shadow:0 2px 7px #000}}
+        .setting-profile-bio{{font-size:13px;color:#e1e8ee;max-width:92%;line-height:1.7;cursor:pointer;text-shadow:0 2px 7px #000}}
+        .setting-divider{{grid-row:2/3;background:#a37a3d55}}
+        .setting-information-container{{grid-row:3/4;display:grid;grid-gap:5px;grid-template-rows:repeat(3,minmax(67px,auto));padding:8px 5px}}
+        .setting-info{{width:100%;border:1px solid #1d3042;border-radius:13px;display:grid;grid-template-columns:minmax(0,1fr) 94px;align-items:center;transition:.2s;background:#0e1b29;text-align:right;color:#edf2f7;padding:12px 16px;cursor:pointer;font:inherit}}
+        .setting-info:hover,.s-button:hover{{background:#1a2c3e;border-color:#3c5871}}
+        .setting-info:active{{transform:scale(.99)}}
+        .setting-info .info{{grid-column:1/2;font-size:15px;text-align:right;align-self:center;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
+        .smal-title{{grid-column:2/3;grid-row:1/2;align-self:center;font-size:12px;padding:0 8px;color:#8fa4b7;white-space:nowrap}}
+        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}
+        .s-button{{display:grid;align-items:center;border-radius:12px;grid-template-columns:42px minmax(0,1fr) 20px;transition:.2s;cursor:pointer;background:#0e1b29;border:1px solid #1d3042;color:#edf2f7;text-align:right;text-decoration:none;padding:6px 12px;font:inherit}}
+        .button-title{{font-size:14px;text-align:right;align-self:center;padding:0 12px;grid-column:2/3;grid-row:1/2}}
+        .buttons-icons{{height:34px;width:34px;border-radius:10px;align-self:center;grid-column:1/2;background:#152b3e;color:#d6ad5b;display:grid;place-items:center}}
+        .buttons-icons svg{{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}}
         .setting-error{{color:#ff9b8f;font-size:12px;line-height:1.8;margin:5px 0}}
+        .setting-edit-overlay{{position:fixed;inset:0;background:#020711b8;backdrop-filter:blur(5px);z-index:30;display:none;align-items:flex-end;justify-content:center;padding:14px 12px calc(90px + env(safe-area-inset-bottom))}}
+        .setting-edit-overlay.open{{display:flex}}
+        .setting-edit-sheet{{width:100%;max-width:430px;background:#0d1a28;border:1px solid #52627a;border-radius:22px;padding:18px;box-shadow:0 20px 60px #0008;text-align:right}}
+        .setting-edit-sheet h3{{margin:0 0 14px;color:#e5bd69;font-size:17px;font-weight:500}}
+        .setting-edit-sheet input,.setting-edit-sheet textarea{{width:100%;background:#07121e;border:1px solid #30485e;border-radius:12px;padding:13px;color:#fff;font:inherit;box-sizing:border-box;resize:vertical}}
+        .setting-edit-sheet button{{margin-top:12px}}
+        .setting-edit-cancel{{background:#1a2a3a;color:#d8e3ec;border:1px solid #344b60}}
         @media(max-width:430px){{.cyrus-settings-page{{max-width:100%}}.setting-container{{border-inline:0}}}}
       </style>
       <section class="setting-container">
-        <header class="setting-header">
-          <div class="setting-delete">𓊹</div>
-          <div class="setting-title">فرمان</div>
-          <a class="close-setting" href="/home" aria-label="بازگشت">×</a>
-          <span></span>
-        </header>
         <section class="setting-img-container">
           {avatar_html}
-          <div class="setting-profile-name">{display_name}</div>
-          <div class="setting-profile-user">@{username}</div>
+          <div class="setting-profile-name" data-edit="display_name" data-current="{display_name}">{display_name}</div>
+          <div class="setting-profile-user" data-edit="username" data-current="{username}">@{username}</div>
+          <div class="setting-profile-bio" data-edit="bio" data-current="{bio}">{bio or "بیوگرافی اضافه نشده · برای ویرایش لمس کنید"}</div>
         </section>
         <div class="setting-divider"></div>
         <section class="setting-information-container">
-          <div class="setting-info">
-            <span class="info-icons">♙</span>
-            <span class="info">{display_name}</span>
-            <span class="smal-title">نام نمایشی</span>
-          </div>
-          <div class="setting-info">
-            <span class="info-icons">⌕</span>
-            <span class="info" dir="ltr">@{username}</span>
-            <span class="smal-title">شناسه</span>
-          </div>
-          <div class="setting-info">
-            <span class="info-icons">𓆃</span>
-            <span class="info">{bio or "بیوگرافی ثبت نشده"}</span>
-            <span class="smal-title">درباره</span>
-          </div>
-        </section>
-        <section class="setting-username-form">
-          <form method="post">
-            <label for="cyrus-settings-username">نام کاربری</label>
-            <input id="cyrus-settings-username" name="username" value="{username}" minlength="3" maxlength="24" required>
-            <p class="setting-error">{html.escape(error)}</p>
-            <button type="submit">ذخیره نام کاربری</button>
-          </form>
+          <button class="setting-info" type="button" data-edit="display_name" data-current="{display_name}">
+            <span class="info">{display_name}</span><span class="smal-title">نام نمایشی</span>
+          </button>
+          <button class="setting-info" type="button" data-edit="username" data-current="{username}">
+            <span class="info" dir="ltr">@{username}</span><span class="smal-title">نام کاربری</span>
+          </button>
+          <button class="setting-info" type="button" data-edit="bio" data-current="{bio}">
+            <span class="info">{bio or "بیوگرافی ثبت نشده · برای ویرایش لمس کنید"}</span><span class="smal-title">درباره</span>
+          </button>
         </section>
         <section class="setting-buttons">
-          <a class="s-button" href="/profile"><span class="buttons-icons">♙</span><span class="button-title">ویرایش پروفایل و تصویر</span><span>‹</span></a>
-          <a class="s-button" href="/contacts"><span class="buttons-icons">𓅃</span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
-          <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons">⧉</span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
-          <a class="s-button" href="/logout"><span class="buttons-icons">⇥</span><span class="button-title">خروج از حساب</span><span>‹</span></a>
-          <a class="s-button" href="/home"><span class="buttons-icons">𓆃</span><span class="button-title">بازگشت به بارگاه</span><span>‹</span></a>
+          <a class="s-button" href="/profile"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2z"/></svg></span><span class="button-title">ویرایش تصویر پروفایل</span><span>‹</span></a>
+          <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
+          <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
+          <a class="s-button" href="/logout"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg></span><span class="button-title">خروج از حساب</span><span>‹</span></a>
+          <a class="s-button" href="/home"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5M5.5 9.5V21h13V9.5M9.5 21v-6h5v6"/></svg></span><span class="button-title">بازگشت به بارگاه</span><span>‹</span></a>
         </section>
         <input id="cyrus-settings-share" type="hidden" value="{share_text}">
       </section>
+      <div class="setting-edit-overlay" id="cyrus-edit-overlay" role="dialog" aria-modal="true" aria-labelledby="cyrus-edit-title">
+        <form class="setting-edit-sheet" method="post" id="cyrus-inline-edit">
+          <h3 id="cyrus-edit-title">ویرایش اطلاعات</h3>
+          <input type="hidden" name="edit_field" id="cyrus-edit-field">
+          <input name="field_value" id="cyrus-edit-input" autocomplete="off">
+          <textarea name="field_value" id="cyrus-edit-textarea" maxlength="250" rows="4" style="display:none"></textarea>
+          <p class="setting-error">{html.escape(error)}</p>
+          <button type="submit">ذخیره</button>
+          <button type="button" class="setting-edit-cancel" onclick="document.getElementById('cyrus-edit-overlay').classList.remove('open')">انصراف</button>
+        </form>
+      </div>
+      <script>
+        (function(){{
+          const overlay=document.getElementById('cyrus-edit-overlay');
+          const field=document.getElementById('cyrus-edit-field');
+          const input=document.getElementById('cyrus-edit-input');
+          const textarea=document.getElementById('cyrus-edit-textarea');
+          const title=document.getElementById('cyrus-edit-title');
+          function openEditor(key,value){{
+            field.value=key;
+            title.textContent=key==='display_name'?'ویرایش نام نمایشی':key==='username'?'ویرایش نام کاربری':'ویرایش بیوگرافی';
+            const useBio=key==='bio';
+            input.style.display=useBio?'none':'block';
+            input.disabled=useBio;
+            textarea.style.display=useBio?'block':'none';
+            textarea.disabled=!useBio;
+            input.value=value;
+            textarea.value=value;
+            if(key==='username'){{input.minLength=3;input.maxLength=24;input.pattern='[A-Za-z0-9_-]+';input.required=true;input.dir='ltr';}}
+            else if(key==='display_name'){{input.minLength=2;input.maxLength=40;input.removeAttribute('pattern');input.required=true;input.dir='auto';}}
+            else{{textarea.maxLength=250;}}
+            overlay.classList.add('open');
+            setTimeout(()=>{{(useBio?textarea:input).focus();}},40);
+          }}
+          document.querySelectorAll('[data-edit]').forEach(el=>{{
+            el.addEventListener('click',()=>openEditor(el.dataset.edit,el.dataset.current||''));
+          }});
+          overlay.addEventListener('click',e=>{{if(e.target===overlay)overlay.classList.remove('open');}});
+          document.addEventListener('keydown',e=>{{if(e.key==='Escape')overlay.classList.remove('open');}});
+          if({str(bool(error)).lower()}) openEditor({json.dumps(edit_field)},'');
+        }})();
+      </script>
     </main>
     """
     return page(content)
