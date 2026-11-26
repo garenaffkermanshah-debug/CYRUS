@@ -1167,6 +1167,12 @@ def chat(conversation_id):
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
         messages = response.json()
+        pinned_message = next((m for m in messages if isinstance(m.get("metadata"), dict) and m["metadata"].get("pinned")), None)
+        pinned_banner = (
+            '<div class="card" style="border-color:#d8b46a;margin-bottom:10px">📌 پیام سنجاق‌شده: '
+            + html.escape(str(pinned_message.get("content") or "")[:180]) + '</div>'
+            if pinned_message else ""
+        )
     except Exception:
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'), 502
 
@@ -1217,7 +1223,7 @@ def chat(conversation_id):
                f'<button type="submit">{"برداشتن سنجاق" if meta.get("pinned") else "سنجاق"}</button></form>' if mine else "")
             + (f'<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
                f'<form method="post" action="/chat/message/{msg_id}/delete" '
-               'onsubmit="return confirm(\\'این پیام برای هر دو طرف حذف شود؟\\')">'
+               'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\\')">'
                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
                '<button type="submit">حذف</button></form>' if mine else "")
             + '</div>'
@@ -1305,6 +1311,7 @@ def chat(conversation_id):
     content = f"""
     <div class="container">
       {room_header}
+      {pinned_banner}
       <style>
         .room-header{{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:14px;border:1px solid #987039;border-radius:16px;background:rgba(9,15,25,.94)}}
         .room-avatar{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:1px solid #987039;background:#111b2b;display:flex;align-items:center;justify-content:center}}
@@ -1439,6 +1446,23 @@ def send_message(conversation_id):
 
         room = room_response.json()[0]
 
+        message_metadata = {}
+        reply_to_id = str(request.form.get("reply_to_id") or "").strip()
+        if reply_to_id:
+            try:
+                uuid.UUID(reply_to_id)
+            except ValueError:
+                return "شناسه پیام پاسخ نامعتبر است", 400
+            reply_response = requests.get(
+                URL + "/rest/v1/cyrus_messages",
+                params={"select":"id,conversation_id,content","id":"eq."+reply_to_id,"limit":"1"},
+                headers=headers, timeout=15
+            )
+            if not reply_response.ok or not reply_response.json() or str(reply_response.json()[0].get("conversation_id")) != conversation_id:
+                return "پیام پاسخ در این گفتگو پیدا نشد", 400
+            replied = reply_response.json()[0]
+            message_metadata = {"reply_to_id":reply_to_id,"reply_to_content":str(replied.get("content") or "")[:500]}
+
         # اگر کاربر، عضو دیگر گفتگوی خصوصی را مسدود کرده باشد، پیام جدید نپذیر.
         if room.get("type") == "private":
             members_check = requests.get(
@@ -1510,7 +1534,8 @@ def send_message(conversation_id):
                 "conversation_id": conversation_id,
                 "sender_id": current_user,
                 "content": message,
-                "message_type": "text"
+                "message_type": "text",
+                "metadata": message_metadata
             },
             headers=headers,
             timeout=20
@@ -1531,6 +1556,96 @@ def send_message(conversation_id):
 
     return redirect(url_for("chat", conversation_id=conversation_id))
 
+
+
+@app.route("/chat/message/<message_id>/pin", methods=["POST"])
+def toggle_message_pin(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    conversation_id = str(request.form.get("conversation_id") or "")
+    current_user = str(session.get("user_id") or "")
+    try:
+        uuid.UUID(message_id); uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه پیام یا گفتگو نامعتبر است", 400
+    headers = {"apikey":KEY, "Authorization":"Bearer "+session["access_token"],
+               "Content-Type":"application/json", "Prefer":"return=minimal"}
+    try:
+        found = requests.get(URL + "/rest/v1/cyrus_messages",
+            params={"select":"id,conversation_id,sender_id,metadata","id":"eq."+message_id,"limit":"1"},
+            headers=headers, timeout=15)
+        if not found.ok or not found.json() or str(found.json()[0].get("conversation_id")) != conversation_id:
+            return "پیام پیدا نشد", 404
+        msg=found.json()[0]
+        if str(msg.get("sender_id") or "") != current_user:
+            return "فعلاً فقط پیام خودتان را می‌توانید سنجاق کنید.", 403
+        meta=msg.get("metadata") if isinstance(msg.get("metadata"),dict) else {}
+        meta=dict(meta); meta["pinned"]=not bool(meta.get("pinned"))
+        saved=requests.patch(URL+"/rest/v1/cyrus_messages",
+            params={"id":"eq."+message_id},json={"metadata":meta},headers=headers,timeout=15)
+        if not saved.ok:
+            return "سنجاق پیام انجام نشد؛ مجوز ویرایش پیام را بررسی کنید.", 403
+        return redirect(url_for("chat",conversation_id=conversation_id))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
+
+
+@app.route("/chat/message/<message_id>/forward", methods=["POST"])
+def forward_message(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    destination=str(request.form.get("conversation_id") or "")
+    current_user=str(session.get("user_id") or "")
+    try:
+        uuid.UUID(message_id); uuid.UUID(destination)
+    except ValueError:
+        return "شناسه پیام یا مقصد نامعتبر است", 400
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+             "Content-Type":"application/json","Prefer":"return=minimal"}
+    try:
+        source=requests.get(URL+"/rest/v1/cyrus_messages",
+            params={"select":"id,conversation_id,content,message_type","id":"eq."+message_id,"limit":"1"},
+            headers=headers,timeout=15)
+        if not source.ok or not source.json():
+            return "پیام مبدأ پیدا نشد",404
+        original=source.json()[0]
+        dest=requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"id,type,created_by","id":"eq."+destination,"limit":"1"},
+            headers=headers,timeout=15)
+        if not dest.ok or not dest.json():
+            return "گفتگوی مقصد پیدا نشد",404
+        room=dest.json()[0]
+        member=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"role","conversation_id":"eq."+destination,"user_id":"eq."+current_user,"limit":"1"},
+            headers=headers,timeout=15)
+        if not member.ok or not member.json():
+            return "عضو گفتگوی مقصد نیستید",403
+        if room.get("type")=="channel" and str(room.get("created_by") or "")!=current_user and member.json()[0].get("role") not in ("admin","owner"):
+            return "در این کانال اجازه انتشار ندارید",403
+        if room.get("type")=="private":
+            others=requests.get(URL+"/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+destination},
+                headers=headers,timeout=15)
+            if others.ok:
+                for m in others.json():
+                    other=str(m.get("user_id") or "")
+                    if other and other!=current_user:
+                        blocked=requests.get(URL+"/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+current_user,"blocked_id":"eq."+other,"limit":"1"},
+                            headers=headers,timeout=15)
+                        if blocked.ok and blocked.json():
+                            return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.",403
+        saved=requests.post(URL+"/rest/v1/cyrus_messages",
+            json={"conversation_id":destination,"sender_id":current_user,
+                  "content":str(original.get("content") or ""),
+                  "message_type":str(original.get("message_type") or "text"),
+                  "metadata":{"forwarded_from_message_id":message_id,"forwarded_from_conversation_id":str(original.get("conversation_id") or "")}},
+            headers=headers,timeout=20)
+        if not saved.ok:
+            return "انتقال پیام ناموفق بود",403
+        return redirect(url_for("chat",conversation_id=destination))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/chat/message/<message_id>/edit", methods=["POST"])
