@@ -441,6 +441,7 @@ def home():
 
     for room in conversations:
         room_type = str(room.get("type") or "private")
+        search_extra = ""
 
         if selected != "all" and room_type != selected:
             continue
@@ -516,6 +517,7 @@ def home():
                     if profile_response.ok and profile_response.json():
                         person = profile_response.json()[0]
                         person_name = str(person.get("display_name") or person.get("username") or room_title)
+                        search_extra = person_name + " " + str(person.get("username") or "")
                         avatar_url = str(person.get("avatar_url") or "")
                         if avatar_url:
                             avatar_html = (
@@ -535,7 +537,7 @@ def home():
                 pass
 
         rows += f"""
-        <div class="chat-row cyrus-chat-row">
+        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}">
           {avatar_html}
           <div class="chat-info" onclick="location.href='/chat/{room_id}'" style="cursor:pointer">
             <div class="chat-name">{html.escape(str(room_title))}</div>
@@ -564,6 +566,7 @@ def home():
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
         .cyrus-chat-row .avatar{{font-weight:bold;color:#fff}}
       </style>
+      <input id="cyrusChatSearch" type="search" placeholder="جست‌وجوی گفتگو، نام یا شناسه..." style="width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border-radius:12px;background:#0b1422;color:#fff;border:1px solid #80643b">
       <div class="tabs">{tabs}</div>
 
       <div class="chat-list">{rows}</div>
@@ -575,6 +578,8 @@ def home():
       </style>
       <script>
       (()=>{{
+        const search=document.getElementById("cyrusChatSearch");
+        if(search)search.addEventListener("input",()=>{{const q=search.value.trim().toLowerCase();document.querySelectorAll(".cyrus-chat-row").forEach(row=>{{row.style.display=(row.dataset.search||"").includes(q)?"":"none";}});}});
         document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
           let timer=null;
           const start=()=>{{timer=setTimeout(()=>{{row.classList.add('remove-open');}},600);}};
@@ -1002,8 +1007,8 @@ def public_user_profile(user_id):
         try:
             block_check = requests.get(
                 URL + "/rest/v1/cyrus_user_blocks",
-                params={"select":"blocker_user_id", "blocker_user_id":"eq."+own_id,
-                        "blocked_user_id":"eq."+user_id, "limit":"1"},
+                params={"select":"blocker_id", "blocker_id":"eq."+own_id,
+                        "blocked_id":"eq."+user_id, "limit":"1"},
                 headers=headers, timeout=15
             )
             blocked_by_me = bool(block_check.ok and block_check.json())
@@ -1040,10 +1045,10 @@ def toggle_user_block(user_id):
         "apikey": KEY, "Authorization": "Bearer " + session["access_token"],
         "Content-Type": "application/json", "Prefer": "return=minimal"
     }
-    params = {"blocker_user_id":"eq."+own_id, "blocked_user_id":"eq."+user_id}
+    params = {"blocker_id":"eq."+own_id, "blocked_id":"eq."+user_id}
     try:
         existing = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={**params, "select":"blocker_user_id"}, headers=headers, timeout=20)
+            params={**params, "select":"blocker_id"}, headers=headers, timeout=20)
         if not existing.ok:
             return page('<div class="container card"><p>بررسی مسدودسازی ناموفق بود؛ دسترسی پایگاه داده را بررسی کنید.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
         if existing.json():
@@ -1051,7 +1056,7 @@ def toggle_user_block(user_id):
                 params=params, headers=headers, timeout=20)
         else:
             changed = requests.post(URL + "/rest/v1/cyrus_user_blocks",
-                json={"blocker_user_id":own_id, "blocked_user_id":user_id},
+                json={"blocker_id":own_id, "blocked_id":user_id},
                 headers=headers, timeout=20)
         if not changed.ok:
             return page('<div class="container card"><p>تغییر وضعیت مسدودسازی انجام نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 400
@@ -1074,11 +1079,18 @@ def message_to_user(user_id):
     own_id = str(session.get("user_id") or "")
     try:
         blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={"select":"id", "blocker_user_id":"eq."+own_id,
-                    "blocked_user_id":"eq."+user_id, "limit":"1"},
+            params={"select":"blocker_id", "blocker_id":"eq."+own_id,
+                    "blocked_id":"eq."+user_id, "limit":"1"},
             headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
             timeout=15)
         if blocked.ok and blocked.json():
+            return redirect("/user/" + user_id)
+        reverse_blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
+            params={"select":"blocker_id", "blocker_id":"eq."+user_id,
+                    "blocked_id":"eq."+own_id, "limit":"1"},
+            headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
+            timeout=15)
+        if reverse_blocked.ok and reverse_blocked.json():
             return redirect("/user/" + user_id)
     except Exception:
         pass
@@ -1149,7 +1161,7 @@ def chat(conversation_id):
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
             params={
-                "select": "id,sender_id,content,message_type,created_at,edited_at",
+                "select": "id,sender_id,content,message_type,created_at,edited_at,metadata",
                 "conversation_id": "eq." + conversation_id,
                 "order": "created_at.asc",
                 "limit": "200"
@@ -1162,10 +1174,34 @@ def chat(conversation_id):
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
         messages = response.json()
+        pinned_message = next((m for m in messages if isinstance(m.get("metadata"), dict) and m["metadata"].get("pinned")), None)
+        pinned_banner = (
+            '<div class="card" style="border-color:#d8b46a;margin-bottom:10px">📌 پیام سنجاق‌شده: '
+            + html.escape(str(pinned_message.get("content") or "")[:180]) + '</div>'
+            if pinned_message else ""
+        )
     except Exception:
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'), 502
 
-    current_user = session.get("user_id", "")
+    current_user = str(session.get("user_id", "") or "")
+    forward_options = '<option value="">مقصد انتقال را انتخاب کنید</option>'
+    try:
+        fm = requests.get(URL + "/rest/v1/cyrus_members",
+            params={"select":"conversation_id","user_id":"eq."+current_user},
+            headers=headers,timeout=15)
+        fids = list(dict.fromkeys(str(x.get("conversation_id") or "") for x in fm.json()
+            if x.get("conversation_id") and str(x.get("conversation_id")) != conversation_id)) if fm.ok else []
+        if fids:
+            fr = requests.get(URL + "/rest/v1/cyrus_conversations",
+                params={"select":"id,title,type","id":"in.("+",".join(fids)+")"},
+                headers=headers,timeout=15)
+            if fr.ok:
+                for dest in fr.json():
+                    did=html.escape(str(dest.get("id") or ""),quote=True)
+                    dtitle=html.escape(str(dest.get("title") or "گفتگو"))
+                    forward_options += f'<option value="{did}">{dtitle}</option>'
+    except Exception:
+        pass
     message_rows = ""
 
     for msg in messages:
@@ -1177,17 +1213,30 @@ def chat(conversation_id):
         raw_content = html.escape(str(msg.get("content") or ""), quote=True)
         edited_label = " · ویرایش‌شده" if msg.get("edited_at") else ""
 
-        controls = ""
+        meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
+        reply_source = html.escape(str(meta.get("reply_to_content") or ""))
+        reply_preview = f'<div class="reply-preview">↪ پاسخ به: {reply_source}</div>' if reply_source else ""
+        forwarded_label = '<small class="forwarded-label">↗ پیام انتقال‌یافته</small>' if meta.get("forwarded_from_message_id") else ""
+        pinned_label = '<small class="pinned-label">📌 سنجاق‌شده</small>' if meta.get("pinned") else ""
+        controls = (
+            '<div class="message-actions">'
+            f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}">پاسخ</button>'
+            f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}">کپی</button>'
+            '<button type="button" onclick="cyrusShowForward(this)">انتقال</button>'
+            f'<form class="forward-form" method="post" action="/chat/message/{msg_id}/forward" style="display:none">'
+            f'<select name="conversation_id" required>{forward_options}</select><button type="submit">ارسال</button></form>'
+            + (f'<form method="post" action="/chat/message/{msg_id}/pin">'
+               f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
+               f'<button type="submit">{"برداشتن سنجاق" if meta.get("pinned") else "سنجاق"}</button></form>' if mine else "")
+            + (f'<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
+               f'<form method="post" action="/chat/message/{msg_id}/delete" '
+               'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
+               f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
+               '<button type="submit">حذف</button></form>' if mine else "")
+            + '</div>'
+        )
         edit_form = ""
         if mine:
-            controls = (
-                '<div class="message-actions">'
-                '<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
-                f'<form method="post" action="/chat/message/{msg_id}/delete" '
-                'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
-                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
-                '<button type="submit">حذف</button></form></div>'
-            )
             edit_form = (
                 f'<form class="edit-form" method="post" '
                 f'action="/chat/message/{msg_id}/edit" style="display:none">'
@@ -1198,6 +1247,7 @@ def chat(conversation_id):
 
         message_rows += f"""
         <div class="message {css_class}" data-content="{raw_content}">
+          {reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           <small>{stamp}{edited_label}</small>
           {controls}
@@ -1251,6 +1301,9 @@ def chat(conversation_id):
 
     send_box = (
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
+        '<div id="cyrusReplyBar" style="display:none;padding:8px;border-right:3px solid #d8b46a;margin-bottom:8px">'
+        '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">لغو پاسخ</button></div>'
+        '<input type="hidden" name="reply_to_id" id="cyrusReplyId" value="">'
         '<input name="content" maxlength="4000" placeholder="پیام خود را بنویسید..." required>'
         '<button type="submit">ارسال</button></form>'
         if room_type != "channel" or channel_can_post else
@@ -1265,6 +1318,7 @@ def chat(conversation_id):
     content = f"""
     <div class="container">
       {room_header}
+      {pinned_banner}
       <style>
         .room-header{{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:14px;border:1px solid #987039;border-radius:16px;background:rgba(9,15,25,.94)}}
         .room-avatar{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:1px solid #987039;background:#111b2b;display:flex;align-items:center;justify-content:center}}
@@ -1280,6 +1334,11 @@ def chat(conversation_id):
         .message .message-body{{color:#55b7ff}}
         .message small{{display:block;color:#b0b2b7;font-size:10px;margin-top:7px}}
         .message-actions{{display:flex;gap:8px;margin-top:8px;align-items:center}}
+        .message-actions{{display:flex;flex-wrap:wrap}}
+        .message-actions form{{display:flex;gap:4px;align-items:center;margin:0}}
+        .message-actions select{{max-width:130px;background:#0b1422;color:#fff;border:1px solid #80643b;border-radius:6px}}
+        .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
+        .forwarded-label,.pinned-label{{color:#d8b46a}}
         .message-actions form{{margin:0}}
         .message-actions button{{width:auto;margin:0;padding:5px 10px;font-size:11px;background:#17283a;color:#c6d9e8;border:1px solid #34516a}}
         .message.mine{{align-self:flex-start;border-color:#278bdc}}
@@ -1288,6 +1347,25 @@ def chat(conversation_id):
       </style>
       <div class="card messages-area">{message_rows}</div>
       <script>
+      function cyrusReply(button) {{
+        document.getElementById("cyrusReplyId").value=button.dataset.id||"";
+        document.getElementById("cyrusReplyText").textContent="پاسخ به: "+(button.dataset.content||"").slice(0,120);
+        document.getElementById("cyrusReplyBar").style.display="block";
+        document.querySelector('.send-box input[name="content"]').focus();
+      }}
+      function cyrusCancelReply() {{
+        document.getElementById("cyrusReplyId").value="";
+        document.getElementById("cyrusReplyBar").style.display="none";
+      }}
+      async function cyrusCopy(button) {{
+        const value=button.dataset.content||"";
+        try {{ await navigator.clipboard.writeText(value); button.textContent="کپی شد"; }}
+        catch(e) {{ window.prompt("متن پیام را کپی کنید:",value); }}
+      }}
+      function cyrusShowForward(button) {{
+        const form=button.parentElement.querySelector(".forward-form");
+        if(form)form.style.display=form.style.display==="none"?"flex":"none";
+      }}
       function cyrusEdit(button) {{
         const message = button.closest('.message');
         const value = prompt('متن پیام را ویرایش کنید:', message.dataset.content);
@@ -1375,6 +1453,23 @@ def send_message(conversation_id):
 
         room = room_response.json()[0]
 
+        message_metadata = {}
+        reply_to_id = str(request.form.get("reply_to_id") or "").strip()
+        if reply_to_id:
+            try:
+                uuid.UUID(reply_to_id)
+            except ValueError:
+                return "شناسه پیام پاسخ نامعتبر است", 400
+            reply_response = requests.get(
+                URL + "/rest/v1/cyrus_messages",
+                params={"select":"id,conversation_id,content","id":"eq."+reply_to_id,"limit":"1"},
+                headers=headers, timeout=15
+            )
+            if not reply_response.ok or not reply_response.json() or str(reply_response.json()[0].get("conversation_id")) != conversation_id:
+                return "پیام پاسخ در این گفتگو پیدا نشد", 400
+            replied = reply_response.json()[0]
+            message_metadata = {"reply_to_id":reply_to_id,"reply_to_content":str(replied.get("content") or "")[:500]}
+
         # اگر کاربر، عضو دیگر گفتگوی خصوصی را مسدود کرده باشد، پیام جدید نپذیر.
         if room.get("type") == "private":
             members_check = requests.get(
@@ -1388,12 +1483,20 @@ def send_message(conversation_id):
                 for other_id in other_ids:
                     block_check = requests.get(
                         URL + "/rest/v1/cyrus_user_blocks",
-                        params={"select":"id", "blocker_user_id":"eq."+current_user,
-                                "blocked_user_id":"eq."+other_id, "limit":"1"},
+                        params={"select":"blocker_id", "blocker_id":"eq."+current_user,
+                                "blocked_id":"eq."+other_id, "limit":"1"},
                         headers=headers, timeout=15
                     )
                     if block_check.ok and block_check.json():
                         return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.", 403
+                    reverse_block_check = requests.get(
+                        URL + "/rest/v1/cyrus_user_blocks",
+                        params={"select":"blocker_id", "blocker_id":"eq."+other_id,
+                                "blocked_id":"eq."+current_user, "limit":"1"},
+                        headers=headers, timeout=15
+                    )
+                    if reverse_block_check.ok and reverse_block_check.json():
+                        return "این کاربر شما را مسدود کرده است؛ امکان ارسال پیام نیست.", 403
 
         # برای گفتگوهای غیرکانال، فرستنده باید عضو گفتگو باشد.
         if room.get("type") != "channel":
@@ -1446,7 +1549,8 @@ def send_message(conversation_id):
                 "conversation_id": conversation_id,
                 "sender_id": current_user,
                 "content": message,
-                "message_type": "text"
+                "message_type": "text",
+                "metadata": message_metadata
             },
             headers=headers,
             timeout=20
@@ -1467,6 +1571,101 @@ def send_message(conversation_id):
 
     return redirect(url_for("chat", conversation_id=conversation_id))
 
+
+
+@app.route("/chat/message/<message_id>/pin", methods=["POST"])
+def toggle_message_pin(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    conversation_id = str(request.form.get("conversation_id") or "")
+    current_user = str(session.get("user_id") or "")
+    try:
+        uuid.UUID(message_id); uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه پیام یا گفتگو نامعتبر است", 400
+    headers = {"apikey":KEY, "Authorization":"Bearer "+session["access_token"],
+               "Content-Type":"application/json", "Prefer":"return=minimal"}
+    try:
+        found = requests.get(URL + "/rest/v1/cyrus_messages",
+            params={"select":"id,conversation_id,sender_id,metadata","id":"eq."+message_id,"limit":"1"},
+            headers=headers, timeout=15)
+        if not found.ok or not found.json() or str(found.json()[0].get("conversation_id")) != conversation_id:
+            return "پیام پیدا نشد", 404
+        msg=found.json()[0]
+        if str(msg.get("sender_id") or "") != current_user:
+            return "فعلاً فقط پیام خودتان را می‌توانید سنجاق کنید.", 403
+        meta=msg.get("metadata") if isinstance(msg.get("metadata"),dict) else {}
+        meta=dict(meta); meta["pinned"]=not bool(meta.get("pinned"))
+        saved=requests.patch(URL+"/rest/v1/cyrus_messages",
+            params={"id":"eq."+message_id},json={"metadata":meta},headers=headers,timeout=15)
+        if not saved.ok:
+            return "سنجاق پیام انجام نشد؛ مجوز ویرایش پیام را بررسی کنید.", 403
+        return redirect(url_for("chat",conversation_id=conversation_id))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
+
+
+@app.route("/chat/message/<message_id>/forward", methods=["POST"])
+def forward_message(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    destination=str(request.form.get("conversation_id") or "")
+    current_user=str(session.get("user_id") or "")
+    try:
+        uuid.UUID(message_id); uuid.UUID(destination)
+    except ValueError:
+        return "شناسه پیام یا مقصد نامعتبر است", 400
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+             "Content-Type":"application/json","Prefer":"return=minimal"}
+    try:
+        source=requests.get(URL+"/rest/v1/cyrus_messages",
+            params={"select":"id,conversation_id,content,message_type","id":"eq."+message_id,"limit":"1"},
+            headers=headers,timeout=15)
+        if not source.ok or not source.json():
+            return "پیام مبدأ پیدا نشد",404
+        original=source.json()[0]
+        dest=requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"id,type,created_by","id":"eq."+destination,"limit":"1"},
+            headers=headers,timeout=15)
+        if not dest.ok or not dest.json():
+            return "گفتگوی مقصد پیدا نشد",404
+        room=dest.json()[0]
+        member=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"role","conversation_id":"eq."+destination,"user_id":"eq."+current_user,"limit":"1"},
+            headers=headers,timeout=15)
+        if not member.ok or not member.json():
+            return "عضو گفتگوی مقصد نیستید",403
+        if room.get("type")=="channel" and str(room.get("created_by") or "")!=current_user and member.json()[0].get("role") not in ("admin","owner"):
+            return "در این کانال اجازه انتشار ندارید",403
+        if room.get("type")=="private":
+            others=requests.get(URL+"/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+destination},
+                headers=headers,timeout=15)
+            if others.ok:
+                for m in others.json():
+                    other=str(m.get("user_id") or "")
+                    if other and other!=current_user:
+                        blocked=requests.get(URL+"/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+current_user,"blocked_id":"eq."+other,"limit":"1"},
+                            headers=headers,timeout=15)
+                        if blocked.ok and blocked.json():
+                            return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.",403
+                        reverse_blocked=requests.get(URL+"/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+other,"blocked_id":"eq."+current_user,"limit":"1"},
+                            headers=headers,timeout=15)
+                        if reverse_blocked.ok and reverse_blocked.json():
+                            return "این کاربر شما را مسدود کرده است؛ امکان ارسال پیام نیست.",403
+        saved=requests.post(URL+"/rest/v1/cyrus_messages",
+            json={"conversation_id":destination,"sender_id":current_user,
+                  "content":str(original.get("content") or ""),
+                  "message_type":str(original.get("message_type") or "text"),
+                  "metadata":{"forwarded_from_message_id":message_id,"forwarded_from_conversation_id":str(original.get("conversation_id") or "")}},
+            headers=headers,timeout=20)
+        if not saved.ok:
+            return "انتقال پیام ناموفق بود",403
+        return redirect(url_for("chat",conversation_id=destination))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/chat/message/<message_id>/edit", methods=["POST"])
