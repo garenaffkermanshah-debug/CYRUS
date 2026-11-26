@@ -582,19 +582,13 @@ def search():
 
     if query:
         try:
-            # جستجوی افراد
-            people_response = requests.get(
-                URL + "/rest/v1/cyrus_profiles",
-                params={
-                    "select": "id,username,display_name,bio",
-                    "id": "neq." + str(session.get("user_id", "")),
-                    "or": "(username.ilike.*" + query + "*,display_name.ilike.*" + query + "*)",
-                    "limit": "50"
-                },
-                headers=headers,
+            # جستجوی کاربران از طریق تابع امن پایگاه داده
+            people_response = requests.post(
+                URL + "/rest/v1/rpc/cyrus_search_users",
+                json={"p_query": query},
+                headers={**headers, "Content-Type": "application/json"},
                 timeout=20
             )
-
             if people_response.ok:
                 people = people_response.json()
 
@@ -743,20 +737,16 @@ def contacts():
     }
 
     try:
-        response = requests.get(
-            URL + "/rest/v1/cyrus_profiles",
-            params={
-                "select": "id,username,display_name,bio,avatar_url",
-                "id": "neq." + session.get("user_id", ""),
-                "order": "username.asc"
-            },
-            headers=headers,
+        response = requests.post(
+            URL + "/rest/v1/rpc/cyrus_search_users",
+            json={"p_query": query or None},
+            headers={**headers, "Content-Type": "application/json"},
             timeout=20
         )
         if response.ok:
             users = response.json()
         else:
-            error = "دریافت مخاطبان انجام نشد"
+            error = "دریافت کاربران انجام نشد؛ تابع جستجوی کاربران را در پایگاه داده فعال کنید"
     except Exception:
         error = "ارتباط با سرور برقرار نشد"
 
