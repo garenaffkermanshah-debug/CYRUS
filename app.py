@@ -2665,6 +2665,7 @@ def profile():
     avatar_url = str(data.get("avatar_url") or "")
     avatar_html = ('<img src="' + html.escape(avatar_url, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 14px;border:2px solid #3297df">') if avatar_url else '<div class="avatar" style="width:110px;height:110px;margin:0 auto 14px;font-size:42px">𓅃</div>'
     avatar_error = html.escape(request.args.get("avatar_error", ""))
+    edit_value_html = html.escape(field_value, quote=True)
 
     content = f"""
     <main class="container cyrus-profile-page">
@@ -2737,6 +2738,7 @@ def settings():
 
     error = ""
     edit_field = ""
+    field_value = ""
     if request.method == "POST":
         edit_field = request.form.get("edit_field", "").strip()
         field_value = request.form.get("field_value", "").strip()
@@ -2859,8 +2861,8 @@ def settings():
         <form class="setting-edit-sheet" method="post" id="cyrus-inline-edit">
           <h3 id="cyrus-edit-title">ویرایش اطلاعات</h3>
           <input type="hidden" name="edit_field" id="cyrus-edit-field">
-          <input name="field_value" id="cyrus-edit-input" autocomplete="off">
-          <textarea name="field_value" id="cyrus-edit-textarea" maxlength="250" rows="4" style="display:none"></textarea>
+          <input name="field_value" id="cyrus-edit-input" autocomplete="off" value="{edit_value_html}">
+          <textarea name="field_value" id="cyrus-edit-textarea" maxlength="250" rows="4" style="display:none">{edit_value_html}</textarea>
           <p class="setting-error">{html.escape(error)}</p>
           <button type="submit">ذخیره</button>
           <button type="button" class="setting-edit-cancel" onclick="document.getElementById('cyrus-edit-overlay').classList.remove('open')">انصراف</button>
@@ -2894,7 +2896,7 @@ def settings():
           }});
           overlay.addEventListener('click',e=>{{if(e.target===overlay)overlay.classList.remove('open');}});
           document.addEventListener('keydown',e=>{{if(e.key==='Escape')overlay.classList.remove('open');}});
-          if({str(bool(error)).lower()}) openEditor({json.dumps(edit_field)},'');
+          if({str(bool(error)).lower()}) openEditor('{html.escape(edit_field, quote=True)}',document.getElementById('{ 'cyrus-edit-textarea' if edit_field == 'bio' else 'cyrus-edit-input' }').value);
         }})();
       </script>
     </main>
