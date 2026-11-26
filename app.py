@@ -534,6 +534,7 @@ def login_password():
             session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
             session.permanent = True
             session["user_id"] = data["user"]["id"]
+            cyrus_ensure_profile(email)
             session.pop("cyrus_login_email", None)
             return redirect(url_for("home"))
         error = "رمز عبور صحیح نیست؛ دوباره تلاش کنید"
@@ -1626,17 +1627,218 @@ def join_by_invite(invite_code):
         ), 502
 
 
-@app.route("/profile")
+
+def cyrus_profile_headers():
+    return {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session.get("access_token", ""),
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
+
+def cyrus_get_profile():
+    uid = str(session.get("user_id") or "")
+    if not uid:
+        return None
+    try:
+        r = requests.get(
+            URL + "/rest/v1/cyrus_profiles",
+            params={
+                "select": "id,username,display_name,bio",
+                "id": "eq." + uid,
+                "limit": "1"
+            },
+            headers=cyrus_profile_headers(),
+            timeout=20
+        )
+        if r.ok and r.json():
+            return r.json()[0]
+    except Exception:
+        pass
+    return None
+
+
+def cyrus_ensure_profile(email=""):
+    existing = cyrus_get_profile()
+    if existing:
+        return existing
+
+    uid = str(session.get("user_id") or "")
+    if not uid:
+        return None
+
+    base = str(email or "").split("@")[0]
+    username = "".join(
+        ch for ch in base if ch.isalnum() or ch in "_-"
+    )[:24]
+    if len(username) < 3:
+        username = "cyrus_" + uid.replace("-", "")[:10]
+
+    payload = {
+        "id": uid,
+        "username": username,
+        "display_name": username,
+        "bio": ""
+    }
+
+    try:
+        r = requests.post(
+            URL + "/rest/v1/cyrus_profiles",
+            json=payload,
+            headers={
+                **cyrus_profile_headers(),
+                "Prefer": "resolution=merge-duplicates,return=representation"
+            },
+            timeout=20
+        )
+        if r.ok:
+            return cyrus_get_profile()
+
+        payload["username"] = "cyrus_" + uid.replace("-", "")[:12]
+        payload["display_name"] = payload["username"]
+        r = requests.post(
+            URL + "/rest/v1/cyrus_profiles",
+            json=payload,
+            headers={
+                **cyrus_profile_headers(),
+                "Prefer": "resolution=merge-duplicates,return=representation"
+            },
+            timeout=20
+        )
+        if r.ok:
+            return cyrus_get_profile()
+    except Exception:
+        pass
+
+    return None
+
+
+@app.route("/profile", methods=["GET", "POST"])
 def profile():
     if not session.get("access_token"):
         return redirect("/login")
-    return page('<main class="container"><div class="card"><h2>نگاره</h2><p class="muted">پروفایل کاربری CYRUS</p><a class="form-link" href="/">بازگشت به بارگاه</a></div></main>')
 
-@app.route("/settings")
+    error = ""
+    if request.method == "POST":
+        display_name = request.form.get("display_name", "").strip()
+        bio = request.form.get("bio", "").strip()
+
+        if not 2 <= len(display_name) <= 40:
+            error = "نام نمایشی باید بین ۲ تا ۴۰ حرف باشد"
+        elif len(bio) > 250:
+            error = "بیوگرافی حداکثر ۲۵۰ حرف باشد"
+        else:
+            try:
+                r = requests.patch(
+                    URL + "/rest/v1/cyrus_profiles",
+                    params={"id": "eq." + str(session.get("user_id"))},
+                    json={"display_name": display_name, "bio": bio},
+                    headers=cyrus_profile_headers(),
+                    timeout=20
+                )
+                if r.ok:
+                    return redirect("/profile")
+                error = "ذخیره پروفایل انجام نشد؛ دوباره تلاش کنید"
+            except Exception:
+                error = "ارتباط با سرور برقرار نشد"
+
+    data = cyrus_ensure_profile(session.get("cyrus_login_email", ""))
+    if not data:
+        data = {"username": "", "display_name": "", "bio": ""}
+
+    username = html.escape(str(data.get("username") or ""))
+    display_name = html.escape(str(data.get("display_name") or ""), quote=True)
+    bio = html.escape(str(data.get("bio") or ""))
+
+    content = f"""
+    <main class="container">
+      <div class="card">
+        <h2>نگاره</h2>
+        <p class="muted">پروفایل کاربری CYRUS</p>
+        <p class="error">{html.escape(error)}</p>
+        <form method="post">
+          <label>نام نمایشی</label>
+          <input name="display_name" maxlength="40" minlength="2"
+                 value="{display_name}" required>
+          <label>بیوگرافی</label>
+          <textarea name="bio" maxlength="250" rows="4"
+            style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white">{bio}</textarea>
+          <button type="submit">ذخیره پروفایل</button>
+        </form>
+        <p class="muted"><a class="form-link" href="/settings">تنظیمات و نام کاربری</a></p>
+        <p class="muted"><a class="form-link" href="/">بازگشت به بارگاه</a></p>
+      </div>
+    </main>
+    """
+    return page(content)
+
+
+@app.route("/settings", methods=["GET", "POST"])
 def settings():
     if not session.get("access_token"):
         return redirect("/login")
-    return page('<main class="container"><div class="card"><h2>فرمان</h2><p class="muted">تنظیمات CYRUS</p><p class="muted"><a class="form-link" href="/logout">خروج از حساب</a></p></div></main>')
+
+    error = ""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+
+        valid = (
+            3 <= len(username) <= 24
+            and all(ch.isalnum() or ch in "_-" for ch in username)
+        )
+
+        if not valid:
+            error = "نام کاربری باید ۳ تا ۲۴ حرف و فقط شامل حروف، عدد، خط تیره یا زیرخط باشد"
+        else:
+            try:
+                r = requests.patch(
+                    URL + "/rest/v1/cyrus_profiles",
+                    params={"id": "eq." + str(session.get("user_id"))},
+                    json={"username": username},
+                    headers=cyrus_profile_headers(),
+                    timeout=20
+                )
+                if r.ok:
+                    return redirect("/settings")
+                error = "این نام کاربری احتمالاً قبلاً انتخاب شده است"
+            except Exception:
+                error = "ارتباط با سرور برقرار نشد"
+
+    data = cyrus_ensure_profile(session.get("cyrus_login_email", ""))
+    if not data:
+        data = {"username": "", "display_name": "", "bio": ""}
+
+    username = html.escape(str(data.get("username") or ""), quote=True)
+    share_text = html.escape("@" + str(data.get("username") or ""), quote=True)
+
+    content = f"""
+    <main class="container">
+      <div class="card">
+        <h2>فرمان</h2>
+        <p class="muted">تنظیمات حساب CYRUS</p>
+        <p class="error">{html.escape(error)}</p>
+        <form method="post">
+          <label>نام کاربری شما</label>
+          <input name="username" value="{username}" minlength="3"
+                 maxlength="24" required>
+          <p class="muted">این نام را دیگران برای پیدا کردن شما جستجو می‌کنند.</p>
+          <button type="submit">ذخیره نام کاربری</button>
+        </form>
+        <div class="card">
+          <p class="muted">نام کاربری برای ارسال به دوستان</p>
+          <input id="cyrus-username" readonly value="{share_text}">
+          <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-username').value).then(()=>alert('نام کاربری کپی شد'))">کپی نام کاربری</button>
+          <button type="button" onclick="if(navigator.share){{navigator.share({{title:'CYRUS',text:document.getElementById('cyrus-username').value}})}}else{{navigator.clipboard.writeText(document.getElementById('cyrus-username').value).then(()=>alert('کپی شد؛ برای دوستان ارسال کنید'))}}">اشتراک‌گذاری نام کاربری</button>
+        </div>
+        <p class="muted"><a class="form-link" href="/profile">ویرایش پروفایل و بیوگرافی</a></p>
+        <p class="muted"><a class="form-link" href="/logout">خروج از حساب</a></p>
+        <p class="muted"><a class="form-link" href="/">بازگشت به بارگاه</a></p>
+      </div>
+    </main>
+    """
+    return page(content)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False)
