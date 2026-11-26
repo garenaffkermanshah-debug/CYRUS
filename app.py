@@ -289,7 +289,8 @@ body {
 {{ nav|safe }}
 <script>
 window.addEventListener('pageshow', function(event) {
-  if (event.persisted && (location.pathname === '/' || location.pathname === '/home')) {
+  const navEntry = performance.getEntriesByType('navigation')[0];
+  if ((event.persisted || (navEntry && navEntry.type === 'back_forward')) && (location.pathname === '/' || location.pathname === '/home')) {
     location.reload();
   }
 });
@@ -2657,7 +2658,7 @@ def upload_profile_avatar():
         saved = requests.patch(URL + "/rest/v1/cyrus_profiles", params={"id":"eq."+uid}, json={"avatar_url":public_url}, headers={**cyrus_profile_headers(),"Prefer":"return=minimal"}, timeout=20)
         if not saved.ok:
             return redirect("/profile?avatar_error=عکس%20بارگذاری%20شد%20اما%20ذخیره%20پروفایل%20ناموفق%20بود")
-        return redirect("/profile")
+        return redirect("/profile?avatar_success=1")
     except Exception:
         return redirect("/profile?avatar_error=ارتباط%20با%20سرور%20برقرار%20نشد")
 
@@ -2701,6 +2702,7 @@ def profile():
     avatar_url = str(data.get("avatar_url") or "")
     avatar_html = ('<img src="' + html.escape(avatar_url, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 14px;border:2px solid #3297df">') if avatar_url else '<div class="avatar" style="width:110px;height:110px;margin:0 auto 14px;font-size:42px">𓅃</div>'
     avatar_error = html.escape(request.args.get("avatar_error", ""))
+    avatar_success = request.args.get("avatar_success") == "1"
 
     content = f"""
     <main class="container cyrus-profile-page">
@@ -2710,6 +2712,7 @@ def profile():
         .avatar-upload-form{{margin:12px auto 16px;max-width:330px;padding:10px;background:#0a1521;border:1px solid #2a4054;border-radius:12px}}
         .avatar-upload-form input[type=file]{{font-size:12px;padding:9px;background:#07121e;border:1px solid #30485e;border-radius:9px;color:#cbd7e2;width:100%;box-sizing:border-box}}
         .avatar-upload-form button{{margin-top:8px;padding:11px;font-size:13px;background:linear-gradient(100deg,#98702e,#e3bf69);color:#181208}}
+        .avatar-upload-success{{color:#8ee0b0;font-size:12px;margin:8px 0}}
         .profile-hero img,.profile-hero .avatar{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center}}
         .profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px;font-weight:500}}
         .profile-hero .username{{color:#78b8e6;font-size:13px;direction:ltr;margin-top:5px}}
@@ -2735,6 +2738,7 @@ def profile():
           <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
           <button type="submit">بارگذاری تصویر پروفایل</button>
           <p class="error">{avatar_error}</p>
+          <p class="avatar-upload-success">{"تصویر پروفایل با موفقیت ذخیره شد" if avatar_success else ""}</p>
         </form>
         <h2>{html.escape(str(data.get("display_name") or data.get("username") or "کاربر"))}</h2>
         <div class="username">@{username}</div>
