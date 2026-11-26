@@ -810,6 +810,9 @@ def search():
         return redirect(url_for("login"))
 
     raw_query = request.args.get("q", "").strip()
+    selected_type = request.args.get("type", "all")
+    if selected_type not in ("all", "messages", "people", "groups", "channels"):
+        selected_type = "all"
     query = "".join(
         ch for ch in raw_query
         if ch.isalnum() or ch in " _-@."
@@ -897,7 +900,7 @@ def search():
             continue
 
         people_rows += f"""
-        <div class="chat-row">
+        <div class="chat-row search-result" data-kind="people">
           <div class="avatar">𓅃</div>
           <div class="chat-info">
             <div class="chat-name">{html.escape(name)}</div>
@@ -937,7 +940,7 @@ def search():
                 action = '<span class="muted">گروه</span>'
 
         room_rows += f"""
-        <div class="chat-row">
+        <div class="chat-row search-result" data-kind="{ "channels" if room_type == "channel" else "groups" }">
           <div class="avatar">{icon}</div>
           <div class="chat-info">
             <div class="chat-name">{html.escape(title)}</div>
@@ -1012,21 +1015,47 @@ def search():
       <p class="error">{html.escape(error)}</p>
 
       <div class="search-category-tabs">
-        <a href="/search?q={html.escape(query, quote=True)}&type=all">همه</a>
-        <a href="/search?q={html.escape(query, quote=True)}&type=messages">پیام‌ها</a>
-        <a href="/search?q={html.escape(query, quote=True)}&type=people">افراد</a>
-        <a href="/search?q={html.escape(query, quote=True)}&type=groups">گروه‌ها</a>
-        <a href="/search?q={html.escape(query, quote=True)}&type=channels">کانال‌ها</a>
+        <a class="{ 'active' if selected_type == 'all' else '' }" href="/search?q={html.escape(query, quote=True)}&type=all">همه</a>
+        <a class="{ 'active' if selected_type == 'messages' else '' }" href="/search?q={html.escape(query, quote=True)}&type=messages">پیام‌ها</a>
+        <a class="{ 'active' if selected_type == 'people' else '' }" href="/search?q={html.escape(query, quote=True)}&type=people">افراد</a>
+        <a class="{ 'active' if selected_type == 'groups' else '' }" href="/search?q={html.escape(query, quote=True)}&type=groups">گروه‌ها</a>
+        <a class="{ 'active' if selected_type == 'channels' else '' }" href="/search?q={html.escape(query, quote=True)}&type=channels">کانال‌ها</a>
       </div>
       <style>
         .search-category-tabs{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #20364b;margin:0 12px 8px}
         .search-category-tabs a{padding:12px 10px;white-space:nowrap;color:#91a6b8;font-size:12px;border-bottom:2px solid transparent}
-        .search-category-tabs a:focus,.search-category-tabs a:hover{color:#69b9f7;border-color:#3297df}
+        .search-category-tabs a:focus,.search-category-tabs a:hover,.search-category-tabs a.active{color:#69b9f7;border-color:#3297df}
       </style>
       <div class="chat-list">{people_rows}</div>
       <div class="chat-list">{room_rows}</div>
 
+      <section id="cyrus-search-recent" style="display:none;padding:12px 15px 18px">
+        <div class="section-title">جستجوهای اخیر</div><div id="cyrus-search-recent-list"></div>
+      </section>
       {empty}
+      <script>
+      (function(){
+        const q={query!r}, kind={selected_type!r};
+        const key='cyrus_global_search_recent_v1';
+        const input=document.querySelector('.cyrus-explore-search input');
+        const recent=document.getElementById('cyrus-search-recent');
+        const list=document.getElementById('cyrus-search-recent-list');
+        document.querySelectorAll('.search-result').forEach(el=>{
+          if(kind!=='all'&&el.dataset.kind!==kind)el.style.display='none';
+        });
+        function read(){try{return JSON.parse(localStorage.getItem(key)||'[]').slice(0,8)}catch(e){return []}}
+        if(q){localStorage.setItem(key,JSON.stringify([q,...read().filter(x=>x!==q)].slice(0,8)));}
+        if(!q){
+          const items=read();
+          if(items.length){recent.style.display='block';items.forEach(value=>{
+            const row=document.createElement('div');row.style.cssText='padding:10px 0;color:#b6c6d4;font-size:13px';
+            const link=document.createElement('a');link.href='/search?q='+encodeURIComponent(value);link.textContent='⌕  '+value;
+            row.appendChild(link);list.appendChild(row);
+          });}
+        }
+        if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8));});
+      })();
+      </script>
     </div>
     """
     return page(content)
