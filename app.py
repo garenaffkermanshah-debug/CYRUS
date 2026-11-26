@@ -1224,21 +1224,24 @@ def chat(conversation_id):
         forwarded_label = '<small class="forwarded-label">↗ پیام انتقال‌یافته</small>' if meta.get("forwarded_from_message_id") else ""
         pinned_label = '<small class="pinned-label">📌 سنجاق‌شده</small>' if meta.get("pinned") else ""
         controls = (
-            '<details class="message-menu"><summary>•••</summary><div class="message-actions">'
-            f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}">پاسخ</button>'
-            f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}">کپی</button>'
-            '<button type="button" onclick="cyrusShowForward(this)">انتقال</button>'
-            f'<form class="forward-form" method="post" action="/chat/message/{msg_id}/forward" style="display:none">'
-            f'<select name="conversation_id" required>{forward_options}</select><button type="submit">ارسال</button></form>'
+            f'<div class="message-context" aria-hidden="true">'
+            '<div class="reaction-strip">'
+            + ''.join(f'<button type="button" class="reaction-choice" onclick="cyrusReact(event,this)" aria-label="واکنش {emoji}">{emoji}</button>' for emoji in ["❤️","👍","👎","🔥","🥰","👏","🇮🇷"])
+            + '</div><div class="context-actions">'
+            + f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}"><span>↶</span> پاسخ</button>'
+            + f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}"><span>▢</span> کپی</button>'
+            + '<button type="button" onclick="cyrusShowForward(this)"><span>↪</span> هدایت</button>'
+            + f'<form class="forward-form" method="post" action="/chat/message/{msg_id}/forward" style="display:none">'
+            + f'<select name="conversation_id" required>{forward_options}</select><button type="submit">ارسال</button></form>'
             + (f'<form method="post" action="/chat/message/{msg_id}/pin">'
                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
-               f'<button type="submit">{"برداشتن سنجاق" if meta.get("pinned") else "سنجاق"}</button></form>' if mine else "")
-            + (f'<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
+               f'<button type="submit"><span>⌖</span> {"برداشتن سنجاق" if meta.get("pinned") else "سنجاق کردن"}</button></form>' if mine else "")
+            + (f'<button type="button" onclick="cyrusEdit(this)"><span>✎</span> ویرایش</button>'
                f'<form method="post" action="/chat/message/{msg_id}/delete" '
                'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
-               '<button type="submit">حذف</button></form>' if mine else "")
-            + '</div></details>'
+               '<button type="submit"><span>⌫</span> حذف</button></form>' if mine else "")
+            + '</div></div>'
         )
         edit_form = ""
         if mine:
@@ -1251,7 +1254,7 @@ def chat(conversation_id):
             )
 
         message_rows += f"""
-        <div class="message {css_class}" data-content="{raw_content}">
+        <div class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
           {reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           <small>{stamp}{edited_label}</small>
@@ -1338,19 +1341,23 @@ def chat(conversation_id):
         .message{{position:relative;max-width:84%;padding:10px 13px;border:1px solid transparent;border-radius:16px;background:#172432;overflow-wrap:anywhere;box-shadow:0 1px 2px #0003}}
         .message .message-body{{color:#edf4fa;font-size:14px;line-height:1.8}}
         .message small{{display:block;color:#93a8ba;font-size:10px;margin-top:5px;text-align:left}}
-        .message-menu{{margin-top:6px;position:relative}}
-        .message-menu summary{{list-style:none;cursor:pointer;display:inline-block;color:#7f9bb2;font-size:12px;padding:2px 8px;border-radius:14px;background:#0e1b28}}
-        .message-menu summary::-webkit-details-marker{{display:none}}
-        .message-menu[open] .message-actions{{display:flex}}
-        .message-actions{{display:none;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}}
-        .message-actions form{{display:flex;gap:4px;align-items:center;margin:0}}
-        .message-actions select{{max-width:130px;background:#0b1422;color:#fff;border:1px solid #80643b;border-radius:6px}}
+        .message{{cursor:pointer}}
+        .message-context{{display:none;position:fixed;z-index:30;left:50%;bottom:calc(78px + env(safe-area-inset-bottom) + 12px);transform:translateX(-50%);width:min(355px,calc(100vw - 34px));filter:drop-shadow(0 12px 28px #0008);cursor:default}}
+        .message.context-open .message-context{{display:block}}
+        .reaction-strip{{display:flex;justify-content:space-around;align-items:center;gap:3px;padding:8px 9px;margin-bottom:8px;border-radius:30px;background:#253747;border:1px solid #354d61}}
+        .reaction-choice{{width:auto;min-width:0;margin:0;padding:3px 2px;background:transparent;border:0;border-radius:50%;font-size:25px;line-height:1.25}}
+        .context-actions{{display:flex;flex-direction:column;padding:6px 0;border-radius:12px;background:#253747;border:1px solid #344b5e;overflow:hidden}}
+        .context-actions>button,.context-actions form>button{{display:flex;align-items:center;gap:16px;width:100%;margin:0;padding:12px 18px;border:0;border-radius:0;background:transparent;color:#edf4f8;text-align:right;font-size:15px;font-weight:normal}}
+        .context-actions button span{{width:24px;text-align:center;color:#9db2c2;font-size:20px}}
+        .context-actions button:active{{background:#344b5e}}
+        .context-actions form{{display:flex;flex-direction:column;gap:5px;margin:0}}
+        .context-actions select{{width:calc(100% - 24px);margin:6px 12px;max-width:none;background:#0b1422;color:#fff;border:1px solid #526a7d;border-radius:7px;padding:9px}}
+        .context-actions form>button{{justify-content:flex-start}}
         .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
         .forwarded-label,.pinned-label{{color:#d8b46a}}
-        .message-actions form{{margin:0}}
-        .message-actions button{{width:auto;margin:0;padding:5px 10px;font-size:11px;background:#17283a;color:#c6d9e8;border:1px solid #34516a}}
         .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
         .message.theirs{{align-self:flex-end;background:#172432;border-color:#263b4d;border-bottom-right-radius:5px}}
+        .message.reacted:after{{content:attr(data-reaction);display:inline-block;margin-top:5px;padding:2px 7px;border-radius:14px;background:#253747;font-size:17px}}
         .send-box{{position:sticky;bottom:70px;display:flex;align-items:center;gap:8px;background:#0b1724;padding:8px 10px;border:1px solid #263e53;border-radius:24px;box-shadow:0 4px 18px #0005}}
         .send-box input[name="content"]{{flex:1;min-width:0;width:auto;margin:0;padding:12px 14px;border:0;background:transparent;border-radius:20px;font-size:14px}}
         .send-box>button{{width:auto;flex:0 0 auto;margin:0;padding:11px 17px;border-radius:22px;background:#248bd0;color:white;font-size:13px}}
@@ -1359,6 +1366,32 @@ def chat(conversation_id):
       </style>
       <div class="messages-area">{message_rows}</div>
       <script>
+      function cyrusOpenMessageMenu(event,message) {{
+        if(event.target.closest('.message-context')) return;
+        if(event.target.closest('button,form,select,input,a')) return;
+        document.querySelectorAll('.message.context-open').forEach(el=>el.classList.remove('context-open'));
+        message.classList.add('context-open');
+        const menu=message.querySelector('.message-context');
+        if(menu)menu.setAttribute('aria-hidden','false');
+        event.stopPropagation();
+      }}
+      document.addEventListener('click',function(event){{
+        if(!event.target.closest('.message.context-open')) {{
+          document.querySelectorAll('.message.context-open').forEach(el=>{{
+            el.classList.remove('context-open');
+            const menu=el.querySelector('.message-context');
+            if(menu)menu.setAttribute('aria-hidden','true');
+          }});
+        }}
+      }});
+      function cyrusReact(event,button) {{
+        event.preventDefault();event.stopPropagation();
+        const message=button.closest('.message');
+        if(!message)return;
+        message.dataset.reaction=button.textContent;
+        message.classList.add('reacted');
+        message.classList.remove('context-open');
+      }}
       function cyrusReply(button) {{
         document.getElementById("cyrusReplyId").value=button.dataset.id||"";
         document.getElementById("cyrusReplyText").textContent="پاسخ به: "+(button.dataset.content||"").slice(0,120);
