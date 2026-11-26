@@ -547,15 +547,15 @@ def home():
     <div class="container">
 
       <style>
-        .top{height:66px;padding:8px 16px}
-        .top .emblem,.top .sub,.top-actions a[href="/settings"]{display:none!important}
-        .top .brand{gap:0}
-        .top .logo{font-family:Tahoma,Arial,sans-serif;font-size:23px;letter-spacing:2px}
-        .top-actions{gap:0}
-        .top-actions a[href="/search"]{font-size:29px;padding:8px}
-        .cyrus-real-avatar{overflow:hidden;padding:0}
-        .cyrus-real-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-        .cyrus-chat-row .avatar{font-weight:bold;color:#fff}
+        .top{{height:66px;padding:8px 16px}}
+        .top .emblem,.top .sub,.top-actions a[href="/settings"]{{display:none!important}}
+        .top .brand{{gap:0}}
+        .top .logo{{font-family:Tahoma,Arial,sans-serif;font-size:23px;letter-spacing:2px}}
+        .top-actions{{gap:0}}
+        .top-actions a[href="/search"]{{font-size:29px;padding:8px}}
+        .cyrus-real-avatar{{overflow:hidden;padding:0}}
+        .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
+        .cyrus-chat-row .avatar{{font-weight:bold;color:#fff}}
       </style>
       <div class="tabs">{tabs}</div>
 
