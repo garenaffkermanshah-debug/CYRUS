@@ -1,6 +1,6 @@
 import os, secrets, requests, html, uuid, time, hashlib
 from pathlib import Path
-from datetime import timedelta
+from datetime import timedelta, datetime
 from dotenv import load_dotenv
 from flask import Flask, request, session, redirect, url_for, render_template, render_template_string
 
@@ -1208,7 +1208,12 @@ def chat(conversation_id):
         mine = str(msg.get("sender_id") or "") == current_user
         css_class = "mine" if mine else "theirs"
         body = html.escape(str(msg.get("content") or "")).replace("\n", "<br>")
-        stamp = html.escape(str(msg.get("created_at") or ""))
+        stamp_raw = str(msg.get("created_at") or "")
+        try:
+            stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00")).astimezone()
+            stamp = html.escape(stamp_dt.strftime("%H:%M"))
+        except Exception:
+            stamp = ""
         msg_id = html.escape(str(msg.get("id") or ""), quote=True)
         raw_content = html.escape(str(msg.get("content") or ""), quote=True)
         edited_label = " · ویرایش‌شده" if msg.get("edited_at") else ""
@@ -1219,7 +1224,7 @@ def chat(conversation_id):
         forwarded_label = '<small class="forwarded-label">↗ پیام انتقال‌یافته</small>' if meta.get("forwarded_from_message_id") else ""
         pinned_label = '<small class="pinned-label">📌 سنجاق‌شده</small>' if meta.get("pinned") else ""
         controls = (
-            '<div class="message-actions">'
+            '<details class="message-menu"><summary>•••</summary><div class="message-actions">'
             f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}">پاسخ</button>'
             f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}">کپی</button>'
             '<button type="button" onclick="cyrusShowForward(this)">انتقال</button>'
@@ -1233,7 +1238,7 @@ def chat(conversation_id):
                'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
                '<button type="submit">حذف</button></form>' if mine else "")
-            + '</div>'
+            + '</div></details>'
         )
         edit_form = ""
         if mine:
@@ -1329,23 +1334,30 @@ def chat(conversation_id):
         .room-type{{font-size:11px;color:#d8b46a}}
         .room-info p{{margin:6px 0 0;color:#c4c6cc;font-size:13px;overflow-wrap:anywhere}}
 
-        .messages-area{{display:flex;flex-direction:column;gap:12px;padding:12px 0}}
-        .message{{max-width:85%;padding:12px 15px;border:1px solid #987039;border-radius:14px;background:rgba(9,15,25,.92);overflow-wrap:anywhere}}
-        .message .message-body{{color:#55b7ff}}
-        .message small{{display:block;color:#b0b2b7;font-size:10px;margin-top:7px}}
-        .message-actions{{display:flex;gap:8px;margin-top:8px;align-items:center}}
-        .message-actions{{display:flex;flex-wrap:wrap}}
+        .messages-area{{display:flex;flex-direction:column;gap:8px;padding:8px 2px 18px}}
+        .message{{position:relative;max-width:84%;padding:10px 13px;border:1px solid transparent;border-radius:16px;background:#172432;overflow-wrap:anywhere;box-shadow:0 1px 2px #0003}}
+        .message .message-body{{color:#edf4fa;font-size:14px;line-height:1.8}}
+        .message small{{display:block;color:#93a8ba;font-size:10px;margin-top:5px;text-align:left}}
+        .message-menu{{margin-top:6px;position:relative}}
+        .message-menu summary{{list-style:none;cursor:pointer;display:inline-block;color:#7f9bb2;font-size:12px;padding:2px 8px;border-radius:14px;background:#0e1b28}}
+        .message-menu summary::-webkit-details-marker{{display:none}}
+        .message-menu[open] .message-actions{{display:flex}}
+        .message-actions{{display:none;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}}
         .message-actions form{{display:flex;gap:4px;align-items:center;margin:0}}
         .message-actions select{{max-width:130px;background:#0b1422;color:#fff;border:1px solid #80643b;border-radius:6px}}
         .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
         .forwarded-label,.pinned-label{{color:#d8b46a}}
         .message-actions form{{margin:0}}
         .message-actions button{{width:auto;margin:0;padding:5px 10px;font-size:11px;background:#17283a;color:#c6d9e8;border:1px solid #34516a}}
-        .message.mine{{align-self:flex-start;border-color:#278bdc}}
-        .message.theirs{{align-self:flex-end}}
-        .send-box{{position:sticky;bottom:75px;background:rgba(9,15,25,.95);padding:12px;border:1px solid #987039;border-radius:12px}}
+        .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
+        .message.theirs{{align-self:flex-end;background:#172432;border-color:#263b4d;border-bottom-right-radius:5px}}
+        .send-box{{position:sticky;bottom:70px;display:flex;align-items:center;gap:8px;background:#0b1724;padding:8px 10px;border:1px solid #263e53;border-radius:24px;box-shadow:0 4px 18px #0005}}
+        .send-box input[name="content"]{{flex:1;min-width:0;width:auto;margin:0;padding:12px 14px;border:0;background:transparent;border-radius:20px;font-size:14px}}
+        .send-box>button{{width:auto;flex:0 0 auto;margin:0;padding:11px 17px;border-radius:22px;background:#248bd0;color:white;font-size:13px}}
+        .message-actions button{{padding:6px 10px;font-size:11px;border-radius:16px;background:#10283b;color:#b9d9f0;border:1px solid #2b4c66}}
+        .message-actions select{{font-size:11px;padding:6px}}
       </style>
-      <div class="card messages-area">{message_rows}</div>
+      <div class="messages-area">{message_rows}</div>
       <script>
       function cyrusReply(button) {{
         document.getElementById("cyrusReplyId").value=button.dataset.id||"";
