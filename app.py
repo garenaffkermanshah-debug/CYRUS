@@ -947,6 +947,49 @@ def search():
         </div>
         """
 
+    message_rows = ""
+    if query and joined_ids:
+        try:
+            message_response = requests.get(
+                URL + "/rest/v1/cyrus_messages",
+                params={
+                    "select": "id,conversation_id,content,created_at",
+                    "conversation_id": "in.(" + ",".join(sorted(joined_ids)) + ")",
+                    "content": "ilike.*" + query.replace("*", "") + "*",
+                    "order": "created_at.desc",
+                    "limit": "50"
+                },
+                headers=headers, timeout=25
+            )
+            if message_response.ok and isinstance(message_response.json(), list):
+                hits = message_response.json()
+                room_ids_for_hits = list(dict.fromkeys(str(x.get("conversation_id") or "") for x in hits if x.get("conversation_id")))
+                room_names = {}
+                if room_ids_for_hits:
+                    names_response = requests.get(URL + "/rest/v1/cyrus_conversations",
+                        params={"select":"id,title","id":"in.(" + ",".join(room_ids_for_hits) + ")"},
+                        headers=headers, timeout=20)
+                    if names_response.ok and isinstance(names_response.json(), list):
+                        room_names = {str(x.get("id")): str(x.get("title") or "گفتگو") for x in names_response.json() if isinstance(x, dict)}
+                for hit in hits:
+                    mid, rid = str(hit.get("id") or ""), str(hit.get("conversation_id") or "")
+                    try:
+                        uuid.UUID(mid); uuid.UUID(rid)
+                    except ValueError:
+                        continue
+                    text_value = str(hit.get("content") or "")
+                    snippet = text_value if len(text_value) <= 170 else text_value[:167] + "…"
+                    message_rows += f"""
+                    <a class="chat-row search-message-result" data-kind="messages" href="/chat/{html.escape(rid, quote=True)}?message={html.escape(mid, quote=True)}">
+                      <div class="avatar">⌕</div><div class="chat-info">
+                        <div class="chat-name">{html.escape(room_names.get(rid, "گفتگو"))}</div>
+                        <div class="chat-preview">{html.escape(snippet)}</div>
+                      </div><span style="color:#70b7e7">‹</span></a>"""
+        except Exception:
+            pass
+
+    if message_rows:
+        room_rows += '<div class="section-title">پیام‌ها</div>' + message_rows
     if query and not people_rows and not room_rows and not error:
         empty = '<div class="empty"><h3>نتیجه‌ای پیدا نشد</h3></div>'
     else:
@@ -968,6 +1011,18 @@ def search():
 
       <p class="error">{html.escape(error)}</p>
 
+      <div class="search-category-tabs">
+        <a href="/search?q={html.escape(query, quote=True)}&type=all">همه</a>
+        <a href="/search?q={html.escape(query, quote=True)}&type=messages">پیام‌ها</a>
+        <a href="/search?q={html.escape(query, quote=True)}&type=people">افراد</a>
+        <a href="/search?q={html.escape(query, quote=True)}&type=groups">گروه‌ها</a>
+        <a href="/search?q={html.escape(query, quote=True)}&type=channels">کانال‌ها</a>
+      </div>
+      <style>
+        .search-category-tabs{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #20364b;margin:0 12px 8px}
+        .search-category-tabs a{padding:12px 10px;white-space:nowrap;color:#91a6b8;font-size:12px;border-bottom:2px solid transparent}
+        .search-category-tabs a:focus,.search-category-tabs a:hover{color:#69b9f7;border-color:#3297df}
+      </style>
       <div class="chat-list">{people_rows}</div>
       <div class="chat-list">{room_rows}</div>
 
@@ -1449,7 +1504,7 @@ def chat(conversation_id):
             )
 
         message_rows += f"""
-        <div class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
+        <div id="message-{msg_id}" class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
           {reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           <small>{stamp}{edited_label}</small>
@@ -1708,6 +1763,13 @@ def chat(conversation_id):
       </script>
       {send_box}
     </div>"""
+    jump_id = request.args.get("message", "").strip()
+    if jump_id:
+        try:
+            uuid.UUID(jump_id)
+            content += f"""<script>window.addEventListener("load",function(){{var m=document.getElementById("message-{html.escape(jump_id, quote=True)}");if(m){{m.scrollIntoView({{behavior:"smooth",block:"center"}});m.classList.add("search-jump-highlight");setTimeout(function(){{m.classList.remove("search-jump-highlight")}},2600);}}}});</script><style>.search-jump-highlight{{outline:2px solid #e5bd69!important;box-shadow:0 0 0 6px #e5bd6922!important}}</style>"""
+        except ValueError:
+            pass
     return page(content)
 
 
