@@ -833,7 +833,7 @@ def search():
             # جستجوی کاربران از طریق تابع امن پایگاه داده
             people_response = requests.post(
                 URL + "/rest/v1/rpc/cyrus_search_users",
-                json={"p_query": query},
+                json={"p_query": query.lstrip("@")},
                 headers={**headers, "Content-Type": "application/json"},
                 timeout=20
             )
