@@ -450,9 +450,12 @@ def register():
     if request.method == "POST":
         email = request.form.get("email","").strip()
         password = request.form.get("password","")
+        password_confirm = request.form.get("password_confirm","")
         username = request.form.get("username","").strip()
-        if not email or not password or not username:
+        if not email or not password or not password_confirm or not username:
             error = "همه بخش‌ها را تکمیل کنید"
+        elif password != password_confirm:
+            error = "رمزهای عبور با یکدیگر مطابقت ندارند"
         else:
             code, data = auth_request("/auth/v1/signup", {"email":email,"password":password})
             if code in (200,201) and data.get("access_token"):
@@ -467,7 +470,10 @@ def register():
                     "Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
                     timeout=20)
                 return redirect(url_for("home"))
-            error = data.get("msg",data.get("message","ثبت‌نام انجام نشد؛ تنظیمات تأیید ایمیل را بررسی کنید"))
+            if code in (200, 201) and data.get("user"):
+                error = "حساب ساخته شد، اما تأیید ایمیل لازم است. تا زمانی که ایمیل تأیید دریافت و تأیید نشود، ورود انجام نمی‌شود."
+            else:
+                error = data.get("msg", data.get("message", "ثبت‌نام انجام نشد؛ تنظیمات ارسال ایمیل را بررسی کنید"))
     content = f"""
     <main class="container"><div class="card">
     <h2>پیوستن به CYRUS</h2><p class="muted">ساخت حساب کاربری</p>
@@ -475,7 +481,8 @@ def register():
     <form method="post">
     <input name="username" placeholder="نام کاربری" required>
     <input name="email" type="email" placeholder="ایمیل" required>
-    <input name="password" type="password" placeholder="رمز عبور" required>
+    <input name="password" type="password" placeholder="رمز عبور" required autocomplete="new-password">
+    <input name="password_confirm" type="password" placeholder="تکرار رمز عبور" required autocomplete="new-password">
     <button>ایجاد حساب</button></form>
     <p class="muted"><a class="form-link" href="/login">قبلاً حساب ساخته‌اید؟ ورود</a></p>
     </div></main>"""
