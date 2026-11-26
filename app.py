@@ -1037,27 +1037,27 @@ def search():
       </section>
       {empty}
       <script>
-      (function(){
+      (function(){{
         const q={query!r}, kind={selected_type!r};
         const key='cyrus_global_search_recent_v1';
         const input=document.querySelector('.cyrus-explore-search input');
         const recent=document.getElementById('cyrus-search-recent');
         const list=document.getElementById('cyrus-search-recent-list');
-        document.querySelectorAll('.search-result').forEach(el=>{
+        document.querySelectorAll('.search-result').forEach(el=>{{
           if(kind!=='all'&&el.dataset.kind!==kind)el.style.display='none';
-        });
-        function read(){try{return JSON.parse(localStorage.getItem(key)||'[]').slice(0,8)}catch(e){return []}}
-        if(q){localStorage.setItem(key,JSON.stringify([q,...read().filter(x=>x!==q)].slice(0,8)));}
-        if(!q){
+        }});
+        function read(){{try{{return JSON.parse(localStorage.getItem(key)||'[]').slice(0,8)}}catch(e){{return []}}}}
+        if(q){{localStorage.setItem(key,JSON.stringify([q,...read().filter(x=>x!==q)].slice(0,8)));}}
+        if(!q){{
           const items=read();
-          if(items.length){recent.style.display='block';items.forEach(value=>{
+          if(items.length){{recent.style.display='block';items.forEach(value=>{{
             const row=document.createElement('div');row.style.cssText='padding:10px 0;color:#b6c6d4;font-size:13px';
             const link=document.createElement('a');link.href='/search?q='+encodeURIComponent(value);link.textContent='⌕  '+value;
             row.appendChild(link);list.appendChild(row);
-          });}
-        }
-        if(input)input.addEventListener('keydown',e=>{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8));});
-      })();
+          }});}}
+        }}
+        if(input)input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8));}});
+      }})();
       </script>
     </div>
     """
