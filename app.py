@@ -997,13 +997,12 @@ def public_user_profile(user_id):
     avatar = str(p.get("avatar_url") or "")
     avatar_html = ('<img src="' + html.escape(avatar, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:2px solid #3297df">') if avatar else '<div class="avatar" style="width:110px;height:110px;margin:auto;font-size:42px">𓅃</div>'
     own_id = str(session.get("user_id") or "")
-    block_headers = {**headers, "Content-Type": "application/json", "Prefer": "return=representation"}
     blocked_by_me = False
     if user_id != own_id:
         try:
             block_check = requests.get(
                 URL + "/rest/v1/cyrus_user_blocks",
-                params={"select":"id", "blocker_user_id":"eq."+own_id,
+                params={"select":"blocker_user_id", "blocker_user_id":"eq."+own_id,
                         "blocked_user_id":"eq."+user_id, "limit":"1"},
                 headers=headers, timeout=15
             )
@@ -1018,6 +1017,7 @@ def public_user_profile(user_id):
         if user_id != own_id else ""
     )
     blocked_notice = '<p class="error">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
+    send_form_style = 'style="display:none"' if blocked_by_me else ""
     content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>{block_form}{blocked_notice}
       <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {"style=\\"display:none\\" " if blocked_by_me else ""}>
         <textarea name="content" maxlength="4000" rows="4" required placeholder="پیام خود را بنویسید..." style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"></textarea>
@@ -1043,7 +1043,7 @@ def toggle_user_block(user_id):
     params = {"blocker_user_id":"eq."+own_id, "blocked_user_id":"eq."+user_id}
     try:
         existing = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={**params, "select":"id"}, headers=headers, timeout=20)
+            params={**params, "select":"blocker_user_id"}, headers=headers, timeout=20)
         if not existing.ok:
             return page('<div class="container card"><p>بررسی مسدودسازی ناموفق بود؛ دسترسی پایگاه داده را بررسی کنید.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
         if existing.json():
