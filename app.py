@@ -2707,6 +2707,9 @@ def profile():
       <style>
         .cyrus-profile-page{{padding:12px 12px 90px;max-width:560px}}
         .profile-hero{{text-align:center;padding:25px 16px 22px;background:#111e2b;border:1px solid #263b50;border-radius:18px;margin-bottom:12px}}
+        .avatar-upload-form{{margin:12px auto 16px;max-width:330px;padding:10px;background:#0a1521;border:1px solid #2a4054;border-radius:12px}}
+        .avatar-upload-form input[type=file]{{font-size:12px;padding:9px;background:#07121e;border:1px solid #30485e;border-radius:9px;color:#cbd7e2;width:100%;box-sizing:border-box}}
+        .avatar-upload-form button{{margin-top:8px;padding:11px;font-size:13px;background:linear-gradient(100deg,#98702e,#e3bf69);color:#181208}}
         .profile-hero img,.profile-hero .avatar{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center}}
         .profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px;font-weight:500}}
         .profile-hero .username{{color:#78b8e6;font-size:13px;direction:ltr;margin-top:5px}}
@@ -2728,6 +2731,11 @@ def profile():
       </style>
       <section class="profile-hero">
         {avatar_html}
+        <form method="post" action="/profile/avatar" enctype="multipart/form-data" class="avatar-upload-form">
+          <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
+          <button type="submit">بارگذاری تصویر پروفایل</button>
+          <p class="error">{avatar_error}</p>
+        </form>
         <h2>{html.escape(str(data.get("display_name") or data.get("username") or "کاربر"))}</h2>
         <div class="username">@{username}</div>
         <p class="bio">{bio or "بیوگرافی اضافه نشده است"}</p>
@@ -2744,12 +2752,6 @@ def profile():
         <summary>ویرایش پروفایل</summary>
         <section class="profile-edit">
           <h3>ویرایش اطلاعات</h3>
-          <p class="error">{avatar_error}</p>
-          <form method="post" action="/profile/avatar" enctype="multipart/form-data">
-            <label>تصویر پروفایل</label>
-            <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
-            <button type="submit">تغییر تصویر</button>
-          </form>
           <p class="error">{html.escape(error)}</p>
           <form method="post">
             <label>نام نمایشی</label>
