@@ -567,14 +567,18 @@ def home():
                 pass
 
         rows += f"""
-        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}">
+        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
+             role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
+             onclick="if(!event.target.closest('.cyrus-remove-chat'))window.location.href='/chat/{room_id}'"
+             onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();window.location.href='/chat/{room_id}'}}"
+             style="cursor:pointer">
           {avatar_html}
-          <div class="chat-info" onclick="location.href='/chat/{room_id}'" style="cursor:pointer">
+          <div class="chat-info">
             <div class="chat-name">{html.escape(str(room_title))}</div>
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
           {unread_badge}
-          <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onsubmit='return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
+          <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
             <button type="submit">حذف گفتگو</button>
           </form>
         </div>"""
@@ -594,7 +598,9 @@ def home():
         .top-actions a[href="/search"]{{font-size:29px;padding:8px}}
         .cyrus-real-avatar{{overflow:hidden;padding:0}}
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
-        .cyrus-chat-row .avatar{{font-weight:bold;color:#fff}}
+        .cyrus-chat-row .avatar{{font-weight:bold;color:#fff;cursor:pointer}}
+        .cyrus-chat-row:focus-visible{{outline:2px solid #3297df;outline-offset:-2px}}
+        .cyrus-chat-row .chat-info{{cursor:pointer}}
       </style>
       <input id="cyrusChatSearch" type="search" placeholder="جست‌وجوی گفتگو، نام یا شناسه..." style="width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border-radius:12px;background:#0b1422;color:#fff;border:1px solid #80643b">
       <div class="tabs">{tabs}</div>
