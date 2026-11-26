@@ -441,6 +441,7 @@ def home():
 
     for room in conversations:
         room_type = str(room.get("type") or "private")
+        search_extra = ""
 
         if selected != "all" and room_type != selected:
             continue
@@ -516,6 +517,7 @@ def home():
                     if profile_response.ok and profile_response.json():
                         person = profile_response.json()[0]
                         person_name = str(person.get("display_name") or person.get("username") or room_title)
+                        search_extra = person_name + " " + str(person.get("username") or "")
                         avatar_url = str(person.get("avatar_url") or "")
                         if avatar_url:
                             avatar_html = (
@@ -535,7 +537,7 @@ def home():
                 pass
 
         rows += f"""
-        <div class="chat-row cyrus-chat-row">
+        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}">
           {avatar_html}
           <div class="chat-info" onclick="location.href='/chat/{room_id}'" style="cursor:pointer">
             <div class="chat-name">{html.escape(str(room_title))}</div>
@@ -564,6 +566,7 @@ def home():
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
         .cyrus-chat-row .avatar{{font-weight:bold;color:#fff}}
       </style>
+      <input id="cyrusChatSearch" type="search" placeholder="جست‌وجوی گفتگو، نام یا شناسه..." style="width:100%;box-sizing:border-box;margin:10px 0;padding:12px;border-radius:12px;background:#0b1422;color:#fff;border:1px solid #80643b">
       <div class="tabs">{tabs}</div>
 
       <div class="chat-list">{rows}</div>
@@ -575,6 +578,8 @@ def home():
       </style>
       <script>
       (()=>{{
+        const search=document.getElementById("cyrusChatSearch");
+        if(search)search.addEventListener("input",()=>{{const q=search.value.trim().toLowerCase();document.querySelectorAll(".cyrus-chat-row").forEach(row=>{{row.style.display=(row.dataset.search||"").includes(q)?"":"none";}});}});
         document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
           let timer=null;
           const start=()=>{{timer=setTimeout(()=>{{row.classList.add('remove-open');}},600);}};
@@ -1002,8 +1007,8 @@ def public_user_profile(user_id):
         try:
             block_check = requests.get(
                 URL + "/rest/v1/cyrus_user_blocks",
-                params={"select":"blocker_user_id", "blocker_user_id":"eq."+own_id,
-                        "blocked_user_id":"eq."+user_id, "limit":"1"},
+                params={"select":"blocker_id", "blocker_id":"eq."+own_id,
+                        "blocked_id":"eq."+user_id, "limit":"1"},
                 headers=headers, timeout=15
             )
             blocked_by_me = bool(block_check.ok and block_check.json())
@@ -1040,10 +1045,10 @@ def toggle_user_block(user_id):
         "apikey": KEY, "Authorization": "Bearer " + session["access_token"],
         "Content-Type": "application/json", "Prefer": "return=minimal"
     }
-    params = {"blocker_user_id":"eq."+own_id, "blocked_user_id":"eq."+user_id}
+    params = {"blocker_id":"eq."+own_id, "blocked_id":"eq."+user_id}
     try:
         existing = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={**params, "select":"blocker_user_id"}, headers=headers, timeout=20)
+            params={**params, "select":"blocker_id"}, headers=headers, timeout=20)
         if not existing.ok:
             return page('<div class="container card"><p>بررسی مسدودسازی ناموفق بود؛ دسترسی پایگاه داده را بررسی کنید.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
         if existing.json():
@@ -1051,7 +1056,7 @@ def toggle_user_block(user_id):
                 params=params, headers=headers, timeout=20)
         else:
             changed = requests.post(URL + "/rest/v1/cyrus_user_blocks",
-                json={"blocker_user_id":own_id, "blocked_user_id":user_id},
+                json={"blocker_id":own_id, "blocked_id":user_id},
                 headers=headers, timeout=20)
         if not changed.ok:
             return page('<div class="container card"><p>تغییر وضعیت مسدودسازی انجام نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 400
@@ -1074,8 +1079,8 @@ def message_to_user(user_id):
     own_id = str(session.get("user_id") or "")
     try:
         blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={"select":"id", "blocker_user_id":"eq."+own_id,
-                    "blocked_user_id":"eq."+user_id, "limit":"1"},
+            params={"select":"blocker_id", "blocker_id":"eq."+own_id,
+                    "blocked_id":"eq."+user_id, "limit":"1"},
             headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
             timeout=15)
         if blocked.ok and blocked.json():
@@ -1388,8 +1393,8 @@ def send_message(conversation_id):
                 for other_id in other_ids:
                     block_check = requests.get(
                         URL + "/rest/v1/cyrus_user_blocks",
-                        params={"select":"id", "blocker_user_id":"eq."+current_user,
-                                "blocked_user_id":"eq."+other_id, "limit":"1"},
+                        params={"select":"blocker_id", "blocker_id":"eq."+current_user,
+                                "blocked_id":"eq."+other_id, "limit":"1"},
                         headers=headers, timeout=15
                     )
                     if block_check.ok and block_check.json():
