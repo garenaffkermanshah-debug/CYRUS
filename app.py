@@ -873,7 +873,7 @@ def chat(conversation_id):
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
             params={
-                "select": "id,sender_id,content,message_type,created_at",
+                "select": "id,sender_id,content,message_type,created_at,edited_at",
                 "conversation_id": "eq." + conversation_id,
                 "order": "created_at.asc",
                 "limit": "200"
@@ -897,11 +897,35 @@ def chat(conversation_id):
         css_class = "mine" if mine else "theirs"
         body = html.escape(str(msg.get("content") or "")).replace("\n", "<br>")
         stamp = html.escape(str(msg.get("created_at") or ""))
+        msg_id = html.escape(str(msg.get("id") or ""), quote=True)
+        raw_content = html.escape(str(msg.get("content") or ""), quote=True)
+        edited_label = " · ویرایش‌شده" if msg.get("edited_at") else ""
+
+        controls = ""
+        edit_form = ""
+        if mine:
+            controls = (
+                '<div class="message-actions">'
+                '<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
+                f'<form method="post" action="/chat/message/{msg_id}/delete" '
+                'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
+                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
+                '<button type="submit">حذف</button></form></div>'
+            )
+            edit_form = (
+                f'<form class="edit-form" method="post" '
+                f'action="/chat/message/{msg_id}/edit" style="display:none">'
+                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
+                '<input type="hidden" name="content">'
+                '</form>'
+            )
 
         message_rows += f"""
-        <div class="message {css_class}">
+        <div class="message {css_class}" data-content="{raw_content}">
           <div>{body}</div>
-          <small>{stamp}</small>
+          <small>{stamp}{edited_label}</small>
+          {controls}
+          {edit_form}
         </div>"""
 
     if not message_rows:
@@ -978,11 +1002,24 @@ def chat(conversation_id):
         .messages-area{{display:flex;flex-direction:column;gap:12px;padding:12px 0}}
         .message{{max-width:85%;padding:12px 15px;border:1px solid #987039;border-radius:14px;background:rgba(9,15,25,.92);overflow-wrap:anywhere}}
         .message small{{display:block;color:#b0b2b7;font-size:10px;margin-top:7px}}
+        .message-actions{{display:flex;gap:8px;margin-top:8px;align-items:center}}
+        .message-actions form{{margin:0}}
+        .message-actions button{{width:auto;margin:0;padding:5px 10px;font-size:11px;background:#17283a;color:#c6d9e8;border:1px solid #34516a}}
         .message.mine{{align-self:flex-start;border-color:#278bdc}}
         .message.theirs{{align-self:flex-end}}
         .send-box{{position:sticky;bottom:75px;background:rgba(9,15,25,.95);padding:12px;border:1px solid #987039;border-radius:12px}}
       </style>
       <div class="card messages-area">{message_rows}</div>
+      <script>
+      function cyrusEdit(button) {{
+        const message = button.closest('.message');
+        const value = prompt('متن پیام را ویرایش کنید:', message.dataset.content);
+        if (value === null || !value.trim()) return;
+        const form = message.querySelector('.edit-form');
+        form.querySelector('[name="content"]').value = value.trim();
+        form.submit();
+      }}
+      </script>
       {send_box}
       {room_manage_link}
       <p><a href="/contacts">بازگشت به خویشان</a></p>
@@ -1089,9 +1126,10 @@ def send_message(conversation_id):
 
         if not response.ok:
             return page(
-                '<div class="container card"><p>ارسال پیام انجام نشد؛ '
-                'ممکن است عضو این گفتگو نباشید</p>'
-                '<a href="/contacts">بازگشت</a></div>'
+                '<div class="container card"><h3>ارسال پیام ناموفق بود</h3><p>'
+                + html.escape(response.text[:500])
+                + '</p><a href="/chat/' + conversation_id
+                + '">بازگشت به گفتگو</a></div>'
             ), 403
 
     except Exception:
@@ -1101,6 +1139,96 @@ def send_message(conversation_id):
 
     return redirect(url_for("chat", conversation_id=conversation_id))
 
+
+
+@app.route("/chat/message/<message_id>/edit", methods=["POST"])
+def edit_message(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+
+    conversation_id = request.form.get("conversation_id", "")
+    content = request.form.get("content", "").strip()
+
+    try:
+        uuid.UUID(message_id)
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه پیام یا گفتگو نامعتبر است", 400
+
+    if not content or len(content) > 4000:
+        return redirect(url_for("chat", conversation_id=conversation_id))
+
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Content-Type": "application/json",
+        "Prefer": "return=representation"
+    }
+
+    try:
+        response = requests.patch(
+            URL + "/rest/v1/cyrus_messages",
+            params={
+                "id": "eq." + message_id,
+                "sender_id": "eq." + str(session.get("user_id") or "")
+            },
+            json={
+                "content": content,
+                "edited_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            },
+            headers=headers,
+            timeout=20
+        )
+        if not response.ok:
+            return page(
+                '<div class="container card"><p>ویرایش انجام نشد: '
+                + html.escape(response.text[:400])
+                + '</p><a href="/chat/' + conversation_id + '">بازگشت</a></div>'
+            ), 400
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
+
+    return redirect(url_for("chat", conversation_id=conversation_id))
+
+
+@app.route("/chat/message/<message_id>/delete", methods=["POST"])
+def delete_message(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+
+    conversation_id = request.form.get("conversation_id", "")
+    try:
+        uuid.UUID(message_id)
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه پیام یا گفتگو نامعتبر است", 400
+
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Prefer": "return=minimal"
+    }
+
+    try:
+        response = requests.delete(
+            URL + "/rest/v1/cyrus_messages",
+            params={
+                "id": "eq." + message_id,
+                "sender_id": "eq." + str(session.get("user_id") or "")
+            },
+            headers=headers,
+            timeout=20
+        )
+        if not response.ok:
+            return page(
+                '<div class="container card"><p>حذف انجام نشد: '
+                + html.escape(response.text[:400])
+                + '</p><a href="/chat/' + conversation_id + '">بازگشت</a></div>'
+            ), 400
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
+
+    return redirect(url_for("chat", conversation_id=conversation_id))
 
 
 def create_room_page(error=""):
