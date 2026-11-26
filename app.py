@@ -830,9 +830,7 @@ def contacts():
             <div class="chat-name">{html.escape(name)}</div>
             <div class="chat-preview">@{html.escape(username)} · {html.escape(bio)}</div>
           </div>
-          <form method="post" action="/start-chat/{safe_id}">
-            <button type="submit">شروع گفتگو</button>
-          </form>
+          <a class="action" style="margin:0;padding:10px 14px;text-align:center" href="/user/{safe_id}">نمایش پروفایل</a>
         </div>"""
 
     if not rows and not error:
@@ -861,39 +859,69 @@ def contacts():
     return page(content)
 
 
-@app.route("/start-chat/<user_id>", methods=["POST"])
-def start_chat(user_id):
+@app.route("/user/<user_id>")
+def public_user_profile(user_id):
     if not session.get("access_token"):
         return redirect("/login")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است", 400
+    headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"]}
+    try:
+        r = requests.get(URL + "/rest/v1/cyrus_profiles",
+            params={"select":"id,username,display_name,bio,avatar_url","id":"eq."+user_id,"limit":"1"},
+            headers=headers, timeout=20)
+        if not r.ok or not r.json():
+            return page('<div class="container card"><h3>پروفایل پیدا نشد</h3><a href="/contacts">بازگشت</a></div>'), 404
+        p = r.json()[0]
+    except Exception:
+        return page('<div class="container card"><h3>ارتباط با سرور برقرار نشد</h3></div>'), 502
+    name = html.escape(str(p.get("display_name") or p.get("username") or "کاربر"))
+    username = html.escape(str(p.get("username") or ""))
+    bio = html.escape(str(p.get("bio") or ""))
+    avatar = str(p.get("avatar_url") or "")
+    avatar_html = ('<img src="' + html.escape(avatar, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:2px solid #3297df">') if avatar else '<div class="avatar" style="width:110px;height:110px;margin:auto;font-size:42px">𓅃</div>'
+    content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>
+      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}">
+        <textarea name="content" maxlength="4000" rows="4" required placeholder="پیام خود را بنویسید..." style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"></textarea>
+        <button type="submit">ارسال پیام</button></form><p class="muted"><a href="/contacts">بازگشت به مخاطبین</a></p></div></main>"""
+    return page(content)
 
+
+@app.route("/message-to/<user_id>", methods=["POST"])
+def message_to_user(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است", 400
+    content = request.form.get("content", "").strip()
+    if not content or len(content) > 4000:
+        return redirect("/user/" + user_id)
+    headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"], "Content-Type": "application/json", "Prefer": "return=minimal"}
+    try:
+        created = requests.post(URL + "/rest/v1/rpc/create_direct_conversation", json={"other_user":user_id}, headers=headers, timeout=20)
+        if not created.ok or not isinstance(created.json(), str):
+            return page('<div class="container card"><p>ساخت گفتگو انجام نشد</p><a href="/contacts">بازگشت</a></div>'), 400
+        room_id = str(uuid.UUID(created.json()))
+        sent = requests.post(URL + "/rest/v1/cyrus_messages", json={"conversation_id":room_id,"sender_id":str(session.get("user_id")),"content":content,"message_type":"text"}, headers=headers, timeout=20)
+        if not sent.ok:
+            return page('<div class="container card"><p>ارسال پیام ناموفق بود</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 400
+        return redirect(url_for("chat", conversation_id=room_id))
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'), 502
+
+
+@app.route("/start-chat/<user_id>", methods=["GET", "POST"])
+def start_chat(user_id):
+    # مسیر قدیمی فقط پروفایل را باز می‌کند و گفتگوی خالی نمی‌سازد.
     try:
         uuid.UUID(user_id)
     except ValueError:
         return redirect("/contacts?error=شناسه%20کاربر%20نامعتبر%20است")
-
-    headers = {
-        "apikey": KEY,
-        "Authorization": "Bearer " + session["access_token"],
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(
-            URL + "/rest/v1/rpc/create_direct_conversation",
-            json={"other_user": user_id},
-            headers=headers,
-            timeout=20
-        )
-
-        if response.ok:
-            room_id = response.json()
-            if isinstance(room_id, str):
-                room_id = str(uuid.UUID(room_id))
-                return redirect(url_for("chat", conversation_id=room_id))
-
-        return redirect("/contacts?error=ساخت%20گفتگو%20انجام%20نشد")
-    except Exception:
-        return redirect("/contacts?error=ارتباط%20با%20سرور%20برقرار%20نشد")
+    return redirect("/user/" + user_id)
 
 
 @app.route("/chat/<conversation_id>")
@@ -1871,7 +1899,7 @@ def cyrus_get_profile():
         r = requests.get(
             URL + "/rest/v1/cyrus_profiles",
             params={
-                "select": "id,username,display_name,bio",
+                "select": "id,username,display_name,bio,avatar_url",
                 "id": "eq." + uid,
                 "limit": "1"
             },
@@ -1940,6 +1968,36 @@ def cyrus_ensure_profile(email=""):
     return None
 
 
+@app.route("/profile/avatar", methods=["POST"])
+def upload_profile_avatar():
+    if not session.get("access_token"):
+        return redirect("/login")
+    file = request.files.get("avatar")
+    if not file or not file.filename:
+        return redirect("/profile?avatar_error=فایلی%20انتخاب%20نشده")
+    mime = (file.mimetype or "").lower()
+    extensions = {"image/jpeg":"jpg", "image/png":"png", "image/webp":"webp"}
+    if mime not in extensions:
+        return redirect("/profile?avatar_error=فقط%20JPG%20،%20PNG%20یا%20WebP")
+    data = file.read(5 * 1024 * 1024 + 1)
+    if not data or len(data) > 5 * 1024 * 1024:
+        return redirect("/profile?avatar_error=حجم%20عکس%20باید%20حداکثر%205%20مگابایت%20باشد")
+    uid = str(session.get("user_id") or "")
+    key_path = uid + "/profile." + extensions[mime]
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"true"}
+    try:
+        uploaded = requests.put(URL + "/storage/v1/object/cyrus-avatars/" + key_path, data=data, headers=headers, timeout=45)
+        if not uploaded.ok:
+            return redirect("/profile?avatar_error=بارگذاری%20عکس%20ناموفق%20بود")
+        public_url = URL + "/storage/v1/object/public/cyrus-avatars/" + key_path + "?v=" + str(int(time.time()))
+        saved = requests.patch(URL + "/rest/v1/cyrus_profiles", params={"id":"eq."+uid}, json={"avatar_url":public_url}, headers={**cyrus_profile_headers(),"Prefer":"return=minimal"}, timeout=20)
+        if not saved.ok:
+            return redirect("/profile?avatar_error=عکس%20بارگذاری%20شد%20اما%20ذخیره%20پروفایل%20ناموفق%20بود")
+        return redirect("/profile")
+    except Exception:
+        return redirect("/profile?avatar_error=ارتباط%20با%20سرور%20برقرار%20نشد")
+
+
 @app.route("/profile", methods=["GET", "POST"])
 def profile():
     if not session.get("access_token"):
@@ -1976,12 +2034,22 @@ def profile():
     username = html.escape(str(data.get("username") or ""))
     display_name = html.escape(str(data.get("display_name") or ""), quote=True)
     bio = html.escape(str(data.get("bio") or ""))
+    avatar_url = str(data.get("avatar_url") or "")
+    avatar_html = ('<img src="' + html.escape(avatar_url, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 14px;border:2px solid #3297df">') if avatar_url else '<div class="avatar" style="width:110px;height:110px;margin:0 auto 14px;font-size:42px">𓅃</div>'
+    avatar_error = html.escape(request.args.get("avatar_error", ""))
 
     content = f"""
     <main class="container">
       <div class="card">
         <h2>نگاره</h2>
         <p class="muted">پروفایل کاربری CYRUS</p>
+        {avatar_html}
+        <p class="error">{avatar_error}</p>
+        <form method="post" action="/profile/avatar" enctype="multipart/form-data">
+          <label>عکس پروفایل (JPG، PNG یا WebP، حداکثر ۵ مگابایت)</label>
+          <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
+          <button type="submit">بارگذاری عکس پروفایل</button>
+        </form>
         <p class="error">{html.escape(error)}</p>
         <form method="post">
           <label>نام نمایشی</label>
