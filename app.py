@@ -2665,7 +2665,6 @@ def profile():
     avatar_url = str(data.get("avatar_url") or "")
     avatar_html = ('<img src="' + html.escape(avatar_url, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 14px;border:2px solid #3297df">') if avatar_url else '<div class="avatar" style="width:110px;height:110px;margin:0 auto 14px;font-size:42px">𓅃</div>'
     avatar_error = html.escape(request.args.get("avatar_error", ""))
-    edit_value_html = html.escape(field_value, quote=True)
 
     content = f"""
     <main class="container cyrus-profile-page">
@@ -2795,6 +2794,7 @@ def settings():
     else:
         avatar_html = '<div class="setting-profile-image setting-profile-fallback">♙</div>'
     avatar_error = html.escape(request.args.get("avatar_error", ""))
+    edit_value_html = html.escape(field_value, quote=True)
 
     content = f"""
     <main class="container cyrus-settings-page">
