@@ -248,16 +248,7 @@ body {
 </style>
 </head>
 <body>
-<header class="top">
- <div class="brand">
-  <div class="emblem"><img src="/static/cyrus-cylinder.jpg" alt="منشور کوروش بزرگ"></div>
-  <div><div class="logo">CYRUS</div><div class="sub">پیوند پارسیان · شکوه هخامنشی</div></div>
- </div>
- <div class="top-actions">
-  <a href="/search" aria-label="جستجو">⌕</a>
-  
- </div>
-</header>
+{{ header|safe }}
 {{ content|safe }}
 {{ nav|safe }}
 </body>
@@ -266,8 +257,20 @@ body {
 
 def page(content):
     nav = ""
-    if session.get("access_token"):
-        current = request.path
+    header = ""
+    current = request.path
+    is_home = current in ("/", "/home")
+    is_chat = current.startswith("/chat/")
+    if is_home:
+        header = """
+        <header class="top cyrus-home-top">
+         <div class="brand">
+          <div class="emblem"><img src="/static/cyrus-cylinder.jpg" alt="منشور کوروش بزرگ"></div>
+          <div><div class="logo">CYRUS</div><div class="sub">پیوند پارسیان · شکوه هخامنشی</div></div>
+         </div>
+         <div class="top-actions"><a href="/search" aria-label="جستجو">⌕</a></div>
+        </header>"""
+    if session.get("access_token") and not is_chat:
         items = [
             ("/home", "𓆃", "بارگاه"),
             ("/contacts", "𓅃", "خویشان"),
@@ -280,7 +283,7 @@ def page(content):
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}"><span>{icon}</span>{label}</a>'
         nav = f'<nav class="bottom">{links}</nav>'
-    return render_template_string(BASE, content=content, nav=nav)
+    return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
     try:
