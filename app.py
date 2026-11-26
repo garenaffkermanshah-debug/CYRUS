@@ -1056,7 +1056,7 @@ def search():
             row.appendChild(link);list.appendChild(row);
           }});}}
         }}
-        if(input)input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8));}});
+        if(input)input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8)));}});
       }})();
       </script>
     </div>
