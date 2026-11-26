@@ -1450,6 +1450,28 @@ def chat(conversation_id):
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
         messages = response.json()
+        requested_message_id = request.args.get("message", "").strip()
+        if requested_message_id:
+            try:
+                uuid.UUID(requested_message_id)
+                target_response = requests.get(
+                    URL + "/rest/v1/cyrus_messages",
+                    params={
+                        "select": "id,sender_id,content,message_type,created_at,edited_at,metadata",
+                        "id": "eq." + requested_message_id,
+                        "conversation_id": "eq." + conversation_id,
+                        "limit": "1"
+                    },
+                    headers=headers,
+                    timeout=15
+                )
+                if target_response.ok and isinstance(target_response.json(), list) and target_response.json():
+                    target_message = target_response.json()[0]
+                    if not any(str(m.get("id") or "") == requested_message_id for m in messages):
+                        messages.append(target_message)
+                        messages.sort(key=lambda item: str(item.get("created_at") or ""))
+            except ValueError:
+                requested_message_id = ""
         pinned_message = next((m for m in messages if isinstance(m.get("metadata"), dict) and m["metadata"].get("pinned")), None)
         pinned_banner = (
             '<div class="card" style="border-color:#d8b46a;margin-bottom:10px">📌 پیام سنجاق‌شده: '
