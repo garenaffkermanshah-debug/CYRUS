@@ -60,6 +60,33 @@ def cyrus_refresh_auth_session():
 URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
 
+@app.before_request
+def cyrus_update_last_seen():
+    if not session.get("access_token") or not session.get("user_id"):
+        return
+    if request.path.startswith("/static/"):
+        return
+    now = time.time()
+    if now - float(session.get("last_seen_ping_at", 0) or 0) < 60:
+        return
+    try:
+        response = requests.patch(
+            URL + "/rest/v1/cyrus_profiles",
+            params={"id": "eq." + str(session.get("user_id"))},
+            json={"last_seen_at": datetime.now().astimezone().isoformat()},
+            headers={
+                "apikey": KEY,
+                "Authorization": "Bearer " + session["access_token"],
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            },
+            timeout=8
+        )
+        if response.ok:
+            session["last_seen_ping_at"] = now
+    except Exception:
+        pass
+
 BASE = """
 <!doctype html>
 <html lang="fa" dir="rtl">
@@ -1353,6 +1380,7 @@ def chat(conversation_id):
     room_title_text = str(room_data.get("title") or "گفتگو")
     room_avatar_source = str(room_data.get("avatar_url") or "")
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
+    room_last_seen = "آخرین بازدید نامشخص"
     room_profile_href = "/conversation/" + conversation_id + "/profile"
     if room_type == "private":
         try:
@@ -1371,13 +1399,26 @@ def chat(conversation_id):
             if other_id:
                 person_response = requests.get(
                     URL + "/rest/v1/cyrus_profiles",
-                    params={"select":"display_name,username,avatar_url","id":"eq."+other_id,"limit":"1"},
+                    params={"select":"display_name,username,avatar_url,last_seen_at","id":"eq."+other_id,"limit":"1"},
                     headers=headers, timeout=15
                 )
                 if person_response.ok and person_response.json():
                     person = person_response.json()[0]
                     room_title_text = str(person.get("display_name") or person.get("username") or room_title_text)
                     room_avatar_source = str(person.get("avatar_url") or room_avatar_source)
+                    seen_raw = str(person.get("last_seen_at") or "")
+                    if seen_raw:
+                        try:
+                            seen_dt = datetime.fromisoformat(seen_raw.replace("Z", "+00:00")).astimezone()
+                            now_dt = datetime.now().astimezone()
+                            if (now_dt - seen_dt).total_seconds() <= 300:
+                                room_last_seen = "آنلاین"
+                            elif seen_dt.date() == now_dt.date():
+                                room_last_seen = "آخرین بازدید امروز " + seen_dt.strftime("%H:%M")
+                            else:
+                                room_last_seen = "آخرین بازدید " + seen_dt.strftime("%Y-%m-%d %H:%M")
+                        except Exception:
+                            room_last_seen = "آخرین بازدید نامشخص"
                     room_profile_href = "/user/" + other_id + "?from_chat=1"
         except Exception:
             pass
@@ -1394,7 +1435,7 @@ def chat(conversation_id):
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}</h2>
-        <span class="room-type">{'آخرین بازدید در دسترس نیست' if room_type == 'private' else room_subtitle}</span>
+        <span class="room-type">{room_last_seen if room_type == 'private' else room_subtitle}</span>
       </a>
       <a class="chat-header-more" href="{html.escape(room_profile_href, quote=True)}" aria-label="پروفایل">⋮</a>
     </section>"""
