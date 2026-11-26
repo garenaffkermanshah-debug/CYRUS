@@ -611,6 +611,20 @@ def home():
         .cyrus-remove-chat button{{width:auto;margin:0;padding:7px 10px;font-size:12px;background:#48252a;border:1px solid #a34a55;color:#ffd9dd}}
         .cyrus-chat-row.remove-open .cyrus-remove-chat{{display:block}}
       </style>
+      <script>
+      (()=>{{
+        document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
+          let timer=null;
+          const start=()=>{{timer=setTimeout(()=>{{row.classList.add('remove-open');}},600);}};
+          const cancel=()=>{{if(timer)clearTimeout(timer);timer=null;}};
+          row.addEventListener('touchstart',start,{{passive:true}});
+          row.addEventListener('touchend',cancel);
+          row.addEventListener('touchmove',cancel,{{passive:true}});
+          row.addEventListener('contextmenu',e=>{{e.preventDefault();row.classList.add('remove-open');}});
+          row.addEventListener('click',e=>{{if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-remove-chat')){{e.preventDefault();row.classList.remove('remove-open');}}}});
+        }});
+      }})();
+      </script>
       <p class="error">{html.escape(error)}</p>
     </div>
     """
