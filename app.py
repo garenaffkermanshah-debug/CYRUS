@@ -1019,7 +1019,7 @@ def public_user_profile(user_id):
     blocked_notice = '<p class="error">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
     send_form_style = 'style="display:none"' if blocked_by_me else ""
     content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>{block_form}{blocked_notice}
-      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {"style=\\"display:none\\" " if blocked_by_me else ""}>
+      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
         <textarea name="content" maxlength="4000" rows="4" required placeholder="پیام خود را بنویسید..." style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"></textarea>
         <button type="submit">ارسال پیام</button></form><p class="muted"><a href="/contacts">بازگشت به مخاطبین</a></p></div></main>"""
     return page(content)
