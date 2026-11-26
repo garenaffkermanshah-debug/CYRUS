@@ -1085,6 +1085,13 @@ def message_to_user(user_id):
             timeout=15)
         if blocked.ok and blocked.json():
             return redirect("/user/" + user_id)
+        reverse_blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
+            params={"select":"blocker_id", "blocker_id":"eq."+user_id,
+                    "blocked_id":"eq."+own_id, "limit":"1"},
+            headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
+            timeout=15)
+        if reverse_blocked.ok and reverse_blocked.json():
+            return redirect("/user/" + user_id)
     except Exception:
         pass
     headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"], "Content-Type": "application/json", "Prefer": "return=minimal"}
@@ -1482,6 +1489,14 @@ def send_message(conversation_id):
                     )
                     if block_check.ok and block_check.json():
                         return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.", 403
+                    reverse_block_check = requests.get(
+                        URL + "/rest/v1/cyrus_user_blocks",
+                        params={"select":"blocker_id", "blocker_id":"eq."+other_id,
+                                "blocked_id":"eq."+current_user, "limit":"1"},
+                        headers=headers, timeout=15
+                    )
+                    if reverse_block_check.ok and reverse_block_check.json():
+                        return "این کاربر شما را مسدود کرده است؛ امکان ارسال پیام نیست.", 403
 
         # برای گفتگوهای غیرکانال، فرستنده باید عضو گفتگو باشد.
         if room.get("type") != "channel":
@@ -1635,6 +1650,11 @@ def forward_message(message_id):
                             headers=headers,timeout=15)
                         if blocked.ok and blocked.json():
                             return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.",403
+                        reverse_blocked=requests.get(URL+"/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+other,"blocked_id":"eq."+current_user,"limit":"1"},
+                            headers=headers,timeout=15)
+                        if reverse_blocked.ok and reverse_blocked.json():
+                            return "این کاربر شما را مسدود کرده است؛ امکان ارسال پیام نیست.",403
         saved=requests.post(URL+"/rest/v1/cyrus_messages",
             json={"conversation_id":destination,"sender_id":current_user,
                   "content":str(original.get("content") or ""),
