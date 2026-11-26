@@ -2836,6 +2836,7 @@ def settings():
     else:
         avatar_html = '<div class="setting-profile-image setting-profile-fallback">♙</div>'
     avatar_error = html.escape(request.args.get("avatar_error", ""))
+    avatar_notice = ('<p class="setting-error">' + avatar_error + '</p>') if avatar_error else ('<p class="setting-avatar-success">تصویر پروفایل با موفقیت تغییر کرد</p>' if request.args.get("avatar_success") == "1" else "")
     edit_value_html = html.escape(field_value, quote=True)
 
     content = f"""
@@ -2856,7 +2857,7 @@ def settings():
         .setting-info:active{{transform:scale(.99)}}
         .setting-info .info{{grid-column:1/2;font-size:15px;text-align:right;align-self:center;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
         .smal-title{{grid-column:2/3;grid-row:1/2;align-self:center;font-size:12px;padding:0 8px;color:#8fa4b7;white-space:nowrap}}
-        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}.setting-avatar-form{{grid-template-columns:42px minmax(0,1fr) auto;gap:8px}}.setting-avatar-form .button-title{{cursor:pointer}}.setting-avatar-form input[type=file]{{grid-column:2/4;grid-row:2;font-size:11px;max-width:100%;color:#b7c8d8}}.setting-avatar-form .avatar-submit{{grid-column:3;grid-row:1;background:#d8b45f;color:#17120a;border:0;border-radius:8px;padding:8px 10px;font:inherit;font-size:12px}}
+        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}.setting-avatar-form{{grid-template-columns:42px minmax(0,1fr) auto;gap:8px}}.setting-avatar-form .button-title{{cursor:pointer}}.setting-avatar-form input[type=file]{{grid-column:2/4;grid-row:2;font-size:11px;max-width:100%;color:#b7c8d8}}.setting-avatar-form .avatar-submit{{grid-column:3;grid-row:1;background:#d8b45f;color:#17120a;border:0;border-radius:8px;padding:8px 10px;font:inherit;font-size:12px}}.setting-avatar-success{{color:#8ee0b0;text-align:center;font-size:12px;margin:4px 0}}
         .s-button{{display:grid;align-items:center;border-radius:12px;grid-template-columns:42px minmax(0,1fr) 20px;transition:.2s;cursor:pointer;background:#0e1b29;border:1px solid #1d3042;color:#edf2f7;text-align:right;text-decoration:none;padding:6px 12px;font:inherit}}
         .button-title{{font-size:14px;text-align:right;align-self:center;padding:0 12px;grid-column:2/3;grid-row:1/2}}
         .buttons-icons{{height:34px;width:34px;border-radius:10px;align-self:center;grid-column:1/2;background:#152b3e;color:#d6ad5b;display:grid;place-items:center}}
@@ -2892,6 +2893,7 @@ def settings():
         </section>
         <section class="setting-buttons">
           <form class="s-button setting-avatar-form" method="post" action="/profile/avatar" enctype="multipart/form-data"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg></span><label class="button-title" for="setting-avatar-file">تغییر تصویر پروفایل</label><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required><button type="submit" class="avatar-submit">بارگذاری</button></form>
+          {avatar_notice}
           <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
           <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
           <a class="s-button" href="/logout"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg></span><span class="button-title">خروج از حساب</span><span>‹</span></a>
