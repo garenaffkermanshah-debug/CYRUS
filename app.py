@@ -1025,9 +1025,9 @@ def search():
         <a class="{ 'active' if selected_type == 'channels' else '' }" href="/search?q={html.escape(query, quote=True)}&type=channels">کانال‌ها</a>
       </div>
       <style>
-        .search-category-tabs{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #20364b;margin:0 12px 8px}
-        .search-category-tabs a{padding:12px 10px;white-space:nowrap;color:#91a6b8;font-size:12px;border-bottom:2px solid transparent}
-        .search-category-tabs a:focus,.search-category-tabs a:hover,.search-category-tabs a.active{color:#69b9f7;border-color:#3297df}
+        .search-category-tabs{{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #20364b;margin:0 12px 8px}}
+        .search-category-tabs a{{padding:12px 10px;white-space:nowrap;color:#91a6b8;font-size:12px;border-bottom:2px solid transparent}}
+        .search-category-tabs a:focus,.search-category-tabs a:hover,.search-category-tabs a.active{{color:#69b9f7;border-color:#3297df}}
       </style>
       <div class="chat-list">{people_rows}</div>
       <div class="chat-list">{room_rows}</div>
