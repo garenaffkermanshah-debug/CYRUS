@@ -260,7 +260,7 @@ def page(content):
     header = ""
     current = request.path
     is_home = current in ("/", "/home")
-    is_chat = current.startswith("/chat/")
+    is_chat = current.startswith("/chat/") or current.startswith("/conversation/") or (current.startswith("/user/") and request.args.get("from_chat") == "1")
     if is_home:
         header = """
         <header class="top cyrus-home-top">
@@ -877,11 +877,11 @@ def search():
     content = f"""
     <div class="container">
       <form class="searchbar" method="get" action="/search"
-            style="display:flex;align-items:center;gap:8px;margin:12px 16px;padding:4px 12px;border-radius:14px;background:rgba(12,22,38,.92);border:1px solid rgba(190,151,82,.45)">
+            style="display:flex;align-items:center;gap:6px;margin:6px 12px 12px;padding:2px 10px;border-radius:22px;background:#101d2c;border:1px solid #263b50;min-height:42px">
         <input name="q" value="{html.escape(query, quote=True)}"
                placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
                autocomplete="off" autofocus
-               style="flex:1;min-width:0;background:transparent;border:0;outline:0;box-shadow:none;padding:12px 4px;color:#fff">
+               style="flex:1;min-width:0;background:transparent;border:0;outline:0;box-shadow:none;padding:8px 4px;color:#fff;font-size:13px">
         <button type="submit" aria-label="جستجو"
                 style="margin:0;padding:8px 10px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#d6b36a">⌕</button>
       </form>
@@ -1026,10 +1026,32 @@ def public_user_profile(user_id):
     )
     blocked_notice = '<p class="error">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
     send_form_style = 'style="display:none"' if blocked_by_me else ""
-    content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>{block_form}{blocked_notice}
-      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
-        <textarea name="content" maxlength="4000" rows="4" required placeholder="پیام خود را بنویسید..." style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"></textarea>
-        <button type="submit">ارسال پیام</button></form><p class="muted"><a href="/contacts">بازگشت به مخاطبین</a></p></div></main>"""
+    content = f"""<main class="container cyrus-user-profile">
+      <style>
+        .cyrus-user-profile{{padding:14px}}
+        .user-profile-hero{{text-align:center;padding:25px 16px 18px;background:#111e2b;border:1px solid #263b50;border-radius:18px}}
+        .user-profile-hero img,.user-profile-hero .avatar{{width:108px;height:108px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px}}
+        .user-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
+        .user-profile-username{{color:#78b8e6;font-size:13px;direction:ltr}}
+        .user-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:13px 0;white-space:pre-wrap}}
+        .user-profile-actions{{margin-top:12px}}
+        .user-profile-actions button{{background:#20384d;color:#eaf3fa}}
+        .user-profile-actions .block-button{{background:#40262c;color:#f0c6c9}}
+      </style>
+      <section class="user-profile-hero">
+        {avatar_html}
+        <h2>{name}</h2>
+        <div class="user-profile-username">@{username}</div>
+        <p class="user-profile-bio">{bio or "بیوگرافی اضافه نشده است"}</p>
+      </section>
+      <div class="user-profile-actions">
+        {block_form.replace('<button type="submit"', '<button class="block-button" type="submit"') if block_form else ""}
+        {blocked_notice}
+        <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
+          <button type="submit">ارسال پیام</button>
+        </form>
+      </div>
+    </main>"""
     return page(content)
 
 
@@ -1359,7 +1381,7 @@ def chat(conversation_id):
                     person = person_response.json()[0]
                     room_title_text = str(person.get("display_name") or person.get("username") or room_title_text)
                     room_avatar_source = str(person.get("avatar_url") or room_avatar_source)
-                    room_profile_href = "/user/" + other_id
+                    room_profile_href = "/user/" + other_id + "?from_chat=1"
         except Exception:
             pass
     room_title = html.escape(room_title_text)
