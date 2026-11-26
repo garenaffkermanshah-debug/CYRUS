@@ -174,6 +174,21 @@ body {
   color: #aab9c8;
   font-size: 12px;
 }
+.folder-unread {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-inline-start: 5px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #2797e5;
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  vertical-align: middle;
+}
 .tab.active {
   color: #69b9f7;
   background: transparent;
@@ -254,11 +269,11 @@ def page(content):
     if session.get("access_token"):
         current = request.path
         items = [
-            ("/home", "▣", "پیام‌ها"),
-            ("/contacts", "♧", "مخاطبین"),
-            ("/search", "⌕", "جستجو"),
-            ("/profile", "◉", "پروفایل"),
-            ("/settings", "⚙", "تنظیمات")
+            ("/home", "𓆃", "بارگاه"),
+            ("/contacts", "𓅃", "خویشان"),
+            ("/search", "⌕", "کاوش"),
+            ("/profile", "♙", "نگاره"),
+            ("/settings", "𓊹", "فرمان")
         ]
         links = ""
         for href, icon, label in items:
@@ -336,18 +351,17 @@ def home():
         unread_counts = {}
         for cid in room_ids:
             marker = read_markers.get(cid)
-            if not marker:
-                unread_counts[cid] = 0
-                continue
+            unread_params = {
+                "select": "id",
+                "conversation_id": "eq." + cid,
+                "sender_id": "neq." + str(session["user_id"]),
+                "limit": "1000"
+            }
+            if marker:
+                unread_params["created_at"] = "gt." + str(marker)
             unread_response = requests.get(
                 URL + "/rest/v1/cyrus_messages",
-                params={
-                    "select": "id",
-                    "conversation_id": "eq." + cid,
-                    "created_at": "gt." + str(marker),
-                    "sender_id": "neq." + str(session["user_id"]),
-                    "limit": "1000"
-                },
+                params=unread_params,
                 headers=headers,
                 timeout=20
             )
@@ -391,8 +405,19 @@ def home():
     except Exception:
         error = "دریافت گفتگوها انجام نشد؛ اتصال یا دسترسی دیتابیس را بررسی کنید"
 
+    folder_unread = {key: 0 for key in categories}
+    for room in conversations:
+        room_id = str(room.get("id") or "")
+        room_type = str(room.get("type") or "private")
+        count = int(unread_counts.get(room_id, 0))
+        folder_unread["all"] += count
+        if room_type in folder_unread and room_type != "all":
+            folder_unread[room_type] += count
+
     tabs = "".join(
-        f'<a class="tab {"active" if key == selected else ""}" href="/home?type={key}">{item[0]}</a>'
+        f'<a class="tab {"active" if key == selected else ""}" href="/home?type={key}">{item[0]}'
+        + (f'<span class="folder-unread">{min(99, folder_unread[key])}</span>' if folder_unread[key] > 0 else "")
+        + '</a>'
         for key, item in categories.items()
     )
 
