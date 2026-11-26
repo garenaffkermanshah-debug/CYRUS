@@ -2779,7 +2779,7 @@ def settings():
     <main class="container cyrus-settings-page">
       <style>
         .cyrus-settings-page{{width:100%;max-width:430px;margin:0 auto;padding:0 0 78px;color:#f1e7d2}}
-        .setting-container{{position:relative;display:grid;grid-template-rows:60px 240px 8px auto 60px auto;width:100%;min-height:calc(100dvh - 65px);text-align:center;background:rgba(7,15,25,.97);color:#f1e7d2;transform:none;transition:.3s ease;z-index:1;overflow-y:auto;border-inline:1px solid #27394a}}
+        .setting-container{{position:relative;display:grid;grid-template-rows:60px 240px 8px auto auto 1fr;width:100%;min-height:calc(100dvh - 65px);text-align:center;background:rgba(7,15,25,.97);color:#f1e7d2;transform:none;transition:.3s ease;z-index:1;overflow-y:auto;border-inline:1px solid #27394a}}
         .setting-header{{display:grid;grid-template-columns:60px 1fr 50px 20px;align-items:center;border-bottom:1px solid #26394b}}
         .setting-delete{{background:linear-gradient(135deg,#8c642b,#d8b15b);color:#17120a;line-height:60px;font-size:23px;font-weight:bold}}
         .setting-title{{align-self:center;text-align:start;padding-left:8px;font-size:20px;color:#e5bd69}}
@@ -2832,8 +2832,8 @@ def settings():
             <span class="smal-title">شناسه</span>
           </div>
           <div class="setting-info">
-            <span class="info">{bio or "بیوگرافی ثبت نشده"}</span>
             <span class="info-icons">𓆃</span>
+            <span class="info">{bio or "بیوگرافی ثبت نشده"}</span>
             <span class="smal-title">درباره</span>
           </div>
         </section>
