@@ -983,7 +983,7 @@ def search():
                     text_value = str(hit.get("content") or "")
                     snippet = text_value if len(text_value) <= 170 else text_value[:167] + "…"
                     message_rows += f"""
-                    <a class="chat-row search-message-result" data-kind="messages" href="/chat/{html.escape(rid, quote=True)}?message={html.escape(mid, quote=True)}">
+                    <a class="chat-row search-result search-message-result" data-kind="messages" href="/chat/{html.escape(rid, quote=True)}?message={html.escape(mid, quote=True)}">
                       <div class="avatar">⌕</div><div class="chat-info">
                         <div class="chat-name">{html.escape(room_names.get(rid, "گفتگو"))}</div>
                         <div class="chat-preview">{html.escape(snippet)}</div>
@@ -1006,6 +1006,7 @@ def search():
         .cyrus-explore-search button{{width:auto;margin:0;padding:6px 9px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#6fb9ef}}
       </style>
       <form class="cyrus-explore-search" method="get" action="/search">
+        <a href="/home" aria-label="بازگشت" style="font-size:25px;color:#70b7e7;padding:0 5px">‹</a>
         <input name="q" value="{html.escape(query, quote=True)}"
                placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
                type="search" autocomplete="off" autofocus>
