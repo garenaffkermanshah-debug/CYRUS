@@ -201,6 +201,7 @@ body {
   margin-bottom: 6px;
 }
 .chat-preview { color: #8ea2b5; font-size: 12px; }
+.unread-badge{min-width:22px;height:22px;padding:0 6px;border-radius:12px;background:#2797e5;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold}
 .empty {
   margin: 16px 12px;
   padding: 25px 18px;
@@ -312,7 +313,7 @@ def home():
         memberships = requests.get(
             URL + "/rest/v1/cyrus_members",
             params={
-                "select": "conversation_id",
+                "select": "conversation_id,last_read_at",
                 "user_id": "eq." + session["user_id"]
             },
             headers=headers,
@@ -322,11 +323,35 @@ def home():
         if not memberships.ok:
             raise Exception("دریافت عضویت‌ها ناموفق بود")
 
+        membership_rows = memberships.json()
         room_ids = list(dict.fromkeys(
             str(x["conversation_id"])
-            for x in memberships.json()
+            for x in membership_rows
             if x.get("conversation_id")
         ))
+        read_markers = {
+            str(x.get("conversation_id")): x.get("last_read_at")
+            for x in membership_rows
+        }
+        unread_counts = {}
+        for cid in room_ids:
+            marker = read_markers.get(cid)
+            if not marker:
+                unread_counts[cid] = 0
+                continue
+            unread_response = requests.get(
+                URL + "/rest/v1/cyrus_messages",
+                params={
+                    "select": "id",
+                    "conversation_id": "eq." + cid,
+                    "created_at": "gt." + str(marker),
+                    "sender_id": "neq." + str(session["user_id"]),
+                    "limit": "1000"
+                },
+                headers=headers,
+                timeout=20
+            )
+            unread_counts[cid] = len(unread_response.json()) if unread_response.ok else 0
 
         if room_ids:
             rooms = requests.get(
@@ -400,6 +425,8 @@ def home():
         if len(preview) > 65:
             preview = preview[:65] + "..."
 
+        unread = int(unread_counts.get(room_id, 0))
+        unread_badge = f'<span class="unread-badge">{unread}</span>' if unread else ""
         rows += f"""
         <a class="chat-row" href="/chat/{room_id}">
           <div class="avatar">{icon}</div>
@@ -407,6 +434,7 @@ def home():
             <div class="chat-name">{html.escape(str(room_title))}</div>
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
+          {unread_badge}
         </a>"""
 
     if not rows and not error:
@@ -870,6 +898,17 @@ def chat(conversation_id):
         if not room.ok or not room.json():
             return page('<div class="container card"><h3>گفتگو پیدا نشد یا دسترسی ندارید</h3><a href="/contacts">بازگشت به خویشان</a></div>'), 404
 
+        # ورود به گفتگو یعنی پیام‌های قبلی تا این لحظه خوانده شده‌اند.
+        requests.patch(
+            URL + "/rest/v1/cyrus_members",
+            params={
+                "conversation_id": "eq." + conversation_id,
+                "user_id": "eq." + str(session.get("user_id"))
+            },
+            json={"last_read_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
+            headers={**headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
+            timeout=20
+        )
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
             params={
@@ -922,7 +961,7 @@ def chat(conversation_id):
 
         message_rows += f"""
         <div class="message {css_class}" data-content="{raw_content}">
-          <div>{body}</div>
+          <div class="message-body">{body}</div>
           <small>{stamp}{edited_label}</small>
           {controls}
           {edit_form}
@@ -1001,6 +1040,7 @@ def chat(conversation_id):
 
         .messages-area{{display:flex;flex-direction:column;gap:12px;padding:12px 0}}
         .message{{max-width:85%;padding:12px 15px;border:1px solid #987039;border-radius:14px;background:rgba(9,15,25,.92);overflow-wrap:anywhere}}
+        .message .message-body{{color:#55b7ff}}
         .message small{{display:block;color:#b0b2b7;font-size:10px;margin-top:7px}}
         .message-actions{{display:flex;gap:8px;margin-top:8px;align-items:center}}
         .message-actions form{{margin:0}}
