@@ -1269,25 +1269,56 @@ def chat(conversation_id):
         message_rows = '<div class="empty">هنوز پیامی ارسال نشده؛ اولین پیام را بفرستید</div>'
 
     room_data = room.json()[0]
-    room_title = html.escape(str(room_data.get("title") or "گفتگو"))
+    room_type = str(room_data.get("type") or "")
+    room_title_text = str(room_data.get("title") or "گفتگو")
+    room_avatar_source = str(room_data.get("avatar_url") or "")
+    room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
+    room_profile_href = "/conversation/" + conversation_id + "/profile"
+    if room_type == "private":
+        try:
+            member_response = requests.get(
+                URL + "/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+conversation_id},
+                headers=headers, timeout=15
+            )
+            other_id = ""
+            if member_response.ok:
+                for member in member_response.json():
+                    candidate = str(member.get("user_id") or "")
+                    if candidate and candidate != str(current_user):
+                        other_id = candidate
+                        break
+            if other_id:
+                person_response = requests.get(
+                    URL + "/rest/v1/cyrus_profiles",
+                    params={"select":"display_name,username,avatar_url","id":"eq."+other_id,"limit":"1"},
+                    headers=headers, timeout=15
+                )
+                if person_response.ok and person_response.json():
+                    person = person_response.json()[0]
+                    room_title_text = str(person.get("display_name") or person.get("username") or room_title_text)
+                    room_avatar_source = str(person.get("avatar_url") or room_avatar_source)
+                    room_profile_href = "/user/" + other_id
+        except Exception:
+            pass
+    room_title = html.escape(room_title_text)
     room_description = html.escape(str(room_data.get("description") or ""))
-    room_avatar_url = html.escape(str(room_data.get("avatar_url") or ""), quote=True)
-    room_type_label = {"group": "گروه", "channel": "کانال", "private": "گفتگوی خصوصی"}.get(str(room_data.get("type") or ""), "گفتگو")
+    room_avatar_url = html.escape(room_avatar_source, quote=True)
     room_avatar = (
         f'<img src="{room_avatar_url}" alt="">'
         if room_avatar_url else '<div class="room-avatar-symbol">𓊹</div>'
     )
     room_header = f"""
-    <section class="room-header">
-      <div class="room-avatar">{room_avatar}</div>
-      <div class="room-info">
+    <section class="room-header cyrus-chat-header">
+      <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
+      <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
+      <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}</h2>
-        <span class="room-type">{room_type_label} · CYRUS</span>
-        <p>{room_description}</p>
-      </div>
+        <span class="room-type">{'آخرین بازدید در دسترس نیست' if room_type == 'private' else room_subtitle}</span>
+      </a>
+      <a class="chat-header-more" href="{html.escape(room_profile_href, quote=True)}" aria-label="پروفایل">⋮</a>
     </section>"""
 
-    room_type = str(room_data.get("type") or "")
     channel_can_post = True
     if room_type == "channel":
         channel_can_post = (
@@ -1331,14 +1362,16 @@ def chat(conversation_id):
       {room_header}
       {pinned_banner}
       <style>
-        .room-header{{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:14px;border:1px solid #987039;border-radius:16px;background:rgba(9,15,25,.94)}}
-        .room-avatar{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:1px solid #987039;background:#111b2b;display:flex;align-items:center;justify-content:center}}
+        .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
+        .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
+        .room-avatar{{width:43px;height:43px;flex:0 0 43px;border-radius:50%;overflow:hidden;border:0;background:#26394a;display:flex;align-items:center;justify-content:center}}
         .room-avatar img{{width:100%;height:100%;object-fit:cover}}
-        .room-avatar-symbol{{font-size:27px;color:#d8b46a}}
-        .room-info{{min-width:0}}
-        .room-info h2{{margin:0 0 5px;font-size:19px;overflow-wrap:anywhere}}
-        .room-type{{font-size:11px;color:#d8b46a}}
-        .room-info p{{margin:6px 0 0;color:#c4c6cc;font-size:13px;overflow-wrap:anywhere}}
+        .room-avatar-symbol{{font-size:23px;color:#d8b46a}}
+        .room-info{{min-width:0;flex:1;text-decoration:none}}
+        .room-info h2{{margin:0 0 4px;font-size:16px;color:#f1f5f8;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+        .room-type{{font-size:12px;color:#94a7b7;display:block}}
+        .room-info p{{display:none}}
+        .chat-header-more{{font-size:25px;color:#d2dce5;padding:4px 7px}}
 
         .messages-area{{display:flex;flex-direction:column;gap:8px;padding:8px 2px 18px}}
         .message{{position:relative;max-width:84%;padding:10px 13px;border:1px solid transparent;border-radius:16px;background:#172432;overflow-wrap:anywhere;box-shadow:0 1px 2px #0003}}
@@ -1361,7 +1394,9 @@ def chat(conversation_id):
         .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
         .message.theirs{{align-self:flex-end;background:#172432;border-color:#263b4d;border-bottom-right-radius:5px}}
         .message.reacted:after{{content:attr(data-reaction);display:inline-block;margin-top:5px;padding:2px 7px;border-radius:14px;background:#253747;font-size:17px}}
-        .send-box{{position:sticky;bottom:70px;display:flex;align-items:center;gap:8px;background:#0b1724;padding:8px 10px;border:1px solid #263e53;border-radius:24px;box-shadow:0 4px 18px #0005}}
+        .send-box{{position:sticky;bottom:8px;display:flex;align-items:center;gap:8px;background:#0b1724;padding:8px 10px;border:1px solid #263e53;border-radius:24px;box-shadow:0 4px 18px #0005;z-index:4}}
+        .container:has(.cyrus-chat-header){{padding-bottom:12px}}
+        .messages-area{{padding-bottom:12px}}
         .send-box input[name="content"]{{flex:1;min-width:0;width:auto;margin:0;padding:12px 14px;border:0;background:transparent;border-radius:20px;font-size:14px}}
         .send-box>button{{width:auto;flex:0 0 auto;margin:0;padding:11px 17px;border-radius:22px;background:#248bd0;color:white;font-size:13px}}
         .message-actions button{{padding:6px 10px;font-size:11px;border-radius:16px;background:#10283b;color:#b9d9f0;border:1px solid #2b4c66}}
@@ -1424,8 +1459,6 @@ def chat(conversation_id):
       }}
       </script>
       {send_box}
-      {room_manage_link}
-      <p><a href="/contacts">بازگشت به خویشان</a></p>
     </div>"""
     return page(content)
 
