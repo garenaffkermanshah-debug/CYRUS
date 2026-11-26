@@ -309,7 +309,7 @@ def page(content):
         for href, icon, label in items:
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}" aria-label="{label}"><svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg><span>{label}</span></a>'
-        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom .nav-svg{{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-svg{{color:#e5bd69;transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
+        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a span{{font-size:10px;line-height:1.3}}.bottom .nav-svg{{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-svg{{color:#e5bd69;transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
     return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
@@ -2885,7 +2885,7 @@ def settings():
             textarea.disabled=!useBio;
             input.value=value;
             textarea.value=value;
-            if(key==='username'){{input.minLength=3;input.maxLength=24;input.pattern='[A-Za-z0-9_-]+';input.required=true;input.dir='ltr';}}
+            if(key==='username'){{input.minLength=3;input.maxLength=24;input.removeAttribute('pattern');input.required=true;input.dir='ltr';}}
             else if(key==='display_name'){{input.minLength=2;input.maxLength=40;input.removeAttribute('pattern');input.required=true;input.dir='auto';}}
             else{{textarea.maxLength=250;}}
             overlay.classList.add('open');
