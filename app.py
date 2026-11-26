@@ -1,4 +1,5 @@
-import os, secrets, requests, html, uuid, time, hashlib
+import os, secrets, requests, html, uuid, time, hashlib, re
+from urllib.parse import quote
 from pathlib import Path
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
@@ -1280,6 +1281,32 @@ def conversation_profile(conversation_id):
     return page(content)
 
 
+def cyrus_format_message_text(value):
+    text_value = str(value or "")
+    pattern = re.compile(r"(?<![\w@])(?:https?://[^\s<>]+|www\.[^\s<>]+|@[A-Za-z0-9_]{3,24})", re.IGNORECASE)
+    pieces = []
+    cursor = 0
+    for match in pattern.finditer(text_value):
+        token = match.group(0)
+        start, end = match.span()
+        if token.startswith("@"):
+            href = "/search?q=" + quote(token[1:])
+            target = ""
+        else:
+            while token and token[-1] in ".,!?;:)]}،؛؟":
+                token = token[:-1]
+                end -= 1
+            if not token:
+                continue
+            href = token if token.lower().startswith(("http://", "https://")) else "https://" + token
+            target = ' target="_blank" rel="noopener noreferrer"'
+        pieces.append(html.escape(text_value[cursor:start]).replace("\n", "<br>"))
+        pieces.append('<a class="chat-inline-link" href="' + html.escape(href, quote=True) + '"' + target + ' onclick="event.stopPropagation()">' + html.escape(token) + '</a>')
+        cursor = end
+    pieces.append(html.escape(text_value[cursor:]).replace("\n", "<br>"))
+    return "".join(pieces)
+
+
 @app.route("/chat/<conversation_id>")
 def chat(conversation_id):
     if not session.get("access_token"):
@@ -1369,7 +1396,7 @@ def chat(conversation_id):
     for msg in messages:
         mine = str(msg.get("sender_id") or "") == current_user
         css_class = "mine" if mine else "theirs"
-        body = html.escape(str(msg.get("content") or "")).replace("\n", "<br>")
+        body = cyrus_format_message_text(msg.get("content") or "")
         stamp_raw = str(msg.get("created_at") or "")
         try:
             stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00")).astimezone()
@@ -1516,11 +1543,15 @@ def chat(conversation_id):
 
     send_box = (
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
-        '<div id="cyrusReplyBar" style="display:none;padding:8px;border-right:3px solid #d8b46a;margin-bottom:8px">'
-        '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">لغو پاسخ</button></div>'
+        '<div id="cyrusReplyBar" class="cyrus-reply-composer" style="display:none">'
+        '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
         '<input type="hidden" name="reply_to_id" id="cyrusReplyId" value="">'
-        '<input name="content" maxlength="4000" placeholder="پیام خود را بنویسید..." required>'
-        '<button type="submit">ارسال</button></form>'
+        '<button class="composer-emoji" type="button" aria-label="ایموجی" onclick="cyrusToggleEmoji(event)">☺</button>'
+        '<div class="composer-emoji-panel" id="cyrusEmojiPanel" style="display:none">'
+        '<button type="button" onclick="cyrusInsertEmoji(\'😀\')">😀</button><button type="button" onclick="cyrusInsertEmoji(\'😂\')">😂</button><button type="button" onclick="cyrusInsertEmoji(\'🥰\')">🥰</button><button type="button" onclick="cyrusInsertEmoji(\'👍\')">👍</button><button type="button" onclick="cyrusInsertEmoji(\'❤️\')">❤️</button><button type="button" onclick="cyrusInsertEmoji(\'🔥\')">🔥</button><button type="button" onclick="cyrusInsertEmoji(\'👏\')">👏</button><button type="button" onclick="cyrusInsertEmoji(\'🙏\')">🙏</button><button type="button" onclick="cyrusInsertEmoji(\'🇮🇷\')">🇮🇷</button><button type="button" onclick="cyrusInsertEmoji(\'😎\')">😎</button><button type="button" onclick="cyrusInsertEmoji(\'🤔\')">🤔</button><button type="button" onclick="cyrusInsertEmoji(\'😍\')">😍</button>'
+        '</div>'
+        '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>'
+        '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
         if room_type != "channel" or channel_can_post else
         '<div class="card"><p>این کانال عمومی است؛ اعضا فقط می‌توانند پست‌ها را مشاهده کنند.</p></div>'
     )
@@ -1535,6 +1566,26 @@ def chat(conversation_id):
       {room_header}
       {pinned_banner}
       <style>
+        .container:has(.cyrus-chat-header){{max-width:650px;min-height:calc(100dvh - 76px);padding:0 12px 12px;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9));}}
+        .cyrus-chat-header{{position:sticky;top:0;z-index:8;flex:0 0 auto;box-shadow:0 4px 16px #0003}}
+        .messages-area{{flex:1 1 auto;min-height:45vh;}}
+        .chat-date-divider{{display:flex;justify-content:center;margin:8px 0 12px;pointer-events:none}}
+        .chat-date-divider span{{padding:5px 12px;border-radius:14px;background:#253646dd;color:#c4d3df;font-size:11px;}}
+        .message{{max-width:min(84%,480px);padding:9px 12px 7px;backdrop-filter:blur(5px);transition:background .15s,border-color .15s}}
+        .message .message-body{{white-space:normal;word-break:break-word;}}
+        .message .message-body a.chat-inline-link{{color:#8acbff;text-decoration:underline;text-underline-offset:2px;}}
+        .message small{{display:flex;align-items:center;justify-content:flex-end;gap:5px;direction:ltr}}
+        .message.context-open{{z-index:12;border-color:#e2bd6b;box-shadow:0 4px 20px #0006}}
+        .send-box{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));flex:0 0 auto;margin:8px 0 0;min-height:54px;border-radius:27px;background:#172432;border:1px solid #2b4053;box-shadow:0 4px 18px #0006;}}
+        .send-box input[name="content"]{{color:#edf4fa;line-height:1.5;}}
+        .composer-emoji,.composer-send{{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;margin:0;padding:0;border-radius:50%;font-size:22px}}
+        .composer-emoji{{background:transparent;color:#a9bdce;border:0}}
+        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}
+        .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
+        .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
+        .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;display:grid;grid-template-columns:repeat(6,40px);gap:4px;padding:8px;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20}}
+        .composer-emoji-panel button{{width:40px;height:40px;margin:0;padding:0;background:transparent;border:0;border-radius:8px;font-size:24px}}
+        @media(max-width:520px){{.container:has(.cyrus-chat-header){{padding-inline:8px}}.message{{max-width:88%}}.messages-area{{gap:7px}}}}
         .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
         .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
         .room-avatar{{width:43px;height:43px;flex:0 0 43px;border-radius:50%;overflow:hidden;border:0;background:#26394a;display:flex;align-items:center;justify-content:center}}
@@ -1577,6 +1628,24 @@ def chat(conversation_id):
       </style>
       <div class="messages-area">{message_rows}</div>
       <script>
+      function cyrusToggleEmoji(event) {{
+        event.preventDefault();event.stopPropagation();
+        const panel=document.getElementById("cyrusEmojiPanel");
+        if(panel)panel.style.display=panel.style.display==="none"?"grid":"none";
+      }}
+      function cyrusInsertEmoji(emoji) {{
+        const input=document.querySelector('.send-box input[name="content"]');
+        const panel=document.getElementById("cyrusEmojiPanel");
+        if(!input)return;
+        const start=input.selectionStart||input.value.length;
+        const end=input.selectionEnd||start;
+        input.value=input.value.slice(0,start)+emoji+input.value.slice(end);
+        input.focus();input.setSelectionRange(start+emoji.length,start+emoji.length);
+        if(panel)panel.style.display="none";
+      }}
+      document.addEventListener('DOMContentLoaded',function(){{
+        window.scrollTo(0,document.body.scrollHeight);
+      }});
       function cyrusOpenMessageMenu(event,message) {{
         if(event.target.closest('.message-context')) return;
         if(event.target.closest('button,form,select,input,a')) return;
