@@ -349,24 +349,31 @@ def home():
             str(x.get("conversation_id")): x.get("last_read_at")
             for x in membership_rows
         }
-        unread_counts = {}
-        for cid in room_ids:
-            marker = read_markers.get(cid)
-            unread_params = {
-                "select": "id",
-                "conversation_id": "eq." + cid,
-                "sender_id": "neq." + str(session["user_id"]),
-                "limit": "1000"
-            }
-            if marker:
-                unread_params["created_at"] = "gt." + str(marker)
-            unread_response = requests.get(
-                URL + "/rest/v1/cyrus_messages",
-                params=unread_params,
-                headers=headers,
-                timeout=20
-            )
-            unread_counts[cid] = len(unread_response.json()) if unread_response.ok else 0
+        unread_counts = {cid: 0 for cid in room_ids}
+        if room_ids:
+            try:
+                unread_params = {
+                    "select": "conversation_id,created_at",
+                    "conversation_id": "in.(" + ",".join(room_ids) + ")",
+                    "sender_id": "neq." + str(session["user_id"]),
+                    "order": "created_at.desc",
+                    "limit": "5000"
+                }
+                unread_response = requests.get(
+                    URL + "/rest/v1/cyrus_messages",
+                    params=unread_params,
+                    headers=headers,
+                    timeout=20
+                )
+                if unread_response.ok:
+                    for msg in unread_response.json():
+                        cid = str(msg.get("conversation_id", ""))
+                        marker = read_markers.get(cid)
+                        created_at = str(msg.get("created_at", ""))
+                        if cid in unread_counts and (not marker or created_at > str(marker)):
+                            unread_counts[cid] += 1
+            except Exception:
+                pass
 
         if room_ids:
             rooms = requests.get(
