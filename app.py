@@ -1,4 +1,4 @@
-import os, secrets, requests, html, uuid, time
+import os, secrets, requests, html, uuid, time, hashlib
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
@@ -255,7 +255,7 @@ body {
  </div>
  <div class="top-actions">
   <a href="/search" aria-label="جستجو">⌕</a>
-  <a href="/settings" aria-label="فرمان">⚙</a>
+  
  </div>
 </header>
 {{ content|safe }}
@@ -421,6 +421,14 @@ def home():
         for key, item in categories.items()
     )
 
+    conversations.sort(
+        key=lambda room: str(
+            (latest_messages.get(str(room.get("id") or ""), {}) or {}).get("created_at")
+            or room.get("created_at") or ""
+        ),
+        reverse=True
+    )
+
     rows = ""
 
     for room in conversations:
@@ -456,9 +464,71 @@ def home():
 
         unread = int(unread_counts.get(room_id, 0))
         unread_badge = f'<span class="unread-badge">{unread}</span>' if unread else ""
+        avatar_color_list = [
+            "#b85c78", "#4f8fbd", "#8d6bb8", "#3d9b87",
+            "#c18a45", "#6b83c9", "#ba6650", "#658d52",
+            "#a65caa", "#4b9ba8", "#a28a48", "#65758f"
+        ]
+        color_seed = sum((i + 1) * ord(ch) for i, ch in enumerate(room_id))
+        avatar_color = avatar_color_list[color_seed % len(avatar_color_list)]
+        avatar_html = (
+            f'<div class="avatar" style="background:{avatar_color};border-color:{avatar_color}">{icon}</div>'
+        )
+
+        if room_type == "private":
+            try:
+                member_response = requests.get(
+                    URL + "/rest/v1/cyrus_members",
+                    params={
+                        "select": "user_id",
+                        "conversation_id": "eq." + room_id
+                    },
+                    headers=headers,
+                    timeout=15
+                )
+                other_user_id = ""
+                if member_response.ok:
+                    for member in member_response.json():
+                        candidate = str(member.get("user_id") or "")
+                        if candidate and candidate != str(session.get("user_id") or ""):
+                            other_user_id = candidate
+                            break
+
+                if other_user_id:
+                    profile_response = requests.get(
+                        URL + "/rest/v1/cyrus_profiles",
+                        params={
+                            "select": "display_name,username,avatar_url",
+                            "id": "eq." + other_user_id,
+                            "limit": "1"
+                        },
+                        headers=headers,
+                        timeout=15
+                    )
+                    if profile_response.ok and profile_response.json():
+                        person = profile_response.json()[0]
+                        person_name = str(person.get("display_name") or person.get("username") or room_title)
+                        avatar_url = str(person.get("avatar_url") or "")
+                        if avatar_url:
+                            avatar_html = (
+                                '<div class="avatar cyrus-real-avatar">'
+                                f'<img src="{html.escape(avatar_url, quote=True)}" alt="{html.escape(person_name, quote=True)}">'
+                                '</div>'
+                            )
+                        else:
+                            first_letter = html.escape(person_name[:1] or icon)
+                            person_seed = sum((i + 1) * ord(ch) for i, ch in enumerate(other_user_id))
+                            person_color = avatar_color_list[person_seed % len(avatar_color_list)]
+                            avatar_html = (
+                                f'<div class="avatar" style="background:{person_color};border-color:{person_color}">'
+                                f'{first_letter}</div>'
+                            )
+            except Exception:
+                pass
+
         rows += f"""
         <div class="chat-row cyrus-chat-row">
-          <div class="avatar">{icon}</div>
+          {avatar_html}
           <div class="chat-info" onclick="location.href='/chat/{room_id}'" style="cursor:pointer">
             <div class="chat-name">{html.escape(str(room_title))}</div>
             <div class="chat-preview">{html.escape(preview)}</div>
@@ -475,6 +545,17 @@ def home():
     content = f"""
     <div class="container">
 
+      <style>
+        .top{height:66px;padding:8px 16px}
+        .top .emblem,.top .sub,.top-actions a[href="/settings"]{display:none!important}
+        .top .brand{gap:0}
+        .top .logo{font-family:Tahoma,Arial,sans-serif;font-size:23px;letter-spacing:2px}
+        .top-actions{gap:0}
+        .top-actions a[href="/search"]{font-size:29px;padding:8px}
+        .cyrus-real-avatar{overflow:hidden;padding:0}
+        .cyrus-real-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+        .cyrus-chat-row .avatar{font-weight:bold;color:#fff}
+      </style>
       <div class="tabs">{tabs}</div>
 
       <div class="chat-list">{rows}</div>
