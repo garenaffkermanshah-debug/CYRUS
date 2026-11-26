@@ -1223,7 +1223,7 @@ def chat(conversation_id):
                f'<button type="submit">{"برداشتن سنجاق" if meta.get("pinned") else "سنجاق"}</button></form>' if mine else "")
             + (f'<button type="button" onclick="cyrusEdit(this)">ویرایش</button>'
                f'<form method="post" action="/chat/message/{msg_id}/delete" '
-               'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\\')">'
+               'onsubmit="return confirm(\'این پیام برای هر دو طرف حذف شود؟\')">'
                f'<input type="hidden" name="conversation_id" value="{conversation_id}">'
                '<button type="submit">حذف</button></form>' if mine else "")
             + '</div>'
