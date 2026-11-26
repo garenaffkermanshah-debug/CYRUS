@@ -917,6 +917,7 @@ def search():
         rid = str(room.get("id") or "")
         title = str(room.get("title") or "بدون نام")
         room_type = str(room.get("type") or "")
+        room_kind = "channels" if room_type == "channel" else "groups"
         is_joined = rid in joined_ids
 
         try:
@@ -940,7 +941,7 @@ def search():
                 action = '<span class="muted">گروه</span>'
 
         room_rows += f"""
-        <div class="chat-row search-result" data-kind="{ "channels" if room_type == "channel" else "groups" }">
+        <div class="chat-row search-result" data-kind="{room_kind}">
           <div class="avatar">{icon}</div>
           <div class="chat-info">
             <div class="chat-name">{html.escape(title)}</div>
@@ -1010,6 +1011,7 @@ def search():
         <input name="q" value="{html.escape(query, quote=True)}"
                placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
                type="search" autocomplete="off" autofocus>
+        <button type="button" aria-label="پاک کردن" onclick="this.form.q.value=this.form.q.value.slice(0,0);this.form.q.focus()" style="width:auto;margin:0;padding:6px 8px;background:transparent;color:#70b7e7">×</button>
         <button type="submit" aria-label="جستجو">⌕</button>
       </form>
 
