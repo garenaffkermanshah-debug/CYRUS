@@ -248,16 +248,7 @@ body {
 </style>
 </head>
 <body>
-<header class="top">
- <div class="brand">
-  <div class="emblem"><img src="/static/cyrus-cylinder.jpg" alt="منشور کوروش بزرگ"></div>
-  <div><div class="logo">CYRUS</div><div class="sub">پیوند پارسیان · شکوه هخامنشی</div></div>
- </div>
- <div class="top-actions">
-  <a href="/search" aria-label="جستجو">⌕</a>
-  
- </div>
-</header>
+{{ header|safe }}
 {{ content|safe }}
 {{ nav|safe }}
 </body>
@@ -266,8 +257,20 @@ body {
 
 def page(content):
     nav = ""
-    if session.get("access_token"):
-        current = request.path
+    header = ""
+    current = request.path
+    is_home = current in ("/", "/home")
+    is_chat = current.startswith("/chat/") or current.startswith("/conversation/") or (current.startswith("/user/") and request.args.get("from_chat") == "1")
+    if is_home:
+        header = """
+        <header class="top cyrus-home-top">
+         <div class="brand">
+          <div class="emblem"><img src="/static/cyrus-cylinder.jpg" alt="منشور کوروش بزرگ"></div>
+          <div><div class="logo">CYRUS</div><div class="sub">پیوند پارسیان · شکوه هخامنشی</div></div>
+         </div>
+         <div class="top-actions"><a href="/search" aria-label="جستجو">⌕</a></div>
+        </header>"""
+    if session.get("access_token") and not is_chat:
         items = [
             ("/home", "𓆃", "بارگاه"),
             ("/contacts", "𓅃", "خویشان"),
@@ -280,7 +283,7 @@ def page(content):
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}"><span>{icon}</span>{label}</a>'
         nav = f'<nav class="bottom">{links}</nav>'
-    return render_template_string(BASE, content=content, nav=nav)
+    return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
     try:
@@ -874,11 +877,11 @@ def search():
     content = f"""
     <div class="container">
       <form class="searchbar" method="get" action="/search"
-            style="display:flex;align-items:center;gap:8px;margin:12px 16px;padding:4px 12px;border-radius:14px;background:rgba(12,22,38,.92);border:1px solid rgba(190,151,82,.45)">
+            style="display:flex;align-items:center;gap:6px;margin:6px 12px 12px;padding:2px 10px;border-radius:22px;background:#101d2c;border:1px solid #263b50;min-height:42px">
         <input name="q" value="{html.escape(query, quote=True)}"
                placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
                autocomplete="off" autofocus
-               style="flex:1;min-width:0;background:transparent;border:0;outline:0;box-shadow:none;padding:12px 4px;color:#fff">
+               style="flex:1;min-width:0;background:transparent;border:0;outline:0;box-shadow:none;padding:8px 4px;color:#fff;font-size:13px">
         <button type="submit" aria-label="جستجو"
                 style="margin:0;padding:8px 10px;background:transparent;border:0;box-shadow:none;font-size:25px;color:#d6b36a">⌕</button>
       </form>
@@ -1023,10 +1026,32 @@ def public_user_profile(user_id):
     )
     blocked_notice = '<p class="error">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
     send_form_style = 'style="display:none"' if blocked_by_me else ""
-    content = f"""<main class="container"><div class="card" style="text-align:center">{avatar_html}<h2>{name}</h2><p class="muted">@{username}</p><p class="muted">{bio}</p>{block_form}{blocked_notice}
-      <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
-        <textarea name="content" maxlength="4000" rows="4" required placeholder="پیام خود را بنویسید..." style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"></textarea>
-        <button type="submit">ارسال پیام</button></form><p class="muted"><a href="/contacts">بازگشت به مخاطبین</a></p></div></main>"""
+    content = f"""<main class="container cyrus-user-profile">
+      <style>
+        .cyrus-user-profile{{padding:14px}}
+        .user-profile-hero{{text-align:center;padding:25px 16px 18px;background:#111e2b;border:1px solid #263b50;border-radius:18px}}
+        .user-profile-hero img,.user-profile-hero .avatar{{width:108px;height:108px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px}}
+        .user-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
+        .user-profile-username{{color:#78b8e6;font-size:13px;direction:ltr}}
+        .user-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:13px 0;white-space:pre-wrap}}
+        .user-profile-actions{{margin-top:12px}}
+        .user-profile-actions button{{background:#20384d;color:#eaf3fa}}
+        .user-profile-actions .block-button{{background:#40262c;color:#f0c6c9}}
+      </style>
+      <section class="user-profile-hero">
+        {avatar_html}
+        <h2>{name}</h2>
+        <div class="user-profile-username">@{username}</div>
+        <p class="user-profile-bio">{bio or "بیوگرافی اضافه نشده است"}</p>
+      </section>
+      <div class="user-profile-actions">
+        {block_form.replace('<button type="submit"', '<button class="block-button" type="submit"') if block_form else ""}
+        {blocked_notice}
+        <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
+          <button type="submit">ارسال پیام</button>
+        </form>
+      </div>
+    </main>"""
     return page(content)
 
 
@@ -1116,6 +1141,67 @@ def start_chat(user_id):
     except ValueError:
         return redirect("/contacts?error=شناسه%20کاربر%20نامعتبر%20است")
     return redirect("/user/" + user_id)
+
+
+@app.route("/conversation/<conversation_id>/profile")
+def conversation_profile(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    try:
+        response = requests.get(
+            URL + "/rest/v1/cyrus_conversations",
+            params={"select":"id,title,type,created_by,description,avatar_url","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=20
+        )
+        if not response.ok or not response.json():
+            return page('<main class="container"><div class="empty">پروفایل مجموعه پیدا نشد</div></main>'),404
+        room=response.json()[0]
+        members_response=requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"user_id,role","conversation_id":"eq."+conversation_id},
+            headers=headers,timeout=20
+        )
+        members=members_response.json() if members_response.ok else []
+    except Exception:
+        return page('<main class="container"><div class="empty">ارتباط با سرور برقرار نشد</div></main>'),502
+    title=html.escape(str(room.get("title") or "گفتگو"))
+    desc=html.escape(str(room.get("description") or ""))
+    avatar=str(room.get("avatar_url") or "")
+    avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="">') if avatar else '<div class="profile-room-symbol">𓊹</div>'
+    kind={"group":"گروه","channel":"کانال"}.get(str(room.get("type") or ""),"گفتگوی خصوصی")
+    uid=str(session.get("user_id") or "")
+    owner=str(room.get("created_by") or "")==uid
+    role=next((str(m.get("role") or "") for m in members if str(m.get("user_id") or "")==uid),"")
+    manage_link=f'<a class="profile-room-action" href="/rooms/{conversation_id}/manage">مدیریت {kind}</a>' if owner or role in ("admin","owner") else ""
+    content=f"""
+    <main class="container cyrus-room-profile">
+      <style>
+        .cyrus-room-profile{{padding:14px}}
+        .room-profile-hero{{text-align:center;padding:24px 16px;background:#111e2b;border:1px solid #263b50;border-radius:18px}}
+        .room-profile-hero img,.profile-room-symbol{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px;color:#d8b46a}}
+        .room-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
+        .room-profile-kind{{color:#7eb8e2;font-size:13px}}
+        .room-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:14px 0;white-space:pre-wrap}}
+        .room-profile-action{{display:block;margin:10px 0;padding:13px;border-radius:24px;text-align:center;background:#20384d;color:#eaf3fa}}
+        .room-profile-actions{{margin-top:12px}}
+      </style>
+      <section class="room-profile-hero">
+        {avatar_html}
+        <h2>{title}</h2>
+        <div class="room-profile-kind">{kind} · {len(members)} عضو</div>
+        <p class="room-profile-bio">{desc or "توضیحی اضافه نشده است"}</p>
+      </section>
+      <div class="room-profile-actions">
+        <a class="profile-room-action" href="/chat/{conversation_id}">بازگشت به گفتگو</a>
+        {manage_link}
+      </div>
+    </main>"""
+    return page(content)
 
 
 @app.route("/chat/<conversation_id>")
@@ -1266,25 +1352,56 @@ def chat(conversation_id):
         message_rows = '<div class="empty">هنوز پیامی ارسال نشده؛ اولین پیام را بفرستید</div>'
 
     room_data = room.json()[0]
-    room_title = html.escape(str(room_data.get("title") or "گفتگو"))
+    room_type = str(room_data.get("type") or "")
+    room_title_text = str(room_data.get("title") or "گفتگو")
+    room_avatar_source = str(room_data.get("avatar_url") or "")
+    room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
+    room_profile_href = "/conversation/" + conversation_id + "/profile"
+    if room_type == "private":
+        try:
+            member_response = requests.get(
+                URL + "/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+conversation_id},
+                headers=headers, timeout=15
+            )
+            other_id = ""
+            if member_response.ok:
+                for member in member_response.json():
+                    candidate = str(member.get("user_id") or "")
+                    if candidate and candidate != str(current_user):
+                        other_id = candidate
+                        break
+            if other_id:
+                person_response = requests.get(
+                    URL + "/rest/v1/cyrus_profiles",
+                    params={"select":"display_name,username,avatar_url","id":"eq."+other_id,"limit":"1"},
+                    headers=headers, timeout=15
+                )
+                if person_response.ok and person_response.json():
+                    person = person_response.json()[0]
+                    room_title_text = str(person.get("display_name") or person.get("username") or room_title_text)
+                    room_avatar_source = str(person.get("avatar_url") or room_avatar_source)
+                    room_profile_href = "/user/" + other_id + "?from_chat=1"
+        except Exception:
+            pass
+    room_title = html.escape(room_title_text)
     room_description = html.escape(str(room_data.get("description") or ""))
-    room_avatar_url = html.escape(str(room_data.get("avatar_url") or ""), quote=True)
-    room_type_label = {"group": "گروه", "channel": "کانال", "private": "گفتگوی خصوصی"}.get(str(room_data.get("type") or ""), "گفتگو")
+    room_avatar_url = html.escape(room_avatar_source, quote=True)
     room_avatar = (
         f'<img src="{room_avatar_url}" alt="">'
         if room_avatar_url else '<div class="room-avatar-symbol">𓊹</div>'
     )
     room_header = f"""
-    <section class="room-header">
-      <div class="room-avatar">{room_avatar}</div>
-      <div class="room-info">
+    <section class="room-header cyrus-chat-header">
+      <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
+      <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
+      <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}</h2>
-        <span class="room-type">{room_type_label} · CYRUS</span>
-        <p>{room_description}</p>
-      </div>
+        <span class="room-type">{'آخرین بازدید در دسترس نیست' if room_type == 'private' else room_subtitle}</span>
+      </a>
+      <a class="chat-header-more" href="{html.escape(room_profile_href, quote=True)}" aria-label="پروفایل">⋮</a>
     </section>"""
 
-    room_type = str(room_data.get("type") or "")
     channel_can_post = True
     if room_type == "channel":
         channel_can_post = (
@@ -1328,14 +1445,16 @@ def chat(conversation_id):
       {room_header}
       {pinned_banner}
       <style>
-        .room-header{{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:14px;border:1px solid #987039;border-radius:16px;background:rgba(9,15,25,.94)}}
-        .room-avatar{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:1px solid #987039;background:#111b2b;display:flex;align-items:center;justify-content:center}}
+        .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
+        .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
+        .room-avatar{{width:43px;height:43px;flex:0 0 43px;border-radius:50%;overflow:hidden;border:0;background:#26394a;display:flex;align-items:center;justify-content:center}}
         .room-avatar img{{width:100%;height:100%;object-fit:cover}}
-        .room-avatar-symbol{{font-size:27px;color:#d8b46a}}
-        .room-info{{min-width:0}}
-        .room-info h2{{margin:0 0 5px;font-size:19px;overflow-wrap:anywhere}}
-        .room-type{{font-size:11px;color:#d8b46a}}
-        .room-info p{{margin:6px 0 0;color:#c4c6cc;font-size:13px;overflow-wrap:anywhere}}
+        .room-avatar-symbol{{font-size:23px;color:#d8b46a}}
+        .room-info{{min-width:0;flex:1;text-decoration:none}}
+        .room-info h2{{margin:0 0 4px;font-size:16px;color:#f1f5f8;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+        .room-type{{font-size:12px;color:#94a7b7;display:block}}
+        .room-info p{{display:none}}
+        .chat-header-more{{font-size:25px;color:#d2dce5;padding:4px 7px}}
 
         .messages-area{{display:flex;flex-direction:column;gap:8px;padding:8px 2px 18px}}
         .message{{position:relative;max-width:84%;padding:10px 13px;border:1px solid transparent;border-radius:16px;background:#172432;overflow-wrap:anywhere;box-shadow:0 1px 2px #0003}}
@@ -1358,7 +1477,9 @@ def chat(conversation_id):
         .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
         .message.theirs{{align-self:flex-end;background:#172432;border-color:#263b4d;border-bottom-right-radius:5px}}
         .message.reacted:after{{content:attr(data-reaction);display:inline-block;margin-top:5px;padding:2px 7px;border-radius:14px;background:#253747;font-size:17px}}
-        .send-box{{position:sticky;bottom:70px;display:flex;align-items:center;gap:8px;background:#0b1724;padding:8px 10px;border:1px solid #263e53;border-radius:24px;box-shadow:0 4px 18px #0005}}
+        .send-box{{position:sticky;bottom:8px;display:flex;align-items:center;gap:8px;background:#0b1724;padding:8px 10px;border:1px solid #263e53;border-radius:24px;box-shadow:0 4px 18px #0005;z-index:4}}
+        .container:has(.cyrus-chat-header){{padding-bottom:12px}}
+        .messages-area{{padding-bottom:12px}}
         .send-box input[name="content"]{{flex:1;min-width:0;width:auto;margin:0;padding:12px 14px;border:0;background:transparent;border-radius:20px;font-size:14px}}
         .send-box>button{{width:auto;flex:0 0 auto;margin:0;padding:11px 17px;border-radius:22px;background:#248bd0;color:white;font-size:13px}}
         .message-actions button{{padding:6px 10px;font-size:11px;border-radius:16px;background:#10283b;color:#b9d9f0;border:1px solid #2b4c66}}
@@ -1421,8 +1542,6 @@ def chat(conversation_id):
       }}
       </script>
       {send_box}
-      {room_manage_link}
-      <p><a href="/contacts">بازگشت به خویشان</a></p>
     </div>"""
     return page(content)
 
@@ -2485,30 +2604,45 @@ def profile():
     avatar_error = html.escape(request.args.get("avatar_error", ""))
 
     content = f"""
-    <main class="container">
-      <div class="card">
-        <h2>نگاره</h2>
-        <p class="muted">پروفایل کاربری CYRUS</p>
+    <main class="container cyrus-profile-page">
+      <style>
+        .cyrus-profile-page{{padding:14px 14px 25px}}
+        .profile-hero{{text-align:center;padding:24px 14px 20px;background:#111e2b;border:1px solid #263b50;border-radius:18px;margin-bottom:12px}}
+        .profile-hero img,.profile-hero .avatar{{width:100px;height:100px;border-radius:50%;object-fit:cover;margin:0 auto 12px;border:2px solid #2d8ecb}}
+        .profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
+        .profile-hero .username{{color:#78b8e6;font-size:13px;direction:ltr}}
+        .profile-hero .bio{{color:#c3cfda;font-size:13px;line-height:1.9;white-space:pre-wrap;margin:12px 0 0}}
+        .profile-edit{{padding:16px;background:#101d2a;border:1px solid #263b50;border-radius:16px}}
+        .profile-edit h3{{margin:0 0 12px;color:#d7b56c;font-size:15px;font-weight:normal}}
+        .profile-edit label{{display:block;color:#9fb1c1;font-size:12px;margin-top:10px}}
+        .profile-edit input,.profile-edit textarea{{background:#0a1521;border:1px solid #2a4054;border-radius:10px;padding:11px 12px;margin:5px 0;font-size:14px}}
+        .profile-edit button{{background:#258bd0;color:white;margin-top:12px}}
+        .profile-link{{display:block;text-align:center;color:#87bfe8;padding:13px}}
+      </style>
+      <section class="profile-hero">
         {avatar_html}
+        <h2>{html.escape(str(data.get("display_name") or data.get("username") or "کاربر"))}</h2>
+        <div class="username">@{username}</div>
+        <p class="bio">{bio or "بیوگرافی اضافه نشده است"}</p>
+      </section>
+      <section class="profile-edit">
+        <h3>ویرایش اطلاعات پروفایل</h3>
         <p class="error">{avatar_error}</p>
         <form method="post" action="/profile/avatar" enctype="multipart/form-data">
-          <label>عکس پروفایل (JPG، PNG یا WebP، حداکثر ۵ مگابایت)</label>
+          <label>تصویر پروفایل</label>
           <input type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required>
-          <button type="submit">بارگذاری عکس پروفایل</button>
+          <button type="submit">تغییر تصویر</button>
         </form>
         <p class="error">{html.escape(error)}</p>
         <form method="post">
           <label>نام نمایشی</label>
-          <input name="display_name" maxlength="40" minlength="2"
-                 value="{display_name}" required>
+          <input name="display_name" maxlength="40" minlength="2" value="{display_name}" required>
           <label>بیوگرافی</label>
-          <textarea name="bio" maxlength="250" rows="4"
-            style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white">{bio}</textarea>
-          <button type="submit">ذخیره پروفایل</button>
+          <textarea name="bio" maxlength="250" rows="3">{bio}</textarea>
+          <button type="submit">ذخیره تغییرات</button>
         </form>
-        <p class="muted"><a class="form-link" href="/settings">تنظیمات و نام کاربری</a></p>
-        <p class="muted"><a class="form-link" href="/">بازگشت به بارگاه</a></p>
-      </div>
+      </section>
+      <a class="profile-link" href="/settings">ویرایش نام کاربری</a>
     </main>
     """
     return page(content)
