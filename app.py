@@ -798,7 +798,10 @@ def search():
                 timeout=20
             )
             if people_response.ok:
-                people = people_response.json()
+                result = people_response.json()
+                people = result if isinstance(result, list) else (result.get("data", []) if isinstance(result, dict) else [])
+                if not isinstance(people, list):
+                    people = []
 
             # جستجوی گروه‌ها و کانال‌ها
             room_response = requests.get(
@@ -815,7 +818,10 @@ def search():
             )
 
             if room_response.ok:
-                rooms = room_response.json()
+                result = room_response.json()
+                rooms = result if isinstance(result, list) else []
+                if not isinstance(rooms, list):
+                    rooms = []
 
             # تشخیص اینکه کاربر عضو کدام گفتگوهاست
             membership_response = requests.get(
@@ -829,10 +835,13 @@ def search():
             )
 
             if membership_response.ok:
-                joined_ids = {
-                    str(item.get("conversation_id"))
-                    for item in membership_response.json()
-                }
+                membership_data = membership_response.json()
+                if isinstance(membership_data, list):
+                    joined_ids = {
+                        str(item.get("conversation_id"))
+                        for item in membership_data
+                        if isinstance(item, dict) and item.get("conversation_id")
+                    }
 
         except Exception:
             error = "جستجو با مشکل اتصال روبه‌رو شد"
@@ -2596,7 +2605,16 @@ def upload_profile_avatar():
     try:
         uploaded = requests.put(URL + "/storage/v1/object/cyrus-avatars/" + key_path, data=data, headers=headers, timeout=45)
         if not uploaded.ok:
-            return redirect("/profile?avatar_error=بارگذاری%20عکس%20ناموفق%20بود")
+            detail = ""
+            try:
+                detail = str(uploaded.json().get("message") or uploaded.json().get("error") or uploaded.json().get("statusCode") or "")
+            except Exception:
+                detail = (uploaded.text or "")[:180]
+            message = "بارگذاری عکس ناموفق بود"
+            if detail:
+                message += " (" + detail[:180] + ")"
+            from urllib.parse import quote
+            return redirect("/profile?avatar_error=" + quote(message))
         public_url = URL + "/storage/v1/object/public/cyrus-avatars/" + key_path + "?v=" + str(int(time.time()))
         saved = requests.patch(URL + "/rest/v1/cyrus_profiles", params={"id":"eq."+uid}, json={"avatar_url":public_url}, headers={**cyrus_profile_headers(),"Prefer":"return=minimal"}, timeout=20)
         if not saved.ok:
