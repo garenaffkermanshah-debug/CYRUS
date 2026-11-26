@@ -1392,6 +1392,7 @@ def chat(conversation_id):
     except Exception:
         pass
     message_rows = ""
+    previous_message_date = None
 
     for msg in messages:
         mine = str(msg.get("sender_id") or "") == current_user
@@ -1401,6 +1402,11 @@ def chat(conversation_id):
         try:
             stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00")).astimezone()
             stamp = html.escape(stamp_dt.strftime("%H:%M"))
+            message_date = stamp_dt.date().isoformat()
+            if message_date != previous_message_date:
+                date_label = "امروز" if stamp_dt.date() == datetime.now().astimezone().date() else stamp_dt.strftime("%Y/%m/%d")
+                message_rows += '<div class="chat-date-divider"><span>' + html.escape(date_label) + '</span></div>'
+                previous_message_date = message_date
         except Exception:
             stamp = ""
         msg_id = html.escape(str(msg.get("id") or ""), quote=True)
