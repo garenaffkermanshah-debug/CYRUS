@@ -1,11 +1,12 @@
 import os, secrets, requests, html, uuid, time, hashlib
 from pathlib import Path
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
 from flask import Flask, request, session, redirect, url_for, render_template, render_template_string
 
 load_dotenv()
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
 # CYRUS_PERSISTENT_SESSION_FIX
 _session_key = os.getenv("SECRET_KEY")
 if not _session_key:
@@ -86,6 +87,14 @@ def cyrus_update_last_seen():
             session["last_seen_ping_at"] = now
     except Exception:
         pass
+
+@app.after_request
+def cyrus_disable_dynamic_page_cache(response):
+    if not request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 BASE = """
 <!doctype html>
@@ -278,6 +287,13 @@ body {
 {{ header|safe }}
 {{ content|safe }}
 {{ nav|safe }}
+<script>
+window.addEventListener('pageshow', function(event) {
+  if (event.persisted && (location.pathname === '/' || location.pathname === '/home')) {
+    location.reload();
+  }
+});
+</script>
 </body>
 </html>
 """
@@ -397,10 +413,30 @@ def home():
                 )
                 if unread_response.ok:
                     for msg in unread_response.json():
+                        if not isinstance(msg, dict):
+                            continue
                         cid = str(msg.get("conversation_id", ""))
-                        marker = read_markers.get(cid)
-                        created_at = str(msg.get("created_at", ""))
-                        if cid in unread_counts and (not marker or created_at > str(marker)):
+                        marker_raw = read_markers.get(cid)
+                        created_raw = msg.get("created_at")
+                        if cid not in unread_counts or not created_raw:
+                            continue
+                        try:
+                            created_dt = datetime.fromisoformat(str(created_raw).replace("Z", "+00:00"))
+                            if created_dt.tzinfo is None:
+                                created_dt = created_dt.replace(tzinfo=timezone.utc)
+                            created_dt = created_dt.astimezone(timezone.utc)
+                        except (TypeError, ValueError):
+                            continue
+                        marker_dt = None
+                        if marker_raw:
+                            try:
+                                marker_dt = datetime.fromisoformat(str(marker_raw).replace("Z", "+00:00"))
+                                if marker_dt.tzinfo is None:
+                                    marker_dt = marker_dt.replace(tzinfo=timezone.utc)
+                                marker_dt = marker_dt.astimezone(timezone.utc)
+                            except (TypeError, ValueError):
+                                marker_dt = None
+                        if marker_dt is None or created_dt > marker_dt:
                             unread_counts[cid] += 1
             except Exception:
                 pass
