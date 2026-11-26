@@ -802,6 +802,7 @@ def search():
                 people = result if isinstance(result, list) else (result.get("data", []) if isinstance(result, dict) else [])
                 if not isinstance(people, list):
                     people = []
+                people = [item for item in people if isinstance(item, dict)]
 
             # جستجوی گروه‌ها و کانال‌ها
             room_response = requests.get(
@@ -822,6 +823,7 @@ def search():
                 rooms = result if isinstance(result, list) else []
                 if not isinstance(rooms, list):
                     rooms = []
+                rooms = [item for item in rooms if isinstance(item, dict)]
 
             # تشخیص اینکه کاربر عضو کدام گفتگوهاست
             membership_response = requests.get(
