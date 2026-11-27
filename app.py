@@ -1381,6 +1381,13 @@ def toggle_user_block(user_id):
                 headers=headers, timeout=20)
         if not changed.ok:
             return page('<div class="container card"><p>تغییر وضعیت مسدودسازی انجام نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 400
+        from_chat = request.args.get("from_chat", "").strip()
+        if from_chat:
+            try:
+                uuid.UUID(from_chat)
+                return redirect(url_for("chat", conversation_id=from_chat))
+            except ValueError:
+                pass
         return redirect("/user/" + user_id)
     except Exception:
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
@@ -1889,7 +1896,7 @@ def chat(conversation_id):
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
         if (room_type != "channel" or channel_can_post) and not room_blocked else
         (
-            ('<div class="cyrus-blocked-composer"><p>این کاربر را مسدود کرده‌اید.</p><form method="post" action="/user/' + html.escape(room_other_user_id, quote=True) + '/block"><button type="submit">رفع مسدودیت</button></form></div>' if room_blocked_by_me else
+            ('<div class="cyrus-blocked-composer"><p>این کاربر را مسدود کرده‌اید.</p><form method="post" action="/user/' + html.escape(room_other_user_id, quote=True) + '/block?from_chat=' + html.escape(conversation_id, quote=True) + '"><button type="submit">رفع مسدودیت</button></form></div>' if room_blocked_by_me else
              '<div class="cyrus-blocked-composer"><p>امکان ارسال پیام وجود ندارد.</p></div>')
             if room_blocked else
             '<div class="cyrus-blocked-composer"><p>این کانال فقط برای مالک و مدیران امکان انتشار پیام دارد.</p></div>'
