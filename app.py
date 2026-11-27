@@ -3330,6 +3330,28 @@ def chat(conversation_id):
       // دریافت نزدیک‌به‌زنده پیام‌های تازه؛ هنگام مخفی بودن صفحه متوقف می‌شود.
       (function(){{
         const endpoint='/chat/{conversation_id}/updates';
+        // اعلان اختیاری پیام تازه؛ فعال‌سازی فقط با انتخاب مستقیم کاربر انجام می‌شود.
+        let cyrusNotifyEnabled=false;
+        try{{
+          cyrusNotifyEnabled=localStorage.getItem('cyrus-chat-notifications')==='1';
+          if('Notification' in window){{
+            const notifyButton=document.createElement('button');
+            notifyButton.type='button';
+            notifyButton.textContent=cyrusNotifyEnabled?'🔔 اعلان‌ها روشن':'🔕 اعلان‌ها خاموش';
+            notifyButton.setAttribute('aria-label','تنظیم اعلان پیام‌های جدید');
+            notifyButton.style.cssText='position:fixed;z-index:1200;top:12px;left:12px;border:1px solid #987039;border-radius:18px;padding:7px 11px;background:#101d2b;color:#f3dfb1;font:12px Tahoma;box-shadow:0 3px 12px #0006';
+            notifyButton.addEventListener('click',async()=>{{
+              if(!cyrusNotifyEnabled){{
+                const permission=Notification.permission==='default'?await Notification.requestPermission():Notification.permission;
+                if(permission!=='granted'){{notifyButton.textContent='اعلان مجاز نشد';return;}}
+                cyrusNotifyEnabled=true;
+              }}else cyrusNotifyEnabled=false;
+              localStorage.setItem('cyrus-chat-notifications',cyrusNotifyEnabled?'1':'0');
+              notifyButton.textContent=cyrusNotifyEnabled?'🔔 اعلان‌ها روشن':'🔕 اعلان‌ها خاموش';
+            }});
+            document.body.appendChild(notifyButton);
+          }}
+        }}catch(e){{}}
         const loadedMessages=document.querySelectorAll('.message[data-message-id]');
         let newest=loadedMessages.length?loadedMessages[loadedMessages.length-1].dataset.messageId:'';
         let delay=7000,timer=null,stopped=false;
@@ -3344,7 +3366,14 @@ def chat(conversation_id):
             if(data.latest_id&&data.latest_id!==newest){{
               const distance=Math.max(0,document.documentElement.scrollHeight-window.scrollY-window.innerHeight);
               try{{sessionStorage.setItem('cyrus-chat-scroll-distance',String(distance));}}catch(e){{}}
-              location.reload();return;
+              try{{
+                if(cyrusNotifyEnabled&&'Notification' in window&&Notification.permission==='granted'){{
+                  const notice=new Notification('پیام تازه در CYRUS',{{body:'در این گفتگو پیام جدیدی دریافت شد.',icon:'/static/cyrus-app-icon.svg',tag:'cyrus-chat-{conversation_id}'}});
+                  notice.onclick=()=>{{window.focus();notice.close();}};
+                }}
+                if(navigator.vibrate)navigator.vibrate([90,45,90]);
+              }}catch(e){{}}
+              setTimeout(()=>location.reload(),650);return;
             }}
             if(data.latest_id)newest=data.latest_id;
           }}catch(e){{delay=Math.min(30000,Math.round(delay*1.7));}}
