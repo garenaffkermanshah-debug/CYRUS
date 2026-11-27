@@ -2525,82 +2525,94 @@ def delete_message(message_id):
     return redirect(url_for("chat", conversation_id=conversation_id))
 
 
-def create_room_page(error=""):
-    selected = request.args.get("type", "group")
-    if selected not in ("group", "channel"):
-        selected = "group"
-
-    group_selected = "selected" if selected == "group" else ""
-    channel_selected = "selected" if selected == "channel" else ""
-
-    content = f"""
-    <div class="container">
-      <section class="welcome">
-        <h2>ساخت قلمرو تازه</h2>
-        <p>یک گروه یا کانال جدید در CYRUS ایجاد کن</p>
-      </section>
-      <form class="card" method="post" action="/rooms/create">
-        <h2>اطلاعات مجموعه</h2>
-        <input name="title" minlength="2" maxlength="60" placeholder="نام گروه یا کانال" required>
-        <select name="type" style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white">
-          <option value="group" {group_selected}>گروه</option>
-          <option value="channel" {channel_selected}>کانال</option>
-        </select>
-        <p class="error">{html.escape(error)}</p>
-        <button type="submit">ساخت و ثبت</button>
-      </form>
-      <p class="muted"><a class="form-link" href="/">بازگشت به بارگاه</a></p>
-    </div>
-    """
+def cyrus_channel_member_picker(title, error=""):
+    uid = str(session.get("user_id") or "")
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session.get("access_token","")}
+    contacts = []
+    try:
+        cr = requests.get(URL+"/rest/v1/cyrus_contacts",params={"select":"contact_user_id,contact_name","owner_id":"eq."+uid,"order":"created_at.desc","limit":"1000"},headers=headers,timeout=20)
+        if cr.ok:
+            contact_rows=cr.json()
+            ids=list(dict.fromkeys(str(x.get("contact_user_id") or "") for x in contact_rows if x.get("contact_user_id")))
+            profiles={}
+            if ids:
+                pr=requests.get(URL+"/rest/v1/cyrus_profiles",params={"select":"id,username,display_name","id":"in.("+",".join(ids)+")"},headers=headers,timeout=20)
+                if pr.ok: profiles={str(x.get("id")):x for x in pr.json() if isinstance(x,dict)}
+            for row in contact_rows:
+                cid=str(row.get("contact_user_id") or "")
+                p=profiles.get(cid)
+                if p: contacts.append((cid,str(row.get("contact_name") or p.get("display_name") or p.get("username") or "کاربر"),str(p.get("username") or "")))
+    except Exception: pass
+    rows=""
+    for cid,name,username in contacts:
+        rows+='<label class="channel-contact"><input type="checkbox" name="member_ids" value="'+html.escape(cid,quote=True)+'"><span><b>'+html.escape(name)+'</b><small>@'+html.escape(username)+'</small></span></label>'
+    if not rows: rows='<p class="muted">مخاطب ذخیره‌شده‌ای پیدا نشد؛ ابتدا افراد را به مخاطبان اضافه کن.</p>'
+    safe_title=html.escape(title,quote=True)
+    content=f"""
+    <main class="container card channel-member-picker"><style>
+    .channel-member-picker{{margin:12px;padding:14px;background:#101b28;border:1px solid #263b50;border-radius:16px}}
+    .channel-member-picker h2{{font-size:18px;margin:5px 0 8px}}
+    .channel-member-picker .channel-contact{{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid #263442;color:#eaf0f5}}
+    .channel-member-picker .channel-contact input{{width:20px;height:20px;margin:0;accent-color:#248bd0;flex:0 0 20px}}
+    .channel-member-picker .channel-contact span{{display:flex;flex-direction:column;gap:4px}}
+    .channel-member-picker .channel-contact small{{direction:ltr;text-align:right;color:#8ea5b9;font-size:11px}}
+    .channel-member-picker .picker-list{{max-height:55vh;overflow:auto}}</style>
+    <h2>انتخاب اعضای کانال</h2><p class="muted">{safe_title} · در آغاز حداکثر ۱۰۰ مخاطب</p><p class="error">{html.escape(error)}</p>
+    <form method="post" action="/rooms/create" id="channel-members-form">
+    <input type="hidden" name="title" value="{safe_title}"><input type="hidden" name="type" value="channel"><input type="hidden" name="action" value="create_channel">
+    <div class="picker-list">{rows}</div><p class="muted" id="channel-member-count">۰ نفر انتخاب شده‌اند</p><button type="submit">ساخت کانال و افزودن اعضا</button></form>
+    <script>(function(){{const f=document.getElementById('channel-members-form'),b=[...f.querySelectorAll('input[name="member_ids"]')],l=document.getElementById('channel-member-count');function u(){{const n=b.filter(x=>x.checked).length;l.textContent=n+' نفر انتخاب شده‌اند';b.forEach(x=>x.disabled=!x.checked&&n>=100)}}b.forEach(x=>x.addEventListener('change',u));f.addEventListener('submit',e=>{{if(b.filter(x=>x.checked).length>100){{e.preventDefault();alert('حداکثر ۱۰۰ مخاطب را انتخاب کن')}}}});u()}})();</script></main>"""
     return page(content)
 
 
-@app.route("/rooms/create", methods=["GET", "POST"])
+def create_room_page(error=""):
+    selected=request.args.get("type","group")
+    if selected not in ("group","channel"): selected="group"
+    group_selected="selected" if selected=="group" else ""
+    channel_selected="selected" if selected=="channel" else ""
+    content=f"""
+    <div class="container"><section class="welcome"><h2>ساخت قلمرو تازه</h2><p>یک گروه یا کانال جدید در CYRUS ایجاد کن</p></section>
+    <form class="card" method="post" action="/rooms/create"><h2>اطلاعات مجموعه</h2>
+    <input name="title" minlength="2" maxlength="60" placeholder="نام گروه یا کانال" required>
+    <select name="type" style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"><option value="group" {group_selected}>گروه</option><option value="channel" {channel_selected}>کانال</option></select>
+    <p class="error">{html.escape(error)}</p><button type="submit">ادامه</button></form><p class="muted"><a class="form-link" href="/contacts">بازگشت به خویشان</a></p></div>"""
+    return page(content)
+
+
+@app.route("/rooms/create", methods=["GET","POST"])
 def create_room():
-    if not session.get("access_token"):
-        return redirect("/login")
-
-    if request.method == "GET":
-        return create_room_page()
-
-    title = request.form.get("title", "").strip()
-    room_type = request.form.get("type", "").strip()
-
-    if len(title) < 2 or len(title) > 60:
-        return create_room_page("نام باید بین ۲ تا ۶۰ حرف باشد"), 400
-
-    if room_type not in ("group", "channel"):
-        return create_room_page("نوع مجموعه نامعتبر است"), 400
-
-    headers = {
-        "apikey": KEY,
-        "Authorization": "Bearer " + session["access_token"],
-        "Content-Type": "application/json"
-    }
-
+    if not session.get("access_token"): return redirect("/login")
+    if request.method=="GET": return create_room_page()
+    title=request.form.get("title","").strip()
+    room_type=request.form.get("type","").strip()
+    action=request.form.get("action","")
+    if not 2<=len(title)<=60: return create_room_page("نام باید بین ۲ تا ۶۰ حرف باشد"),400
+    if room_type not in ("group","channel"): return create_room_page("نوع مجموعه نامعتبر است"),400
+    if room_type=="channel" and action!="create_channel": return cyrus_channel_member_picker(title)
+    member_ids=request.form.getlist("member_ids") if room_type=="channel" else []
+    if len(member_ids)>100: return cyrus_channel_member_picker(title,"حداکثر ۱۰۰ مخاطب را انتخاب کن"),400
+    uid=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json"}
+    if room_type=="channel" and member_ids:
+        try:
+            cr=requests.get(URL+"/rest/v1/cyrus_contacts",params={"select":"contact_user_id","owner_id":"eq."+uid,"contact_user_id":"in.("+",".join(member_ids)+")"},headers=headers,timeout=20)
+            valid={str(x.get("contact_user_id")) for x in cr.json()} if cr.ok else set()
+            if len(valid)!=len(set(member_ids)): return cyrus_channel_member_picker(title,"فقط مخاطبان ذخیره‌شده را می‌توان در شروع اضافه کرد"),400
+        except Exception: return cyrus_channel_member_picker(title,"بررسی مخاطبان انجام نشد؛ دوباره تلاش کن"),502
     try:
-        response = requests.post(
-            URL + "/rest/v1/rpc/create_cyrus_room",
-            json={"room_title": title, "room_type": room_type},
-            headers=headers,
-            timeout=20
-        )
-
-        if not response.ok:
-            return create_room_page("ساخت انجام نشد؛ دسترسی پایگاه داده را بررسی کنید"), 502
-
-        result = response.json()
-        if isinstance(result, list) and result:
-            result = result[0]
-        if isinstance(result, dict):
-            result = result.get("create_cyrus_room") or result.get("id")
-
-        room_id = str(uuid.UUID(str(result)))
-        return redirect(url_for("chat", conversation_id=room_id))
-
-    except Exception:
-        return create_room_page("ارتباط با سرور برقرار نشد یا پاسخ نامعتبر بود"), 502
-
+        response=requests.post(URL+"/rest/v1/rpc/create_cyrus_room",json={"room_title":title,"room_type":room_type},headers=headers,timeout=20)
+        if not response.ok: return create_room_page("ساخت انجام نشد؛ دسترسی پایگاه داده را بررسی کنید"),502
+        result=response.json()
+        if isinstance(result,list) and result: result=result[0]
+        if isinstance(result,dict): result=result.get("create_cyrus_room") or result.get("id")
+        room_id=str(uuid.UUID(str(result)))
+        failed=[]
+        for member_id in dict.fromkeys(member_ids):
+            added=requests.post(URL+"/rest/v1/rpc/cyrus_manage_add_member",json={"p_conversation_id":room_id,"p_user_id":member_id},headers=headers,timeout=15)
+            if not added.ok: failed.append(member_id)
+        if failed: return page('<div class="container card"><p>کانال ساخته شد، اما افزودن بعضی مخاطبان ناموفق بود.</p><a href="/rooms/'+room_id+'/manage">مدیریت اعضا</a><a href="/chat/'+room_id+'">باز کردن کانال</a></div>'),502
+        return redirect(url_for("chat",conversation_id=room_id))
+    except Exception: return create_room_page("ارتباط با سرور برقرار نشد یا پاسخ نامعتبر بود"),502
 
 
 @app.route("/rooms/<conversation_id>/manage", methods=["GET", "POST"])
