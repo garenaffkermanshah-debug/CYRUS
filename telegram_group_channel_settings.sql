@@ -63,3 +63,46 @@ BEGIN
 END; $$;
 GRANT EXECUTE ON FUNCTION public.cyrus_manage_list_join_requests(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.cyrus_manage_review_join_request(uuid,uuid,boolean) TO authenticated;
+
+
+-- Contact book and saved profile actions used by the public user profile
+CREATE TABLE IF NOT EXISTS public.cyrus_contacts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  contact_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  contact_name text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT cyrus_contacts_not_self CHECK (owner_id <> contact_user_id),
+  CONSTRAINT cyrus_contacts_owner_target_unique UNIQUE (owner_id, contact_user_id)
+);
+ALTER TABLE public.cyrus_contacts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cyrus_contacts_read_own ON public.cyrus_contacts;
+CREATE POLICY cyrus_contacts_read_own ON public.cyrus_contacts FOR SELECT TO authenticated USING (owner_id = auth.uid());
+DROP POLICY IF EXISTS cyrus_contacts_insert_own ON public.cyrus_contacts;
+CREATE POLICY cyrus_contacts_insert_own ON public.cyrus_contacts FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
+DROP POLICY IF EXISTS cyrus_contacts_update_own ON public.cyrus_contacts;
+CREATE POLICY cyrus_contacts_update_own ON public.cyrus_contacts FOR UPDATE TO authenticated USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
+DROP POLICY IF EXISTS cyrus_contacts_delete_own ON public.cyrus_contacts;
+CREATE POLICY cyrus_contacts_delete_own ON public.cyrus_contacts FOR DELETE TO authenticated USING (owner_id = auth.uid());
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.cyrus_contacts TO authenticated;
+
+CREATE TABLE IF NOT EXISTS public.cyrus_saved_profiles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  saved_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT cyrus_saved_profiles_not_self CHECK (owner_id <> saved_user_id),
+  CONSTRAINT cyrus_saved_profiles_owner_user_unique UNIQUE (owner_id, saved_user_id)
+);
+ALTER TABLE public.cyrus_saved_profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cyrus_saved_profiles_read_own ON public.cyrus_saved_profiles;
+CREATE POLICY cyrus_saved_profiles_read_own ON public.cyrus_saved_profiles FOR SELECT TO authenticated USING (owner_id = auth.uid());
+DROP POLICY IF EXISTS cyrus_saved_profiles_insert_own ON public.cyrus_saved_profiles;
+CREATE POLICY cyrus_saved_profiles_insert_own ON public.cyrus_saved_profiles FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
+DROP POLICY IF EXISTS cyrus_saved_profiles_delete_own ON public.cyrus_saved_profiles;
+CREATE POLICY cyrus_saved_profiles_delete_own ON public.cyrus_saved_profiles FOR DELETE TO authenticated USING (owner_id = auth.uid());
+GRANT SELECT, INSERT, DELETE ON public.cyrus_saved_profiles TO authenticated;
+
+CREATE UNIQUE INDEX IF NOT EXISTS cyrus_messages_client_nonce_unique
+ON public.cyrus_messages (conversation_id, sender_id, (metadata->>'client_nonce'))
+WHERE metadata ? 'client_nonce';
