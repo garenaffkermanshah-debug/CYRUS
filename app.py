@@ -814,9 +814,7 @@ def home():
 
       <div class="cyrus-list-tools">
         <input id="cyrus-list-search" type="search" placeholder="جستجو در گفتگوها…" aria-label="جستجو در گفتگوها">
-        <button type="button" id="cyrus-unread-filter" aria-pressed="false">فقط خوانده‌نشده‌ها</button>
-        <select id="cyrus-list-sort" aria-label="ترتیب گفتگوها"><option value="recent">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="pinned">سنجاق‌شده‌ها</option></select>
-        <button type="button" id="cyrus-clear-list-filters">پاک‌کردن فیلترها</button>
+
       </div>
       <div class="chat-list" id="cyrus-main-chat-list">{rows}</div>
       <script>
