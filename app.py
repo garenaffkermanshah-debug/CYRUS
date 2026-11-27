@@ -2670,7 +2670,7 @@ def chat(conversation_id):
         cyrusSelectionBar=document.createElement('div');
         cyrusSelectionBar.className='cyrus-selection-bar';
         cyrusSelectionBar.setAttribute('role','toolbar');
-        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-select-all>انتخاب همه</button><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-delete>حذف پیام‌های من</button><button type="button" data-clear>لغو</button>';
+        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-select-all>انتخاب همه</button><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-save>ذخیره منتخب‌ها</button><button type="button" data-delete>حذف پیام‌های من</button><button type="button" data-clear>لغو</button>';
         cyrusSelectionBar.style.cssText='position:fixed;z-index:50;bottom:calc(84px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#102033;border:1px solid #42617a;border-radius:18px;box-shadow:0 8px 30px #0008;color:#eaf3fa';
         cyrusSelectionBar.querySelector('[data-copy]').addEventListener('click',async()=>{{
           const texts=cyrusSelectedMessageTexts();
@@ -2680,6 +2680,14 @@ def chat(conversation_id):
           document.querySelectorAll('.message[data-message-id]').forEach(message=>cyrusSelectedMessages.add(message.dataset.messageId));
           cyrusUpdateMessageSelection();
           cyrusToast('همه پیام‌های بارگذاری‌شده انتخاب شدند');
+        }});
+        cyrusSelectionBar.querySelector('[data-save]').addEventListener('click',()=>{{
+          const ids=[...cyrusSelectedMessages];if(!ids.length)return;
+          const first=document.querySelector('.message[data-message-id]'),conversationId=first&&first.dataset.conversationId;
+          if(!conversationId)return cyrusToast('شناسه گفتگو در دسترس نیست');
+          const form=document.createElement('form');form.method='post';form.action='/chat/'+encodeURIComponent(conversationId)+'/save-selected';
+          ids.forEach(id=>{{const field=document.createElement('input');field.type='hidden';field.name='message_ids';field.value=id;form.appendChild(field);}});
+          document.body.appendChild(form);form.submit();
         }});
         cyrusSelectionBar.querySelector('[data-delete]').addEventListener('click',()=>{{
           const ids=[...cyrusSelectedMessages];
@@ -3180,6 +3188,58 @@ def mark_conversation_unread(conversation_id):
         return redirect(url_for("home"))
     except Exception:
         return "ارتباط با سرور برقرار نشد", 502
+
+
+@app.route("/chat/<conversation_id>/save-selected", methods=["POST"])
+def save_selected_messages(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+    ids = list(dict.fromkeys(str(x or "").strip() for x in request.form.getlist("message_ids")))
+    if not ids or len(ids) > 100:
+        return "تعداد پیام‌های انتخاب‌شده نامعتبر است", 400
+    valid_ids = []
+    for value in ids:
+        try:
+            valid_ids.append(str(uuid.UUID(value)))
+        except ValueError:
+            return "شناسه یکی از پیام‌ها نامعتبر است", 400
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+               "Content-Type":"application/json","Prefer":"return=minimal"}
+    try:
+        own_id = str(session.get("user_id") or "")
+        room = requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"id,title,created_by","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=15)
+        member = requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,"user_id":"eq."+own_id,"limit":"1"},
+            headers=headers,timeout=15)
+        if not room.ok or not room.json() or (not member.ok or not member.json()) and str((room.json() or [{}])[0].get("created_by") or "") != own_id:
+            return "به این گفتگو دسترسی ندارید",403
+        found = requests.get(URL+"/rest/v1/cyrus_messages",
+            params={"select":"id,content,created_at","conversation_id":"eq."+conversation_id,
+                    "id":"in.("+",".join(valid_ids)+")","limit":"100"},
+            headers=headers,timeout=20)
+        if not found.ok:
+            return "دریافت پیام‌های انتخاب‌شده ناموفق بود",502
+        title = str(room.json()[0].get("title") or "گفتگو")[:100]
+        records = []
+        for item in found.json():
+            mid = str(item.get("id") or "")
+            source = request.host_url.rstrip("/") + url_for("chat",conversation_id=conversation_id) + "?message=" + quote(mid)
+            records.append({"user_id":own_id,"content":str(item.get("content") or "")[:10000] + "\n\n— ذخیره‌شده از «" + title + "»\n" + source})
+        if not records:
+            return "پیامی برای ذخیره پیدا نشد",404
+        saved = requests.post(URL+"/rest/v1/cyrus_saved_messages",json=records,
+            headers={**headers,"Prefer":"return=minimal"},timeout=30)
+        if not saved.ok:
+            return "ذخیره پیام‌های انتخاب‌شده انجام نشد",502
+        return redirect("/saved-messages")
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/chat/<conversation_id>/delete-selected", methods=["POST"])
