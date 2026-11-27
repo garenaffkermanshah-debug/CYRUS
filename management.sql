@@ -160,3 +160,50 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.cyrus_is_blocked_pair(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.cyrus_is_blocked_pair(uuid) TO authenticated;
+
+
+-- CYRUS Telegram-like invite preview and explicit join/request flow.
+-- GET /invite/<code> only previews; membership is created only by the POST action.
+CREATE OR REPLACE FUNCTION public.cyrus_invite_preview(p_invite_code text)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_room public.cyrus_conversations%ROWTYPE;
+BEGIN
+ IF auth.uid() IS NULL THEN RAISE EXCEPTION 'ورود لازم است'; END IF;
+ SELECT * INTO v_room FROM public.cyrus_conversations
+ WHERE invite_code=trim(p_invite_code) AND type IN ('group','channel') LIMIT 1;
+ IF v_room.id IS NULL THEN RAISE EXCEPTION 'لینک دعوت نامعتبر یا لغو شده است'; END IF;
+ RETURN jsonb_build_object(
+  'id',v_room.id,'title',v_room.title,'type',v_room.type,
+  'description',v_room.description,'avatar_url',v_room.avatar_url,
+  'member_count',(SELECT count(*) FROM public.cyrus_members m WHERE m.conversation_id=v_room.id),
+  'is_public',coalesce(v_room.is_public,false),'join_approval',coalesce(v_room.join_approval,false),
+  'already_member',EXISTS(SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=v_room.id AND m.user_id=auth.uid()),
+  'request_pending',EXISTS(SELECT 1 FROM public.cyrus_join_requests j WHERE j.conversation_id=v_room.id AND j.user_id=auth.uid())
+ );
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.cyrus_invite_join(p_invite_code text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_room public.cyrus_conversations%ROWTYPE;
+BEGIN
+ IF auth.uid() IS NULL THEN RAISE EXCEPTION 'ورود لازم است'; END IF;
+ SELECT * INTO v_room FROM public.cyrus_conversations
+ WHERE invite_code=trim(p_invite_code) AND type IN ('group','channel') LIMIT 1;
+ IF v_room.id IS NULL THEN RAISE EXCEPTION 'لینک دعوت نامعتبر یا لغو شده است'; END IF;
+ IF EXISTS(SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=v_room.id AND m.user_id=auth.uid()) THEN
+  RETURN jsonb_build_object('status','joined','conversation_id',v_room.id);
+ END IF;
+ IF coalesce(v_room.join_approval,false) THEN
+  INSERT INTO public.cyrus_join_requests(conversation_id,user_id) VALUES(v_room.id,auth.uid())
+  ON CONFLICT(conversation_id,user_id) DO UPDATE SET requested_at=now();
+  RETURN jsonb_build_object('status','requested','conversation_id',v_room.id);
+ END IF;
+ INSERT INTO public.cyrus_members(conversation_id,user_id,role)
+ VALUES(v_room.id,auth.uid(),'member') ON CONFLICT DO NOTHING;
+ RETURN jsonb_build_object('status','joined','conversation_id',v_room.id);
+END; $$;
+
+REVOKE ALL ON FUNCTION public.cyrus_invite_preview(text) FROM PUBLIC,anon;
+REVOKE ALL ON FUNCTION public.cyrus_invite_join(text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_invite_preview(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.cyrus_invite_join(text) TO authenticated;
