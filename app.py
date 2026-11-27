@@ -2950,11 +2950,14 @@ async function cyrusToggleVoiceRecord(b){
           const form=document.querySelector(".send-box"),input=form&&form.querySelector("input[name=content]"),send=form&&form.querySelector(".composer-send"),counter=document.getElementById("cyrusComposerCounter");
           if(!form||!input||!send)return;
           const match=form.action.match(/\\/chat\\/([^/]+)\\/send/),draftKey="cyrus-draft-"+(match?match[1]:"default");
-          try{if(!input.value)input.value=localStorage.getItem(draftKey)||"";}catch(e){}
+          const nonceField=form.querySelector('input[name="client_nonce"]'),nonceKey=draftKey+"-pending";
+          const justSent=new URLSearchParams(location.search).get("sent")==="1";
+          if(justSent){try{localStorage.removeItem(draftKey);sessionStorage.removeItem(nonceKey);}catch(e){}history.replaceState(null,"",location.pathname+location.hash);}
+          else{try{if(!input.value)input.value=localStorage.getItem(draftKey)||"";}catch(e){}}
           function update(){const n=input.value.length;send.disabled=!input.value.trim();if(counter)counter.textContent=n.toLocaleString("fa-IR")+" / ۴۰۰۰";try{if(input.value)localStorage.setItem(draftKey,input.value);else localStorage.removeItem(draftKey);}catch(e){}}
           update();input.addEventListener("input",update);
           input.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!send.disabled)form.requestSubmit();}});
-          form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}form.dataset.sending="1";send.disabled=true;send.textContent="…";try{localStorage.removeItem(draftKey);}catch(err){}});
+          form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}if(nonceField){let nonce="";try{nonce=sessionStorage.getItem(nonceKey)||"";}catch(err){}if(!nonce){nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2));try{sessionStorage.setItem(nonceKey,nonce);}catch(err){}}nonceField.value=nonce;}form.dataset.sending="1";send.disabled=true;send.textContent="…";});
           const picker=document.getElementById("cyrusFullEmojiPicker");if(picker)picker.addEventListener("emoji-click",function(e){const emoji=e.detail&&e.detail.unicode;if(!emoji)return;const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;input.setRangeText(emoji,start,end,"end");input.dispatchEvent(new Event("input",{bubbles:true}));input.focus();});
           document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;const a=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(a)a.hidden=true;if(p)p.style.display="none";});
         })();
@@ -3814,7 +3817,7 @@ def send_message(conversation_id):
 
     message = request.form.get("content", "").strip()
     if not message or len(message) > 4000:
-        return redirect(url_for("chat", conversation_id=conversation_id))
+        return redirect(url_for("chat", conversation_id=conversation_id, sent="1"))
 
     headers = {
         "apikey": KEY,
@@ -3879,7 +3882,7 @@ def send_message(conversation_id):
                     for existing_message in duplicate_check.json():
                         existing_meta = existing_message.get("metadata") if isinstance(existing_message.get("metadata"),dict) else {}
                         if str(existing_meta.get("client_nonce") or "") == client_nonce:
-                            return redirect(url_for("chat", conversation_id=conversation_id))
+                            return redirect(url_for("chat", conversation_id=conversation_id, sent="1"))
             except Exception:
                 pass
 
@@ -3991,7 +3994,7 @@ def send_message(conversation_id):
                         isinstance(x.get("metadata"),dict) and str(x["metadata"].get("client_nonce") or "") == client_nonce
                         for x in duplicate_check.json()
                     ):
-                        return redirect(url_for("chat", conversation_id=conversation_id))
+                        return redirect(url_for("chat", conversation_id=conversation_id, sent="1"))
                 except Exception:
                     pass
             return page(
@@ -4014,7 +4017,7 @@ def send_message(conversation_id):
             '<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'
         ), 502
 
-    return redirect(url_for("chat", conversation_id=conversation_id))
+    return redirect(url_for("chat", conversation_id=conversation_id, sent="1"))
 
 
 
