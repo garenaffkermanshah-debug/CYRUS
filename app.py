@@ -1398,25 +1398,12 @@ def message_to_user(user_id):
     if not content or len(content) > 4000:
         return redirect("/user/" + user_id)
     own_id = str(session.get("user_id") or "")
-    try:
-        blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={"select":"blocker_id", "blocker_id":"eq."+own_id,
-                    "blocked_id":"eq."+user_id, "limit":"1"},
-            headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
-            timeout=15)
-        if blocked.ok and blocked.json():
-            return redirect("/user/" + user_id)
-        reverse_blocked = requests.get(URL + "/rest/v1/cyrus_user_blocks",
-            params={"select":"blocker_id", "blocker_id":"eq."+user_id,
-                    "blocked_id":"eq."+own_id, "limit":"1"},
-            headers={"apikey":KEY, "Authorization":"Bearer "+session["access_token"]},
-            timeout=15)
-        if reverse_blocked.ok and reverse_blocked.json():
-            return redirect("/user/" + user_id)
-    except Exception:
-        pass
     headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"], "Content-Type": "application/json", "Prefer": "return=minimal"}
-    try:
+    block_status = cyrus_block_status(user_id, headers)
+    if block_status is None:
+        return page('<div class="container card"><p>بررسی مسدودسازی با سرور انجام نشد؛ پیام ارسال نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'),503
+    if block_status:
+        return redirect("/user/" + user_id)
         created = requests.post(URL + "/rest/v1/rpc/create_direct_conversation", json={"other_user":user_id}, headers=headers, timeout=20)
         if not created.ok or not isinstance(created.json(), str):
             return page('<div class="container card"><p>ساخت گفتگو انجام نشد</p><a href="/contacts">بازگشت</a></div>'), 400
@@ -1823,23 +1810,11 @@ def chat(conversation_id):
                                 room_last_seen = "مدتی پیش"
                         except (TypeError, ValueError, OverflowError):
                             room_last_seen = "آخرین بازدید نامشخص"
-                    # Show the blocked state in the conversation and prevent composing.
-                    try:
-                        own_block = requests.get(
-                            URL + "/rest/v1/cyrus_user_blocks",
-                            params={"select":"blocker_id","blocker_id":"eq."+str(current_user),"blocked_id":"eq."+other_id,"limit":"1"},
-                            headers=headers, timeout=12
-                        )
-                        other_block = requests.get(
-                            URL + "/rest/v1/cyrus_user_blocks",
-                            params={"select":"blocker_id","blocker_id":"eq."+other_id,"blocked_id":"eq."+str(current_user),"limit":"1"},
-                            headers=headers, timeout=12
-                        )
-                        room_blocked = bool((own_block.ok and own_block.json()) or (other_block.ok and other_block.json()))
-                        if room_blocked:
-                            room_last_seen = "این گفتگو مسدود است"
-                    except Exception:
-                        room_blocked = False
+                    # Pair-level RPC checks both directions despite private block-table RLS.
+                    block_status = cyrus_block_status(other_id, headers)
+                    room_blocked = block_status is True
+                    if room_blocked:
+                        room_last_seen = "این گفتگو مسدود است"
                     room_profile_href = "/user/" + other_id + "?from_chat=1"
         except Exception:
             pass
@@ -2229,33 +2204,25 @@ def send_message(conversation_id):
             except Exception:
                 pass
 
-        # اگر کاربر، عضو دیگر گفتگوی خصوصی را مسدود کرده باشد، پیام جدید نپذیر.
+        # Secure pair check sees blocks in either direction without exposing block rows.
         if room.get("type") == "private":
             members_check = requests.get(
                 URL + "/rest/v1/cyrus_members",
                 params={"select":"user_id", "conversation_id":"eq."+conversation_id},
                 headers=headers, timeout=20
             )
-            if members_check.ok:
-                other_ids = [str(m.get("user_id") or "") for m in members_check.json()
-                             if str(m.get("user_id") or "") != current_user]
-                for other_id in other_ids:
-                    block_check = requests.get(
-                        URL + "/rest/v1/cyrus_user_blocks",
-                        params={"select":"blocker_id", "blocker_id":"eq."+current_user,
-                                "blocked_id":"eq."+other_id, "limit":"1"},
-                        headers=headers, timeout=15
-                    )
-                    if block_check.ok and block_check.json():
-                        return "این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.", 403
-                    reverse_block_check = requests.get(
-                        URL + "/rest/v1/cyrus_user_blocks",
-                        params={"select":"blocker_id", "blocker_id":"eq."+other_id,
-                                "blocked_id":"eq."+current_user, "limit":"1"},
-                        headers=headers, timeout=15
-                    )
-                    if reverse_block_check.ok and reverse_block_check.json():
-                        return "این کاربر شما را مسدود کرده است؛ امکان ارسال پیام نیست.", 403
+            if not members_check.ok:
+                return "بررسی وضعیت مسدودسازی ناموفق بود؛ دوباره تلاش کنید.", 503
+            other_ids = [str(m.get("user_id") or "") for m in members_check.json()
+                         if str(m.get("user_id") or "") != current_user]
+            if not other_ids:
+                return "عضو دیگر گفتگو پیدا نشد؛ ارسال پیام متوقف شد.", 403
+            for other_id in other_ids:
+                block_status = cyrus_block_status(other_id, headers)
+                if block_status is None:
+                    return "بررسی مسدودسازی با سرور انجام نشد؛ پیام ارسال نشد.", 503
+                if block_status:
+                    return "این گفتگو مسدود است؛ امکان ارسال پیام وجود ندارد.", 403
 
         # برای گفتگوهای غیرکانال، فرستنده باید عضو گفتگو باشد.
         if room.get("type") != "channel":
@@ -3545,6 +3512,26 @@ def delete_saved_message(message_id):
     if not response.ok:
         return page('<div class="container card"><p>حذف پیام انجام نشد</p><a href="/saved-messages">بازگشت</a></div>'),400
     return redirect("/saved-messages")
+
+
+def cyrus_block_status(other_user_id, headers):
+    """Return True/False for a blocked pair, or None if the server check failed."""
+    try:
+        response = requests.post(
+            URL + "/rest/v1/rpc/cyrus_is_blocked_pair",
+            json={"other_user_id":str(other_user_id)},
+            headers={**headers, "Content-Type":"application/json"},
+            timeout=12
+        )
+        if response.ok:
+            value = response.json()
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, list) and value and isinstance(value[0], bool):
+                return value[0]
+    except Exception:
+        pass
+    return None
 
 
 @app.route("/settings", methods=["GET", "POST"])
