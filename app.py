@@ -1254,8 +1254,10 @@ def login():
                 error = "ایمیل این حساب هنوز تأیید نشده؛ از بخش ثبت‌نام کد تأیید دریافت کنید."
             else:
                 security, security_error = cyrus_get_account_security(existing.get("id"))
-                if security_error:
-                    error = "بررسی تنظیمات امنیتی حساب انجام نشد؛ دوباره تلاش کنید."
+                if security_error == "missing_admin_key":
+                    error = "کلید مدیریتی SUPABASE_SERVICE_ROLE_KEY در تنظیمات محرمانه سرور تنظیم نشده است."
+                elif security_error:
+                    error = "جدول cyrus_account_security یا دسترسی service_role آماده نیست؛ بخش امنیت حساب در management.sql را اجرا کنید."
                 elif security and security.get("two_factor_enabled"):
                     session.clear()
                     session["cyrus_2fa_email"] = email
