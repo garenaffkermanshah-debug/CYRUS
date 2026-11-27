@@ -1773,6 +1773,19 @@ def chat(conversation_id):
                 messages = filtered_messages
             except (TypeError, ValueError):
                 messages = []
+        reaction_map = {}
+        try:
+            reaction_message_ids = [str(item.get("id") or "") for item in messages if item.get("id")]
+            if reaction_message_ids:
+                reaction_response = requests.get(URL + "/rest/v1/cyrus_message_reactions",
+                    params={"select":"message_id,user_id,emoji","conversation_id":"eq."+conversation_id,
+                            "message_id":"in.("+",".join(reaction_message_ids)+")"},
+                    headers=headers,timeout=15)
+                if reaction_response.ok:
+                    for reaction_row in reaction_response.json():
+                        reaction_map.setdefault(str(reaction_row.get("message_id") or ""),[]).append(reaction_row)
+        except Exception:
+            reaction_map = {}
         requested_message_id = request.args.get("message", "").strip()
         if requested_message_id:
             try:
@@ -1864,6 +1877,16 @@ def chat(conversation_id):
                 previous_message_date = message_date
         except Exception:
             stamp = ""
+        message_reactions = reaction_map.get(str(msg.get("id") or ""), [])
+        reaction_counts = {}
+        for reaction_row in message_reactions:
+            reaction_emoji = str(reaction_row.get("emoji") or "")
+            if reaction_emoji:
+                reaction_counts[reaction_emoji] = reaction_counts.get(reaction_emoji, 0) + 1
+        reaction_badges_html = '<div class="message-reaction-badges">' + ''.join(
+            '<button type="button" class="message-reaction-badge'+(' mine' if str(row.get("user_id") or "") == current_user else '')+'" onclick="cyrusReactBadge(event,this)" data-emoji="'+html.escape(emoji,quote=True)+'">'+html.escape(emoji)+' <small>'+str(count)+'</small></button>'
+            for emoji,count in reaction_counts.items()
+        ) + '</div>' if reaction_counts else ""
         msg_id = html.escape(str(msg.get("id") or ""), quote=True)
         raw_content = html.escape(str(msg.get("content") or ""), quote=True)
         edited_label = " · ویرایش‌شده" if msg.get("edited_at") else ""
@@ -1904,9 +1927,10 @@ def chat(conversation_id):
             )
 
         message_rows += f"""
-        <div id="message-{msg_id}" class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
+        <div id="message-{msg_id}" class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" data-conversation-id="{conversation_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
           {reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
+          {reaction_badges_html}
           <small>{stamp}{edited_label}</small>
           {controls}
           {edit_form}
@@ -2284,13 +2308,30 @@ def chat(conversation_id):
           }});
         }}
       }});
-      function cyrusReact(event,button) {{
+      async function cyrusReact(event,button) {{
         event.preventDefault();event.stopPropagation();
         const message=button.closest('.message');
-        if(!message)return;
-        message.dataset.reaction=button.textContent;
-        message.classList.add('reacted');
-        message.classList.remove('context-open');
+        if(message)await cyrusSaveReaction(message,button.textContent.trim());
+      }}
+      async function cyrusReactBadge(event,button) {{
+        event.preventDefault();event.stopPropagation();
+        const message=button.closest('.message');
+        if(message)await cyrusSaveReaction(message,button.dataset.emoji||button.textContent.trim().split(' ')[0]);
+      }}
+      async function cyrusSaveReaction(message,emoji) {{
+        const form=new URLSearchParams();form.set('conversation_id',message.dataset.conversationId||'');form.set('emoji',emoji);
+        try {{
+          const response=await fetch('/chat/message/'+encodeURIComponent(message.dataset.messageId)+'/react',{{method:'POST',headers:{{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'}},body:form.toString(),credentials:'same-origin'}});
+          if(!response.ok)throw new Error('reaction failed');
+          const data=await response.json();
+          let badges=message.querySelector('.message-reaction-badges');
+          if(!badges){{badges=document.createElement('div');badges.className='message-reaction-badges';message.querySelector('.message-body').after(badges);}}
+          const current=[...badges.querySelectorAll('[data-emoji]')].find(x=>x.dataset.emoji===emoji);
+          if(data.removed){{if(current)current.remove();}}
+          else if(current){{const count=current.querySelector('small');if(count)count.textContent=data.count||'1';current.classList.add('mine');}}
+          else{{const b=document.createElement('button');b.type='button';b.className='message-reaction-badge mine';b.dataset.emoji=emoji;b.onclick=function(e){{cyrusReactBadge(e,this)}};b.append(document.createTextNode(emoji+' '));const c=document.createElement('small');c.textContent=data.count||'1';b.append(c);badges.append(b);}}
+          if(!badges.children.length)badges.remove();message.classList.remove('context-open');
+        }}catch(e){{alert('ثبت واکنش انجام نشد؛ دوباره تلاش کنید.');}}
       }}
       function cyrusReply(button) {{
         document.getElementById("cyrusReplyId").value=button.dataset.id||"";
@@ -2808,6 +2849,48 @@ def forward_message(message_id):
         return redirect(url_for("chat",conversation_id=destination))
     except Exception:
         return "ارتباط با سرور برقرار نشد",502
+
+
+@app.route("/chat/message/<message_id>/react", methods=["POST"])
+def react_message(message_id):
+    if not session.get("access_token"):
+        return Response('{"error":"unauthorized"}',status=401,mimetype="application/json")
+    conversation_id=str(request.form.get("conversation_id") or "").strip()
+    emoji=str(request.form.get("emoji") or "").strip()
+    allowed={"❤️","👍","👎","🔥","🥰","👏","🇮🇷","😂","😮","😢"}
+    try:
+        uuid.UUID(message_id); uuid.UUID(conversation_id)
+    except ValueError:
+        return Response('{"error":"invalid id"}',status=400,mimetype="application/json")
+    if emoji not in allowed:
+        return Response('{"error":"invalid emoji"}',status=400,mimetype="application/json")
+    uid=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json","Prefer":"return=representation"}
+    try:
+        member=requests.get(URL+"/rest/v1/cyrus_members",params={"select":"role","conversation_id":"eq."+conversation_id,"user_id":"eq."+uid,"limit":"1"},headers=headers,timeout=15)
+        if not member.ok or not member.json():
+            return Response('{"error":"not a member"}',status=403,mimetype="application/json")
+        message=requests.get(URL+"/rest/v1/cyrus_messages",params={"select":"id","id":"eq."+message_id,"conversation_id":"eq."+conversation_id,"limit":"1"},headers=headers,timeout=15)
+        if not message.ok or not message.json():
+            return Response('{"error":"message not found"}',status=404,mimetype="application/json")
+        existing=requests.get(URL+"/rest/v1/cyrus_message_reactions",params={"select":"emoji","message_id":"eq."+message_id,"user_id":"eq."+uid,"limit":"1"},headers=headers,timeout=15)
+        if not existing.ok:
+            return Response('{"error":"reaction lookup failed"}',status=502,mimetype="application/json")
+        if existing.json() and str(existing.json()[0].get("emoji") or "")==emoji:
+            deleted=requests.delete(URL+"/rest/v1/cyrus_message_reactions",params={"message_id":"eq."+message_id,"user_id":"eq."+uid},headers=headers,timeout=15)
+            if not deleted.ok:
+                return Response('{"error":"reaction delete failed"}',status=502,mimetype="application/json")
+            return Response(__import__("json").dumps({"removed":True,"count":0}),mimetype="application/json")
+        if existing.json():
+            requests.delete(URL+"/rest/v1/cyrus_message_reactions",params={"message_id":"eq."+message_id,"user_id":"eq."+uid},headers=headers,timeout=15)
+        inserted=requests.post(URL+"/rest/v1/cyrus_message_reactions",json={"message_id":message_id,"conversation_id":conversation_id,"user_id":uid,"emoji":emoji},headers=headers,timeout=15)
+        if not inserted.ok:
+            return Response('{"error":"reaction save failed"}',status=502,mimetype="application/json")
+        count=requests.get(URL+"/rest/v1/cyrus_message_reactions",params={"select":"user_id","message_id":"eq."+message_id,"emoji":"eq."+emoji},headers=headers,timeout=15)
+        total=len(count.json()) if count.ok else 1
+        return Response(__import__("json").dumps({"removed":False,"count":total}),mimetype="application/json")
+    except Exception:
+        return Response('{"error":"server error"}',status=502,mimetype="application/json")
 
 
 @app.route("/chat/message/<message_id>/edit", methods=["POST"])
