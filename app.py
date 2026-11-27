@@ -2887,11 +2887,26 @@ async function cyrusToggleVoiceRecord(b){
    const blob=new Blob(cyrusVoiceChunks,{type:recorder.mimeType||"audio/webm"});cyrusVoiceChunks=[];
    if(!blob.size){alert("ضبط صدا خالی بود");return;}
    const ext=blob.type.includes("ogg")?"ogg":blob.type.includes("mp4")?"m4a":"webm";
-   const uploadForm=document.getElementById("cyrusMediaUpload"),form=new FormData(uploadForm);form.delete("media");form.append("media",blob,"voice."+ext);
-   const button=document.getElementById("cyrusVoiceButton");if(button)button.disabled=true;
-   try{const res=await fetch(document.getElementById("cyrusMediaUpload").action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok)location.reload();else alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}
-   catch(err){alert("ارتباط برای ارسال صدا برقرار نشد");}
-   finally{if(button)button.disabled=false;}
+   const status=document.getElementById("cyrusVoiceStatus"),button=document.getElementById("cyrusVoiceButton");
+   if(button)button.hidden=true;
+   if(status){
+    status.textContent="";
+    const preview=document.createElement("div");preview.style.cssText="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:6px 0";
+    const player=document.createElement("audio");player.controls=true;player.preload="metadata";player.src=URL.createObjectURL(blob);player.style.cssText="width:min(220px,55vw);height:34px";
+    const send=document.createElement("button");send.type="button";send.textContent="ارسال صدا";send.style.cssText="border:0;border-radius:10px;padding:8px 11px;background:#268bd0;color:white";
+    const discard=document.createElement("button");discard.type="button";discard.textContent="ضبط دوباره";discard.style.cssText="border:1px solid #754d4d;border-radius:10px;padding:8px 10px;background:#321e25;color:#ffb5a8";
+    const cleanup=()=>{URL.revokeObjectURL(player.src);preview.remove();if(button){button.hidden=false;button.disabled=false;}};
+    discard.addEventListener("click",()=>{cleanup();});
+    send.addEventListener("click",async()=>{
+     send.disabled=true;discard.disabled=true;send.textContent="در حال ارسال…";
+     const uploadForm=document.getElementById("cyrusMediaUpload"),form=new FormData(uploadForm);form.delete("media");form.append("media",blob,"voice."+ext);
+     if(button)button.disabled=true;
+     try{const res=await fetch(uploadForm.action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok){cleanup();location.reload();}else{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}}
+     catch(err){send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";alert("ارتباط برای ارسال صدا برقرار نشد");}
+     finally{if(button)button.disabled=false;}
+    });
+    preview.append(player,send,discard);status.appendChild(preview);
+   }
   };
   cyrusRecorder.start(500);cyrusVoiceStartedAt=Date.now();cyrusVoiceUi(true,0);
   cyrusVoiceTimer=setInterval(()=>{const elapsed=Math.floor((Date.now()-cyrusVoiceStartedAt)/1000);cyrusVoiceUi(true,elapsed);if(elapsed>=300&&cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusVoiceCancelled=false;cyrusRecorder.stop();}},250);
