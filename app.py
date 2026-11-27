@@ -4,6 +4,7 @@ from pathlib import Path
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
 from flask import Flask, request, session, redirect, url_for, render_template, render_template_string, Response
+from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
 app = Flask(__name__)
@@ -102,6 +103,81 @@ URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
 # Server-only Supabase Auth admin key; never expose this to clients.
 ADMIN_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+def cyrus_security_headers():
+    return {"apikey": ADMIN_KEY, "Authorization": "Bearer " + ADMIN_KEY, "Content-Type": "application/json"}
+
+def cyrus_get_account_security(user_id):
+    if not ADMIN_KEY:
+        return None, "missing_admin_key"
+    try:
+        r = requests.get(URL + "/rest/v1/cyrus_account_security",
+            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until","user_id":"eq."+str(user_id),"limit":"1"},
+            headers=cyrus_security_headers(), timeout=12)
+        if not r.ok:
+            return None, "security_lookup_failed"
+        rows = r.json()
+        return (rows[0] if rows else None), None
+    except Exception:
+        return None, "security_lookup_failed"
+
+def cyrus_save_account_security(user_id, payload):
+    if not ADMIN_KEY:
+        return False
+    try:
+        body = {"user_id":str(user_id), **payload, "updated_at":datetime.now(timezone.utc).isoformat()}
+        r = requests.post(URL + "/rest/v1/cyrus_account_security", json=body,
+            headers={**cyrus_security_headers(),"Prefer":"resolution=merge-duplicates,return=minimal"},
+            timeout=15)
+        return r.ok
+    except Exception:
+        return False
+
+def cyrus_upload_room_avatar(room_id, file_obj, access_token):
+    if not file_obj or not file_obj.filename:
+        return None, None
+    mime = (file_obj.mimetype or "").lower()
+    extensions = {"image/jpeg":"jpg","image/png":"png","image/webp":"webp"}
+    if mime not in extensions:
+        return None, "فقط تصویر JPG، PNG یا WebP مجاز است"
+    data = file_obj.read(5 * 1024 * 1024 + 1)
+    valid = ((mime == "image/jpeg" and data.startswith(b"\\xff\\xd8\\xff")) or
+             (mime == "image/png" and data.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or
+             (mime == "image/webp" and len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"))
+    if not data or len(data) > 5*1024*1024 or not valid:
+        return None, "تصویر نامعتبر است یا حجم آن بیشتر از ۵ مگابایت است"
+    uid = str(session.get("user_id") or "")
+    path = str(room_id) + "/" + uid + "/" + uuid.uuid4().hex + "." + extensions[mime]
+    try:
+        uploaded = requests.post(URL + "/storage/v1/object/cyrus-room-avatars/" + path,
+            data=data, headers={"apikey":KEY,"Authorization":"Bearer "+access_token,
+            "Content-Type":mime,"x-upsert":"false"}, timeout=45)
+        if not uploaded.ok:
+            return None, "بارگذاری تصویر مجموعه انجام نشد"
+        return URL + "/storage/v1/object/public/cyrus-room-avatars/" + path, None
+    except Exception:
+        return None, "ارتباط با فضای ذخیره‌سازی برقرار نشد"
+
+def cyrus_set_room_avatar(room_id, avatar_url, access_token):
+    h={"apikey":KEY,"Authorization":"Bearer "+access_token,"Content-Type":"application/json"}
+    try:
+        q=requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"title,description,reactions_enabled,is_public,join_approval,history_visible,slow_mode_seconds,topics_enabled,sign_messages,member_permissions","id":"eq."+str(room_id),"limit":"1"},
+            headers=h,timeout=15)
+        if not q.ok or not q.json():
+            return False
+        room=q.json()[0]
+        payload={"p_conversation_id":str(room_id),"p_title":room.get("title") or "مجموعه",
+            "p_description":room.get("description") or "","p_avatar_url":avatar_url,
+            "p_reactions_enabled":room.get("reactions_enabled",True),
+            "p_is_public":room.get("is_public",False),"p_join_approval":room.get("join_approval",False),
+            "p_history_visible":room.get("history_visible",True),"p_slow_mode_seconds":room.get("slow_mode_seconds") or 0,
+            "p_topics_enabled":room.get("topics_enabled",False),"p_sign_messages":room.get("sign_messages",False),
+            "p_member_permissions":room.get("member_permissions") or {}}
+        saved=requests.post(URL+"/rest/v1/rpc/cyrus_manage_update_room_settings",json=payload,headers=h,timeout=20)
+        return saved.ok
+    except Exception:
+        return False
 
 def auth_find_user_by_email(email):
     """Exact email lookup via the server-only Auth Admin API; returns (user, error)."""
