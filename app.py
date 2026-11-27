@@ -1818,8 +1818,7 @@ def blocked_users():
     error=""
     try:
         blocked=requests.get(URL+"/rest/v1/cyrus_user_blocks",
-            params={"select":"blocked_id,created_at","blocker_id":"eq."+own_id,
-                    "order":"created_at.desc","limit":"500"},
+            params={"select":"blocked_id","blocker_id":"eq."+own_id,"limit":"500"},
             headers=headers,timeout=20)
         if not blocked.ok:
             raise RuntimeError("blocked list unavailable")
