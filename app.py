@@ -39,7 +39,7 @@ def cyrus_manifest():
         "display": "standalone", "orientation": "portrait",
         "background_color": "#0d1722", "theme_color": "#0d1722",
         "icons": [
-            {"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+            {"src": "/static/cyrus-app-icon.webp", "sizes": "1536x1536", "type": "image/webp", "purpose": "any"},
             {"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
         ]
     }
@@ -322,9 +322,9 @@ BASE = """
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="/static/cyrus-app-icon.webp" type="image/webp" sizes="1536x1536">
 <link rel="icon" href="/static/cyrus-app-icon.svg" type="image/svg+xml">
-<link rel="icon" href="/static/cyrus-app-icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/static/cyrus-app-icon.svg">
+<link rel="apple-touch-icon" href="/static/cyrus-app-icon.webp">
 <title>CYRUS | شاهنشاهی ارتباطات</title>
 <style>
 *{box-sizing:border-box}
