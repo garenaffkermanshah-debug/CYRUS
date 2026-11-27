@@ -3220,7 +3220,7 @@ def join_by_invite(invite_code):
                 member_count = 0
             pending = bool(preview.get("request_pending")) or request.args.get("request_sent") == "1"
             join_approval = bool(preview.get("join_approval"))
-            notice = '<div class="invite-pending">درخواست عضویت ارسال شده؛ پس از تأیید مدیر به مجموعه دسترسی پیدا می‌کنی.</div>' if pending else ""
+            notice = ""
             button = "درخواست عضویت" if join_approval else "پیوستن"
             button_html = '<div class="invite-pending">درخواست عضویت شما در انتظار تأیید است.</div>' if pending else '<form method="post"><button type="submit">' + button + '</button></form>'
             content = f"""
