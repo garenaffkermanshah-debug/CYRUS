@@ -2302,7 +2302,7 @@ def manage_room(conversation_id):
         rr = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,title,type,created_by,description,avatar_url,invite_code,reactions_enabled",
+                "select": "id,title,type,created_by,description,avatar_url,invite_code,reactions_enabled,is_public,join_approval,history_visible,slow_mode_seconds,topics_enabled,sign_messages,member_permissions",
                 "id": "eq." + conversation_id,
                 "limit": "1"
             },
@@ -2347,6 +2347,22 @@ def manage_room(conversation_id):
                 description = request.form.get("description", "").strip()
                 avatar_url = request.form.get("avatar_url", "").strip()
                 reactions = request.form.get("reactions_enabled") == "on"
+                is_public = request.form.get("is_public") == "on"
+                join_approval = request.form.get("join_approval") == "on"
+                history_visible = request.form.get("history_visible") == "on"
+                topics_enabled = request.form.get("topics_enabled") == "on"
+                sign_messages = request.form.get("sign_messages") == "on"
+                try:
+                    slow_mode_seconds = int(request.form.get("slow_mode_seconds", "0"))
+                except ValueError:
+                    slow_mode_seconds = -1
+                member_permissions = {
+                    "send_messages": request.form.get("perm_send_messages") == "on",
+                    "send_media": request.form.get("perm_send_media") == "on",
+                    "add_members": request.form.get("perm_add_members") == "on",
+                    "pin_messages": request.form.get("perm_pin_messages") == "on",
+                    "change_info": request.form.get("perm_change_info") == "on"
+                }
 
                 if not 2 <= len(title) <= 60:
                     return "نام باید بین ۲ تا ۶۰ حرف باشد", 400
@@ -2354,13 +2370,22 @@ def manage_room(conversation_id):
                     return "توضیحات حداکثر ۵۰۰ حرف باشد", 400
                 if len(avatar_url) > 500:
                     return "آدرس تصویر بیش از حد طولانی است", 400
+                if slow_mode_seconds not in (0, 10, 30, 60, 300, 900, 3600):
+                    return "مدت حالت آهسته نامعتبر است", 400
 
                 rpc = "cyrus_manage_update_room_settings"
                 data.update({
                     "p_title": title,
                     "p_description": description,
                     "p_avatar_url": avatar_url or None,
-                    "p_reactions_enabled": reactions
+                    "p_reactions_enabled": reactions,
+                    "p_is_public": is_public,
+                    "p_join_approval": join_approval,
+                    "p_history_visible": history_visible,
+                    "p_slow_mode_seconds": slow_mode_seconds,
+                    "p_topics_enabled": topics_enabled,
+                    "p_sign_messages": sign_messages,
+                    "p_member_permissions": member_permissions
                 })
 
             elif action == "rotate_invite":
@@ -2441,6 +2466,23 @@ def manage_room(conversation_id):
         invite_url = request.host_url.rstrip("/") + "/invite/" + invite_code if invite_code else ""
         invite_safe = html.escape(invite_url, quote=True)
         reactions_checked = "checked" if room.get("reactions_enabled", True) else ""
+        public_checked = "checked" if room.get("is_public", False) else ""
+        approval_checked = "checked" if room.get("join_approval", False) else ""
+        history_checked = "checked" if room.get("history_visible", True) else ""
+        topics_checked = "checked" if room.get("topics_enabled", False) else ""
+        sign_checked = "checked" if room.get("sign_messages", False) else ""
+        permissions = room.get("member_permissions") or {}
+        if not isinstance(permissions, dict):
+            permissions = {}
+        perm_checks = {
+            key: ("checked" if permissions.get(key, default) else "")
+            for key, default in (("send_messages", True),("send_media", True),("add_members", True),("pin_messages", True),("change_info", False))
+        }
+        slow_mode = int(room.get("slow_mode_seconds") or 0)
+        slow_options = "".join(
+            '<option value="' + str(value) + '"' + (" selected" if value == slow_mode else "") + ">" + label + "</option>"
+            for value, label in ((0,"خاموش"),(10,"۱۰ ثانیه"),(30,"۳۰ ثانیه"),(60,"۱ دقیقه"),(300,"۵ دقیقه"),(900,"۱۵ دقیقه"),(3600,"۱ ساعت"))
+        )
         kind = "گروه" if room_type == "group" else "کانال"
         subtitle = (
             "گفتگوی اعضا و مدیریت گروه"
@@ -2503,6 +2545,13 @@ def manage_room(conversation_id):
             <label>آدرس تصویر (اختیاری)</label>
             <input name="avatar_url" maxlength="500" value="{avatar_url}" placeholder="https://...">
             <label><input type="checkbox" name="reactions_enabled" {reactions_checked}> فعال بودن واکنش‌ها</label>
+            <hr>
+            <h3>نوع و دسترسی</h3>
+            <label><input type="checkbox" name="is_public" {public_checked}> {("گروه عمومی (قابل جستجو)" if room_type == "group" else "کانال عمومی (قابل جستجو)")}</label>
+            <label><input type="checkbox" name="join_approval" {approval_checked}> درخواست عضویت نیازمند تأیید مدیر</label>
+            <label><input type="checkbox" name="history_visible" {history_checked}> نمایش پیام‌های قبلی به اعضای جدید</label>
+            <hr>
+            {('<h3>مجوزهای اعضای گروه</h3><label><input type="checkbox" name="perm_send_messages" ' + perm_checks["send_messages"] + '> ارسال پیام</label><label><input type="checkbox" name="perm_send_media" ' + perm_checks["send_media"] + '> ارسال رسانه</label><label><input type="checkbox" name="perm_add_members" ' + perm_checks["add_members"] + '> افزودن اعضا</label><label><input type="checkbox" name="perm_pin_messages" ' + perm_checks["pin_messages"] + '> سنجاق پیام</label><label><input type="checkbox" name="perm_change_info" ' + perm_checks["change_info"] + '> تغییر اطلاعات گروه</label><label><input type="checkbox" name="topics_enabled" ' + topics_checked + '> فعال‌سازی موضوعات گروه</label><label>حالت آهسته ارسال پیام<select name="slow_mode_seconds">' + slow_options + '</select></label>') if room_type == "group" else ('<h3>تنظیمات کانال</h3><label><input type="checkbox" name="sign_messages" ' + sign_checked + '> نمایش امضای مدیر در پست‌ها</label><p class="muted">در کانال فقط مالک و مدیران مجاز به انتشار هستند.</p>')}
             <button type="submit">ذخیره تنظیمات</button>
           </form>
 
