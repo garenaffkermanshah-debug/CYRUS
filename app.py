@@ -2749,11 +2749,15 @@ def public_channels():
         if not rows:
             rows = '<div class="empty"><h3>هنوز کانال عمومی ساخته نشده است</h3></div>'
 
+        request_notice = (
+            '<div class="card"><p class="muted">درخواست عضویت ارسال شد؛ پس از تأیید مدیر به کانال دسترسی پیدا می‌کنید.</p></div>'
+            if request.args.get("request_sent") == "1" else ""
+        )
         content = (
             '<div class="container"><section class="welcome">'
             '<h2>کانال‌های عمومی</h2>'
             '<p>کانال‌های قابل دسترس در CYRUS</p></section>'
-            + rows +
+            + request_notice + rows +
             '<p class="muted"><a href="/contacts">بازگشت</a></p></div>'
         )
         return page(content)
@@ -2794,6 +2798,9 @@ def join_public_channel(conversation_id):
                 '<a href="/channels">بازگشت به کانال‌ها</a></div>'
             ), 400
 
+        outcome = result.json()
+        if outcome == "requested":
+            return redirect("/channels?request_sent=1")
         return redirect(url_for("chat", conversation_id=conversation_id))
 
     except Exception:
