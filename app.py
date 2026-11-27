@@ -1488,16 +1488,21 @@ def conversation_profile(conversation_id):
     content=f"""
     <main class="container cyrus-room-profile">
       <style>
-        .cyrus-room-profile{{padding:14px}}
-        .room-profile-hero{{text-align:center;padding:24px 16px;background:#111e2b;border:1px solid #263b50;border-radius:18px}}
+        .cyrus-room-profile{{padding:0 0 24px;background:#0d1722;min-height:calc(100dvh - 76px)}}
+        .room-profile-hero{{text-align:center;padding:0 16px 20px;background:transparent;border:0;border-radius:0}}
+        .room-profile-topbar{{height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 -16px 22px;padding:0 16px;background:#172331;border-bottom:1px solid #263442;text-align:right}}
+        .room-profile-topbar a{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;font-size:25px;background:#203243}}
+        .room-profile-topbar span{{flex:1;color:#eef4f8;font-size:16px;font-weight:600}}
         .room-profile-hero img,.profile-room-symbol{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px;color:#d8b46a}}
-        .room-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
-        .room-profile-kind{{color:#7eb8e2;font-size:13px}}
+        .room-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px;font-weight:600}}
+        .room-profile-kind{{color:#7eb8e2;font-size:13px;margin-top:6px}}
         .room-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:14px 0;white-space:pre-wrap}}
-        .room-profile-action{{display:block;margin:10px 0;padding:13px;border-radius:24px;text-align:center;background:#20384d;color:#eaf3fa}}
-        .room-profile-actions{{margin-top:12px}}
+        .room-profile-action{{display:block;margin:0;padding:15px 16px;border-radius:0;text-align:right;background:#111e2b;color:#69b9f7;border-bottom:1px solid #263442;font-size:14px}}
+        .room-profile-actions{{margin:12px 0;background:#111e2b;border-top:1px solid #263442;border-bottom:1px solid #263442}}
+        .room-profile-actions .room-profile-action:first-child{{color:#69b9f7}}
       </style>
       <section class="room-profile-hero">
+        <div class="room-profile-topbar"><a href="/chat/{conversation_id}" aria-label="بازگشت به گفتگو">‹</a><span>{kind}</span>{('<a href="/rooms/'+conversation_id+'/manage" aria-label="تنظیمات">⋮</a>' if owner or role in ("admin","owner") else '<span style="width:38px"></span>')}</div>
         {avatar_html}
         <h2>{title}</h2>
         <div class="room-profile-kind">{kind} · {len(members)} عضو</div>
