@@ -22,7 +22,7 @@ class CyrusSecurityTests(unittest.TestCase):
         previous = cyrus.ADMIN_KEY
         cyrus.ADMIN_KEY = "sb_secret_test_only"
         try:
-            headers = cyrus.cyrus_security_headers()
+            headers = cyrus.cyrus_admin_api_headers()
             self.assertEqual(headers["apikey"], "sb_secret_test_only")
             self.assertNotIn("Authorization", headers)
             self.assertEqual(headers["Content-Type"], "application/json")
@@ -33,7 +33,7 @@ class CyrusSecurityTests(unittest.TestCase):
         previous = cyrus.ADMIN_KEY
         cyrus.ADMIN_KEY = "legacy-service-role-jwt"
         try:
-            headers = cyrus.cyrus_security_headers()
+            headers = cyrus.cyrus_admin_api_headers()
             self.assertEqual(headers["apikey"], "legacy-service-role-jwt")
             self.assertEqual(headers["Authorization"], "Bearer legacy-service-role-jwt")
         finally:
