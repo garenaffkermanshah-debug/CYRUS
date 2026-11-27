@@ -841,6 +841,8 @@ def register():
         else:
             code, data = auth_request("/auth/v1/signup", {"email":email,"password":password})
             if code in (200,201) and data.get("access_token"):
+                # Start the newly registered account with a fresh session cookie.
+                session.clear()
                 session["access_token"] = data["access_token"]
                 session["refresh_token"] = data.get("refresh_token", "")
                 session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
@@ -911,6 +913,8 @@ def login_password():
             {"email": email, "password": password}
         )
         if code == 200 and data.get("access_token"):
+            # Rotate the client session after successful authentication.
+            session.clear()
             session["access_token"] = data["access_token"]
             session["refresh_token"] = data.get("refresh_token", "")
             session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
@@ -936,10 +940,27 @@ def login_password():
     return page(content)
 
 
-@app.route("/logout")
+@app.route("/logout", methods=["GET", "POST"])
 def logout():
+    # Revoke the Supabase session server-side before clearing the local cookie.
+    access_token = str(session.get("access_token") or "")
+    if access_token and URL and KEY:
+        try:
+            requests.post(
+                URL + "/auth/v1/logout",
+                headers={"apikey": KEY, "Authorization": "Bearer " + access_token},
+                timeout=12
+            )
+        except Exception:
+            pass
     session.clear()
-    return redirect("/login")
+    response = redirect("/login")
+    response.delete_cookie(
+        app.config.get("SESSION_COOKIE_NAME", "session"),
+        path=app.config.get("SESSION_COOKIE_PATH", "/"),
+        domain=app.config.get("SESSION_COOKIE_DOMAIN")
+    )
+    return response
 
 
 @app.route("/search", methods=["GET"])
