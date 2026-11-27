@@ -74,10 +74,7 @@ def cyrus_refresh_auth_session():
         data = response.json()
         if response.status_code == 200 and data.get("access_token"):
             session["access_token"] = data["access_token"]
-            session["refresh_token"] = data.get("refresh_token", "")
-            session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
-            session.permanent = True
-            session["refresh_token"] = data.get("refresh_token", refresh_token)
+            session["refresh_token"] = data.get("refresh_token") or refresh_token
             session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
             session.permanent = True
         else:
@@ -1886,11 +1883,14 @@ def export_account_data():
         room_ids=list(dict.fromkeys(room_ids))
         conversations=[]
         messages=[]
+        reactions=[]
         for start in range(0,len(room_ids),35):
             batch=room_ids[start:start+35]
             expr="in.("+",".join(batch)+")"
             conversations.extend(fetch_rows("cyrus_conversations",{"select":"*","id":expr},"conversations"))
             messages.extend(fetch_rows("cyrus_messages",{"select":"*","conversation_id":expr,"order":"created_at.asc"},"messages"))
+            # واکنش‌ها نیز بخشی از سابقهٔ گفتگو هستند و در نسخهٔ پشتیبان نگهداری می‌شوند.
+            reactions.extend(fetch_rows("cyrus_message_reactions",{"select":"*","conversation_id":expr},"message reactions"))
         contacts=fetch_rows("cyrus_contacts",{"select":"*","owner_id":"eq."+own_id},"contacts")
         saved_messages=fetch_rows("cyrus_saved_messages",{"select":"*","user_id":"eq."+own_id},"saved messages")
         saved_profiles=fetch_rows("cyrus_saved_profiles",{"select":"*","owner_id":"eq."+own_id},"saved profiles")
@@ -1901,8 +1901,8 @@ def export_account_data():
             "account":{"user_id":own_id,"email":str(session.get("cyrus_login_email") or "")},
             "data":{
                 "profile":profile,"memberships":memberships,"conversations":conversations,
-                "messages":messages,"contacts":contacts,"saved_messages":saved_messages,
-                "saved_profiles":saved_profiles,"blocked_users":blocked_users
+                "messages":messages,"message_reactions":reactions,"contacts":contacts,
+                "saved_messages":saved_messages,"saved_profiles":saved_profiles,"blocked_users":blocked_users
             },
             "notes":["فقط اطلاعاتی صادر می‌شود که حساب فعلی طبق مجوزهای پایگاه داده اجازه خواندن آن را دارد.",
                      "فایل‌های پیوست به‌صورت نشانی ثبت شده‌اند و محتوای فایل‌ها داخل این خروجی قرار نگرفته است."]
@@ -5554,26 +5554,6 @@ def delete_saved_message(message_id):
     if not response.ok:
         return page('<div class="container card"><p>حذف پیام انجام نشد</p><a href="/saved-messages">بازگشت</a></div>'),400
     return redirect("/saved-messages")
-
-
-def cyrus_block_status(other_user_id, headers):
-    """Return True/False for a blocked pair, or None if the server check failed."""
-    try:
-        response = requests.post(
-            URL + "/rest/v1/rpc/cyrus_is_blocked_pair",
-            json={"other_user_id":str(other_user_id)},
-            headers={**headers, "Content-Type":"application/json"},
-            timeout=12
-        )
-        if response.ok:
-            value = response.json()
-            if isinstance(value, bool):
-                return value
-            if isinstance(value, list) and value and isinstance(value[0], bool):
-                return value[0]
-    except Exception:
-        pass
-    return None
 
 
 def cyrus_block_status(other_user_id, headers):
