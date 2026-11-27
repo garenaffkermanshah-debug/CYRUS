@@ -3064,7 +3064,7 @@ async function cyrusToggleVoiceRecord(b){
         .context-actions form{{display:flex;flex-direction:column;gap:5px;margin:0}}
         .context-actions select{{width:calc(100% - 24px);margin:6px 12px;max-width:none;background:#0b1422;color:#fff;border:1px solid #526a7d;border-radius:7px;padding:9px}}
         .context-actions form>button{{justify-content:flex-start}}
-        .cyrus-inchat-search{{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#142231;border-bottom:1px solid #2b4054;position:sticky;top:0;z-index:35}}.cyrus-inchat-search input{{min-width:0;flex:1;background:#0a1521;color:#fff;border:1px solid #334b61;border-radius:10px;padding:9px;font-size:13px}}.cyrus-inchat-search button{{border:0;border-radius:8px;background:#24394b;color:#e5eef6;padding:7px 10px}}.cyrus-search-count{{font-size:11px;color:#a9bdce;white-space:nowrap}}.message.cyrus-search-hit{{outline:2px solid #caa65d;outline-offset:2px}}.message.cyrus-search-current{{outline:3px solid #42a5f5;outline-offset:3px}}.cyrus-scroll-latest{{position:fixed;right:16px;bottom:94px;z-index:30;width:42px;height:42px;border:1px solid #3b5368;border-radius:50%;background:#172a3b;color:#eaf4fc;font-size:22px;box-shadow:0 5px 18px #0006}}.cyrus-scroll-latest[hidden]{{display:none}}.cyrus-compose-counter{{position:absolute;left:54px;bottom:7px;color:#9db0c2;font-size:10px;pointer-events:none}}.cyrus-compose-counter[hidden]{{display:none}}
+        .cyrus-inchat-search{{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#142231;border-bottom:1px solid #2b4054;position:sticky;top:0;z-index:35}}.cyrus-inchat-search input{{min-width:0;flex:1;background:#0a1521;color:#fff;border:1px solid #334b61;border-radius:10px;padding:9px;font-size:13px}}.cyrus-inchat-search button{{border:0;border-radius:8px;background:#24394b;color:#e5eef6;padding:7px 10px}}.cyrus-search-count{{font-size:11px;color:#a9bdce;white-space:nowrap}}.cyrus-search-remote{{flex-basis:100%;max-height:42vh;overflow:auto;border-top:1px solid #2b4054;padding-top:6px}}.cyrus-search-remote-title,.cyrus-search-remote-empty{{padding:7px;color:#a9bdce;font-size:11px}}.cyrus-search-remote-item{{display:flex;flex-direction:column;gap:4px;padding:9px;margin:4px 0;border-radius:9px;background:#0d1b29;color:#eaf2f8;text-decoration:none;font-size:12px}}.cyrus-search-remote-item small{{color:#9db2c2;font-size:10px}}.message.cyrus-search-hit{{outline:2px solid #caa65d;outline-offset:2px}}.message.cyrus-search-current{{outline:3px solid #42a5f5;outline-offset:3px}}.cyrus-scroll-latest{{position:fixed;right:16px;bottom:94px;z-index:30;width:42px;height:42px;border:1px solid #3b5368;border-radius:50%;background:#172a3b;color:#eaf4fc;font-size:22px;box-shadow:0 5px 18px #0006}}.cyrus-scroll-latest[hidden]{{display:none}}.cyrus-compose-counter{{position:absolute;left:54px;bottom:7px;color:#9db0c2;font-size:10px;pointer-events:none}}.cyrus-compose-counter[hidden]{{display:none}}
         .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
         .forwarded-label,.pinned-label{{color:#d8b46a}}
         .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
@@ -3272,17 +3272,44 @@ async function cyrusToggleVoiceRecord(b){
         function ensureSearch(){{
           if(searchBox)return;
           searchBox=document.createElement('div');searchBox.className='cyrus-inchat-search';
-          searchBox.innerHTML='<input type="search" placeholder="جستجو در پیام‌های این گفتگو" aria-label="جستجو در گفتگو"><span class="cyrus-search-count">۰/۰</span><button type="button" data-dir="-1" aria-label="نتیجهٔ قبلی">↑</button><button type="button" data-dir="1" aria-label="نتیجهٔ بعدی">↓</button><button type="button" data-close aria-label="بستن جستجو">×</button>';
+          searchBox.innerHTML='<input type="search" placeholder="جستجو در تمام پیام‌های گفتگو" aria-label="جستجو در گفتگو"><span class="cyrus-search-count">۰/۰</span><button type="button" data-dir="-1" aria-label="نتیجهٔ قبلی">↑</button><button type="button" data-dir="1" aria-label="نتیجهٔ بعدی">↓</button><button type="button" data-close aria-label="بستن جستجو">×</button><div class="cyrus-search-remote" aria-live="polite" hidden></div>';
           const header=document.querySelector('.room-header');if(header)header.after(searchBox);
           searchInput=searchBox.querySelector('input');
           searchInput.addEventListener('input',runSearch);
           searchBox.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>moveMatch(Number(b.dataset.dir))));
           searchBox.querySelector('[data-close]').addEventListener('click',closeSearch);
         }}
-        function runSearch(){{
-          const q=(searchInput.value||'').trim().toLocaleLowerCase();matches=[];
+        let remoteSearchSequence=0;
+        async function runSearch(){{
+          const raw=(searchInput.value||'').trim(),q=raw.toLocaleLowerCase();matches=[];
           msgs.forEach(m=>{{m.classList.remove('cyrus-search-hit','cyrus-search-current');if(q&&m.textContent.toLocaleLowerCase().includes(q))matches.push(m);}});
           matchAt=0;updateSearch();if(matches.length)showMatch(0);
+          const remote=searchBox.querySelector('.cyrus-search-remote');
+          const sequence=++remoteSearchSequence;
+          if(raw.length<2){{remote.hidden=true;remote.replaceChildren();return;}}
+          remote.hidden=false;remote.textContent='در حال جستجو در تاریخچه…';
+          try{{
+            const response=await fetch('/chat/'+encodeURIComponent(chatId)+'/search?q='+encodeURIComponent(raw),{{credentials:'same-origin',headers:{{'Accept':'application/json'}}}});
+            if(!response.ok)throw new Error('search unavailable');
+            const data=await response.json();
+            if(sequence!==remoteSearchSequence)return;
+            remote.replaceChildren();
+            const rows=Array.isArray(data.results)?data.results:[];
+            const heading=document.createElement('div');heading.className='cyrus-search-remote-title';heading.textContent='نتایج کل تاریخچه: '+rows.length+(rows.length===50?' (۵۰ نتیجهٔ نخست)':'');remote.append(heading);
+            if(!rows.length){{const empty=document.createElement('div');empty.className='cyrus-search-remote-empty';empty.textContent='در تاریخچه پیامی پیدا نشد';remote.append(empty);return;}}
+            rows.forEach(row=>{{
+              const link=document.createElement('a');link.className='cyrus-search-remote-item';
+              link.href='/chat/'+encodeURIComponent(chatId)+'?message='+encodeURIComponent(row.id||'');
+              const body=document.createElement('span');body.textContent=String(row.content||'').slice(0,180);
+              const meta=document.createElement('small');
+              let stamp='';try{{stamp=row.created_at?new Date(row.created_at).toLocaleString('fa-IR'):'';}}catch(e){{}}
+              meta.textContent=(row.message_type&&row.message_type!=='text'?'📎 ':'')+stamp;
+              link.append(body,meta);remote.append(link);
+            }});
+          }}catch(e){{
+            if(sequence!==remoteSearchSequence)return;
+            remote.textContent='جستجوی تاریخچه در دسترس نیست؛ پیام‌های بارگذاری‌شده همچنان جستجو می‌شوند.';
+          }}
         }}
         function updateSearch(){{const n=searchBox.querySelector('.cyrus-search-count');if(n)n.textContent=(matches.length?matchAt+1:0)+'/'+matches.length;}}
         function showMatch(i){{if(!matches.length)return;matchAt=(i+matches.length)%matches.length;matches.forEach((m,j)=>m.classList.toggle('cyrus-search-current',j===matchAt));matches.forEach(m=>m.classList.add('cyrus-search-hit'));matches[matchAt].scrollIntoView({{behavior:'smooth',block:'center'}});updateSearch();}}
