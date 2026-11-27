@@ -128,7 +128,7 @@ def cyrus_official_channel_id():
             response = requests.get(
                 URL + "/rest/v1/cyrus_official_channels",
                 params={"select":"channel_id", "singleton":"eq.true", "limit":"1"},
-                headers=cyrus_security_headers(), timeout=12
+                headers=cyrus_admin_api_headers(), timeout=12
             )
             if response.ok and response.json():
                 return str(response.json()[0].get("channel_id") or CYRUS_OFFICIAL_CHANNEL_ID)
@@ -148,14 +148,14 @@ def cyrus_ensure_official_membership(user_id):
             URL + "/rest/v1/cyrus_members",
             params={"on_conflict":"conversation_id,user_id"},
             json={"conversation_id":channel_id, "user_id":user_id, "role":"member"},
-            headers={**cyrus_security_headers(), "Prefer":"resolution=ignore-duplicates,return=minimal"},
+            headers={**cyrus_admin_api_headers(), "Prefer":"resolution=ignore-duplicates,return=minimal"},
             timeout=12
         )
         return response.ok or response.status_code == 409
     except Exception:
         return False
 
-def cyrus_security_headers():
+def cyrus_admin_api_headers():
     """Build server-side Supabase headers for legacy JWT or new opaque secret keys."""
     headers = {"apikey": ADMIN_KEY, "Content-Type": "application/json"}
     # sb_secret_* keys are opaque API keys, not JWTs: never send them as Bearer.
@@ -169,7 +169,7 @@ def cyrus_get_account_security(user_id):
     try:
         r = requests.get(URL + "/rest/v1/cyrus_account_security",
             params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until,pending_password_hash,pending_expires_at","user_id":"eq."+str(user_id),"limit":"1"},
-            headers=cyrus_security_headers(), timeout=12)
+            headers=cyrus_admin_api_headers(), timeout=12)
         if not r.ok:
             return None, "security_lookup_failed"
         rows = r.json()
@@ -183,7 +183,7 @@ def cyrus_save_account_security(user_id, payload):
     try:
         body = {"user_id":str(user_id), **payload, "updated_at":datetime.now(timezone.utc).isoformat()}
         r = requests.post(URL + "/rest/v1/cyrus_account_security", json=body,
-            headers={**cyrus_security_headers(),"Prefer":"resolution=merge-duplicates,return=minimal"},
+            headers={**cyrus_admin_api_headers(),"Prefer":"resolution=merge-duplicates,return=minimal"},
             timeout=15)
         return r.ok
     except Exception:
@@ -243,7 +243,7 @@ def auth_find_user_by_email(email):
         response = requests.get(
             URL + "/auth/v1/admin/users",
             params={"filter": email, "per_page": 100},
-            headers=cyrus_security_headers(),
+            headers=cyrus_admin_api_headers(),
             timeout=15
         )
         if response.status_code != 200:
@@ -2312,7 +2312,7 @@ def manage_account_two_factor():
         email=str(session.get("cyrus_login_email") or "")
         if not email and ADMIN_KEY:
             try:
-                account=requests.get(URL+"/auth/v1/admin/users/"+uid,headers=cyrus_security_headers(),timeout=12)
+                account=requests.get(URL+"/auth/v1/admin/users/"+uid,headers=cyrus_admin_api_headers(),timeout=12)
                 if account.ok:
                     email=str(account.json().get("email") or "").strip().lower()
             except Exception:
