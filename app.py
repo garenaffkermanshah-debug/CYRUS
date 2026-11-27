@@ -116,7 +116,7 @@ def cyrus_verified_badge_html(size=19):
     return ('<svg class="cyrus-verified-badge" viewBox="0 0 24 24" width="' + str(px) + '" height="' + str(px) + '" '
             'role="img" aria-label="کانال رسمی تأییدشده" title="کانال رسمی تأییدشده" '
             'style="display:inline-block;vertical-align:-3px;flex:0 0 auto">'
-            '<path d="M12 0.8 14.7 5.1 19.7 3.7 19.1 8.9 23.2 12 19.1 15.1 19.7 20.3 14.7 18.9 12 23.2 9.3 18.9 4.3 20.3 4.9 15.1 0.8 12 4.9 8.9 4.3 3.7 9.3 5.1Z" fill="#229ED9"/>'
+            '<path d="M7 1.2H17L22.8 7V17L17 22.8H7L1.2 17V7Z" fill="#229ED9"/>'
             '<path d="M7.1 12.1l3.1 3.1 6.8-6.7" fill="none" stroke="#fff" stroke-width="2.15" '
             'stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
@@ -965,7 +965,7 @@ def home():
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
         .cyrus-chat-row .avatar{{font-weight:bold;color:#fff;cursor:pointer}}
         .cyrus-chat-row:focus-visible{{outline:2px solid #3297df;outline-offset:-2px}}
-        .cyrus-verified-badge{{display:inline-grid;place-items:center;width:16px;height:16px;margin-right:6px;border-radius:50%;background:#229ee6;color:#fff;font:700 11px Arial;vertical-align:middle;box-shadow:0 0 0 1px #0c1b29}}
+        .cyrus-verified-badge{{display:inline-block;width:auto;height:auto;margin-right:6px;border-radius:0;background:transparent;vertical-align:middle;box-shadow:none}}
         .cyrus-chat-row .chat-info{{cursor:pointer}}
       </style>
       <div class="tabs">{tabs}<a class="tab" href="/home?view=archive">آرشیو</a></div>
@@ -3231,7 +3231,7 @@ def chat(conversation_id):
         )
     room_header = f"""
     <section class="room-header cyrus-chat-header">
-      <style>.cyrus-verified-badge{{display:inline-grid;place-items:center;width:17px;height:17px;margin-right:7px;border-radius:50%;background:#229ee6;color:#fff;font:700 11px Arial;vertical-align:middle}}</style>
+      <style>.cyrus-verified-badge{{display:inline-block;width:auto;height:auto;margin-right:7px;border-radius:0;background:transparent;vertical-align:middle;box-shadow:none}}</style>
       <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
