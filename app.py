@@ -209,7 +209,7 @@ def cyrus_liveness():
 @app.route("/readyz", methods=["GET"])
 def cyrus_readiness():
     """Readiness probe checks required configuration and Supabase Auth reachability."""
-    if not URL or not KEY:
+    if not URL or not KEY or not ADMIN_KEY:
         return Response('{"status":"not_ready","reason":"configuration"}',status=503,
                         mimetype="application/json",headers={"Cache-Control":"no-store"})
     try:
@@ -801,7 +801,7 @@ def home():
         avatar_color = avatar_color_list[color_seed % len(avatar_color_list)]
         room_avatar = str(room.get("avatar_url") or "")
         avatar_html = (
-            '<img class="avatar" src="' + html.escape(room_avatar, quote=True) + '" alt="">'
+            '<img class="avatar" style="object-fit:cover" src="' + html.escape(room_avatar, quote=True) + '" alt="">'
             if room_avatar else
             f'<div class="avatar" style="background:{avatar_color};border-color:{avatar_color}">{icon}</div>'
         )
@@ -2242,8 +2242,16 @@ def manage_account_two_factor():
         if len(password)<10 or len(password)>128 or password!=confirm:
             return page('<main class="container card"><p>گذرواژه باید حداقل ۱۰ نویسه باشد و هر دو ورودی یکسان باشند.</p><a href="/privacy-security">بازگشت</a></main>'),400
         email=str(session.get("cyrus_login_email") or "")
+        if not email and ADMIN_KEY:
+            try:
+                account=requests.get(URL+"/auth/v1/admin/users/"+uid,headers={"apikey":ADMIN_KEY,"Authorization":"Bearer "+ADMIN_KEY},timeout=12)
+                if account.ok:
+                    email=str(account.json().get("email") or "").strip().lower()
+            except Exception:
+                email=""
         if not email:
-            return page('<main class="container card"><p>ایمیل حساب در نشست پیدا نشد؛ دوباره وارد شوید.</p><a href="/login">ورود</a></main>'),400
+            return page('<main class="container card"><p>ایمیل حساب پیدا نشد؛ یک‌بار خارج شوید و دوباره وارد شوید.</p><a href="/login">ورود</a></main>'),400
+        session["cyrus_login_email"]=email
         code,data=auth_request("/auth/v1/otp",{"email":email,"create_user":False})
         if code not in (200,201,202):
             return page('<main class="container card"><p>ارسال کد تأیید فعال‌سازی انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
