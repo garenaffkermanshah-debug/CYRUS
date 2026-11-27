@@ -2327,23 +2327,52 @@ def chat(conversation_id):
           }});
         }}
       }});
+      function cyrusCloseMessageMenus(returnFocus=false) {{
+        document.querySelectorAll('.message.context-open').forEach(el=>{{
+          el.classList.remove('context-open');
+          const menu=el.querySelector('.message-context');
+          if(menu)menu.setAttribute('aria-hidden','true');
+          el.setAttribute('aria-expanded','false');
+          if(returnFocus)el.focus({{preventScroll:true}});
+        }});
+      }}
       function cyrusOpenMessageMenu(event,message) {{
         if(event.target.closest('.message-context')) return;
         if(event.target.closest('button,form,select,input,a')) return;
-        document.querySelectorAll('.message.context-open').forEach(el=>el.classList.remove('context-open'));
+        if(window.getSelection&&String(window.getSelection()).trim())return;
+        cyrusCloseMessageMenus(false);
         message.classList.add('context-open');
+        message.setAttribute('aria-expanded','true');
         const menu=message.querySelector('.message-context');
-        if(menu)menu.setAttribute('aria-hidden','false');
+        if(menu){{menu.setAttribute('aria-hidden','false');const first=menu.querySelector('button');if(first&&event.type==='keydown')first.focus({{preventScroll:true}});}}
         event.stopPropagation();
       }}
-      document.addEventListener('click',function(event){{
-        if(!event.target.closest('.message.context-open')) {{
-          document.querySelectorAll('.message.context-open').forEach(el=>{{
-            el.classList.remove('context-open');
-            const menu=el.querySelector('.message-context');
-            if(menu)menu.setAttribute('aria-hidden','true');
+      (function(){{
+        let pressTimer=null,startX=0,startY=0,longPressed=false;
+        document.querySelectorAll('.message').forEach(message=>{{
+          message.setAttribute('aria-expanded','false');
+          message.addEventListener('pointerdown',event=>{{
+            if(event.pointerType==='mouse'||event.target.closest('.message-context,button,form,a,input,select'))return;
+            startX=event.clientX;startY=event.clientY;longPressed=false;
+            clearTimeout(pressTimer);
+            pressTimer=setTimeout(()=>{{longPressed=true;cyrusOpenMessageMenu(event,message);}},560);
           }});
-        }}
+          ['pointerup','pointercancel','pointerleave'].forEach(type=>message.addEventListener(type,()=>clearTimeout(pressTimer)));
+          message.addEventListener('pointermove',event=>{{if(Math.abs(event.clientX-startX)>12||Math.abs(event.clientY-startY)>12)clearTimeout(pressTimer);}});
+          message.addEventListener('click',event=>{{if(longPressed){{event.preventDefault();event.stopPropagation();longPressed=false;}}}});
+        }});
+        document.addEventListener('keydown',event=>{{
+          const opened=document.querySelector('.message.context-open');
+          if(!opened)return;
+          if(event.key==='Escape'){{event.preventDefault();cyrusCloseMessageMenus(true);return;}}
+          const actions=[...opened.querySelectorAll('.message-context button:not([disabled])')];
+          const at=actions.indexOf(document.activeElement);
+          if(event.key==='ArrowDown'&&actions.length){{event.preventDefault();actions[(at+1)%actions.length].focus();}}
+          if(event.key==='ArrowUp'&&actions.length){{event.preventDefault();actions[(at-1+actions.length)%actions.length].focus();}}
+        }});
+      }})();
+      document.addEventListener('click',function(event){{
+        if(!event.target.closest('.message.context-open'))cyrusCloseMessageMenus(false);
       }});
       async function cyrusReact(event,button) {{
         event.preventDefault();event.stopPropagation();
@@ -2409,23 +2438,33 @@ def chat(conversation_id):
         document.getElementById("cyrusReplyId").value=button.dataset.id||"";
         document.getElementById("cyrusReplyText").textContent="پاسخ به: "+(button.dataset.content||"").slice(0,120);
         document.getElementById("cyrusReplyBar").style.display="block";
+        cyrusCloseMessageMenus(false);
         document.querySelector('.send-box input[name="content"]').focus();
       }}
       function cyrusCancelReply() {{
         document.getElementById("cyrusReplyId").value="";
         document.getElementById("cyrusReplyBar").style.display="none";
       }}
+      function cyrusToast(text) {{
+        let toast=document.getElementById('cyrus-message-toast');
+        if(!toast){{toast=document.createElement('div');toast.id='cyrus-message-toast';toast.setAttribute('role','status');toast.setAttribute('aria-live','polite');toast.style.cssText='position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:100;background:#13283a;border:1px solid #41617a;color:#eaf4fc;padding:10px 16px;border-radius:22px;font-size:12px;box-shadow:0 5px 20px #0007';document.body.appendChild(toast);}}
+        toast.textContent=text;toast.hidden=false;clearTimeout(toast._timer);toast._timer=setTimeout(()=>toast.hidden=true,2100);
+      }}
       async function cyrusCopy(button) {{
         const value=button.dataset.content||"";
-        try {{ await navigator.clipboard.writeText(value); button.textContent="کپی شد"; }}
-        catch(e) {{ window.prompt("متن پیام را کپی کنید:",value); }}
+        try {{
+          if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(value);
+          else{{const area=document.createElement('textarea');area.value=value;area.style.cssText='position:fixed;opacity:0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('copy unavailable');}}
+          cyrusToast('متن پیام کپی شد');cyrusCloseMessageMenus(false);
+        }}catch(e){{window.prompt('متن پیام را برای کپی انتخاب کنید:',value);}}
       }}
       function cyrusShowForward(button) {{
         const form=button.parentElement.querySelector(".forward-form");
-        if(form)form.style.display=form.style.display==="none"?"flex":"none";
+        if(form){{form.style.display=form.style.display==="none"?"flex":"none";if(form.style.display!=="none")form.querySelector('select')?.focus();}}
       }}
       function cyrusEdit(button) {{
         const message = button.closest('.message');
+        cyrusCloseMessageMenus(false);
         const value = prompt('متن پیام را ویرایش کنید:', message.dataset.content);
         if (value === null || !value.trim()) return;
         const form = message.querySelector('.edit-form');
