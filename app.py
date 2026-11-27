@@ -2846,6 +2846,7 @@ def chat(conversation_id):
 
     send_box = (
         f'<form class="media-picker-form" id="cyrusMediaUpload" method="post" enctype="multipart/form-data" action="/chat/{conversation_id}/upload">'
+        '<input type="hidden" name="upload_nonce" id="cyrusUploadNonce" value="">'
         '<input type="file" id="cyrusMediaInput" name="media" multiple accept="image/*,video/mp4,video/webm,audio/*,.pdf,.txt,.zip,.docx,.xlsx" hidden>'
         '<button type="submit" id="cyrusMediaSubmit" hidden>ارسال</button></form>'
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
@@ -2922,6 +2923,10 @@ async function cyrusToggleVoiceRecord(b){
 }(function(){
  const form=document.getElementById("cyrusMediaUpload"),input=document.getElementById("cyrusMediaInput");
  if(!form||!input)return;
+ const nonceField=form.querySelector('input[name="upload_nonce"]');
+ const nonceKey="cyrus-upload-nonce-"+form.action.split("/").filter(Boolean).slice(-2,-1)[0];
+ const makeUploadNonce=()=>window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
+ try{if(nonceField)nonceField.value=sessionStorage.getItem(nonceKey)||makeUploadNonce();}catch(e){if(nonceField)nonceField.value=makeUploadNonce();}
  const panel=document.createElement("div");panel.id="cyrusMediaProgress";panel.hidden=true;
  panel.style.cssText="position:fixed;z-index:9998;bottom:calc(82px + env(safe-area-inset-bottom));left:12px;right:12px;max-width:620px;margin:auto;padding:12px 14px;border:1px solid #34516a;border-radius:14px;background:#102235;color:#e6edf4;box-shadow:0 8px 28px #0009;font:13px Tahoma";
  const label=document.createElement("div");label.style.cssText="margin-bottom:8px";
@@ -3819,8 +3824,30 @@ def upload_chat_media(conversation_id):
 
         sent_count=0
         failures=[]
-        for file in files:
+        upload_nonce=str(request.form.get("upload_nonce") or "").strip()
+        try:
+            upload_nonce=str(uuid.UUID(upload_nonce))
+        except ValueError:
+            upload_nonce=""
+        for file_index,file in enumerate(files):
             mime=(file.mimetype or "").lower().split(";")[0].strip()
+            if upload_nonce:
+                try:
+                    existing=requests.get(URL+"/rest/v1/cyrus_messages",
+                        params={"select":"id","conversation_id":"eq."+conversation_id,
+                                "sender_id":"eq."+current_user,
+                                "metadata->>upload_nonce":"eq."+upload_nonce,
+                                "metadata->>file_index":"eq."+str(file_index),"limit":"1"},
+                        headers=headers,timeout=12)
+                    if existing.ok and existing.json():
+                        sent_count+=1
+                        continue
+                    if not existing.ok:
+                        failures.append((file.filename,"بررسی ارسال تکراری ناموفق بود"))
+                        continue
+                except requests.RequestException:
+                    failures.append((file.filename,"بررسی اتصال برای جلوگیری از ارسال تکراری ناموفق بود"))
+                    continue
             if mime not in kind_by_mime:
                 failures.append((file.filename,"نوع فایل پشتیبانی نمی‌شود"))
                 continue
@@ -3847,7 +3874,8 @@ def upload_chat_media(conversation_id):
             message_response=requests.post(URL+"/rest/v1/cyrus_messages",
                 json={"conversation_id":conversation_id,"sender_id":current_user,"content":filename,
                       "message_type":kind_by_mime[mime],"attachment_url":public_url,
-                      "metadata":{"file_name":filename,"mime_type":mime,"file_size":len(data)}},
+                      "metadata":{"file_name":filename,"mime_type":mime,"file_size":len(data),
+                                  **({"upload_nonce":upload_nonce,"file_index":file_index} if upload_nonce else {})}},
                 headers=headers,timeout=30)
             if not message_response.ok:
                 requests.delete(URL+"/storage/v1/object/cyrus-chat-files/"+object_path,
@@ -3868,6 +3896,9 @@ def upload_chat_media(conversation_id):
             )
         if failures:
             flash(str(sent_count)+" فایل ارسال شد؛ "+str(len(failures))+" فایل ارسال نشد.")
+        elif upload_nonce:
+            # Keep nonce only until this batch is confirmed; reload creates a fresh batch.
+            pass
         return redirect(url_for("chat",conversation_id=conversation_id))
     except Exception:
         return "ارتباط با سرور برقرار نشد",502
