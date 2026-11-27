@@ -1969,6 +1969,31 @@ def chat(conversation_id):
                     forward_options += f'<option value="{did}">{dtitle}</option>'
     except Exception:
         pass
+    # رسید خواندن پیام‌ها: زمان آخرین بازدید خوانده‌شدهٔ اعضای دیگر
+    room_read_markers = []
+    try:
+        read_response = requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"user_id,last_read_at","conversation_id":"eq."+conversation_id},
+            headers=headers, timeout=15
+        )
+        if read_response.ok:
+            room_read_markers = [
+                row for row in read_response.json()
+                if str(row.get("user_id") or "") != current_user
+            ]
+    except Exception:
+        room_read_markers = []
+
+    def cyrus_read_time(value):
+        try:
+            dt = datetime.fromisoformat(str(value or "").replace("Z","+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc)
+        except (TypeError, ValueError):
+            return None
+
     message_rows = ""
     previous_message_date = None
 
@@ -2014,6 +2039,18 @@ def chat(conversation_id):
         msg_id = html.escape(str(msg.get("id") or ""), quote=True)
         raw_content = html.escape(str(msg.get("content") or ""), quote=True)
         edited_label = " · ویرایش‌شده" if msg.get("edited_at") else ""
+        read_status_html = ""
+        if mine:
+            created_for_receipt = cyrus_read_time(msg.get("created_at"))
+            readers = sum(
+                1 for row in room_read_markers
+                if created_for_receipt and cyrus_read_time(row.get("last_read_at"))
+                and cyrus_read_time(row.get("last_read_at")) >= created_for_receipt
+            )
+            if room_type == "private":
+                read_status_html = '<span class="message-read-status" title="'+("خوانده‌شده" if readers else "ارسال‌شده")+'">'+("✓✓" if readers else "✓")+'</span>'
+            elif readers:
+                read_status_html = '<span class="message-read-status" title="تعداد اعضای خواننده">✓✓ '+str(readers)+'</span>'
 
         meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
         reply_source = html.escape(str(meta.get("reply_to_content") or ""))
@@ -2062,7 +2099,7 @@ def chat(conversation_id):
           {reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           {reaction_badges_html}
-          <small>{stamp}{edited_label}</small>
+          <small>{stamp}{edited_label} {read_status_html}</small>
           {controls}
           {edit_form}
         </div>"""
