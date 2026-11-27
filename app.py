@@ -1887,8 +1887,11 @@ def chat(conversation_id):
         can_manage_room = is_room_owner or str(member_history_row.get("role") or "") in ("owner","admin")
         room_manage_menu = '<a href="/rooms/' + html.escape(conversation_id,quote=True) + '/manage">مدیریت</a>' if can_manage_room else ''
         room_more_html = (
-            '<div class="tg-chat-menu-wrap"><button type="button" class="chat-header-more" aria-label="گزینه‌ها" onclick="cyrusToggleRoomMenu(event)">⋮</button>'
+            '<div class="tg-chat-menu-wrap"><button type="button" class="chat-header-more" aria-label="گزینه‌های کانال" onclick="cyrusToggleRoomMenu(event)">⋮</button>'
             '<div class="tg-chat-menu" id="cyrusRoomMenu" hidden>'
+            '<button type="button" onclick="cyrusToggleMute()">بی‌صدا کردن</button>'
+            '<button type="button" onclick="cyrusTogglePin()">سنجاق / برداشتن سنجاق</button>'
+            '<button type="button" onclick="cyrusSearchInChat()">جستجو در گفتگو</button>'
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
             + room_manage_menu
             + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
@@ -1911,6 +1914,9 @@ def chat(conversation_id):
       function cyrusToggleRoomMenu(e){{e.stopPropagation();const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=!m.hidden;}}
       document.addEventListener('click',function(e){{const m=document.getElementById('cyrusRoomMenu');if(m&&!e.target.closest('.tg-chat-menu-wrap'))m.hidden=true;}});
       function cyrusCopyRoomInvite(){{const u="{room_invite_safe}";if(!u)return;const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;navigator.clipboard.writeText(u).then(()=>alert('لینک دعوت کپی شد')).catch(()=>prompt('لینک دعوت',u));}}
+      function cyrusToggleMute(){{const k='cyrus-mute-{conversation_id}',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');alert(v?'صدای گفتگو فعال شد':'گفتگو بی‌صدا شد');}}
+      function cyrusTogglePin(){{const k='cyrus-pin-{conversation_id}',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');alert(v?'سنجاق گفتگو برداشته شد':'گفتگو سنجاق شد');}}
+      function cyrusSearchInChat(){{const q=prompt('جستجو در پیام‌های این گفتگو');if(!q)return;const t=q.toLocaleLowerCase();let n=0;document.querySelectorAll('.message').forEach(x=>{{const ok=x.textContent.toLocaleLowerCase().includes(t);x.style.display=ok?'':'none';if(ok)n++;}});alert(n+' پیام پیدا شد');}}
     </script>"""
 
     channel_can_post = True
@@ -3228,9 +3234,10 @@ def manage_room(conversation_id):
             .tg-room-settings .tg-permissions summary .tg-chevron{{color:#7f94a7;transition:transform .18s}}
             .tg-room-settings .tg-permissions[open] summary .tg-chevron{{transform:rotate(180deg)}}
             .tg-room-settings .tg-permissions-body{{padding:0 16px 10px}}
-            .tg-room-settings .tg-save{{display:block;width:calc(100% - 32px);margin:16px auto;padding:13px;border:0;border-radius:10px;background:#248bd2;color:white;font-size:15px;font-weight:500}}
+            .tg-room-settings .tg-save{{position:fixed;left:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:25;width:auto;min-width:150px;margin:0;padding:13px 20px;border:0;border-radius:24px;background:#248bd2;color:white;font-size:14px;font-weight:600;box-shadow:0 5px 18px #0006}}\n            .tg-room-settings .tg-save:disabled{{background:#253747;color:#8193a2;box-shadow:none;opacity:.75}}\n            .tg-manage-topbar{{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#172331;border-bottom:1px solid #263442}}\n            .tg-manage-topbar a{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;font-size:25px;background:#203243}}\n            .tg-manage-topbar span{{flex:1;text-align:right;color:#eef4f8;font-size:16px;font-weight:600}}
             .tg-room-settings hr{{display:none}}
           </style>
+          <header class="tg-manage-topbar"><a href="/conversation/{conversation_id{'}'}/profile" aria-label="بازگشت به اطلاعات مجموعه">➜</a><span>مدیریت {kind{'}'}</span></header>
           <form class="tg-room-settings" method="post">
             <input type="hidden" name="action" value="save_settings">
             <div class="tg-section">
@@ -3261,8 +3268,19 @@ def manage_room(conversation_id):
               '</div></details></div><div class="tg-section">' +
               '<label class="tg-switch-row"><span>فعال‌سازی موضوعات گروه</span><span class="tg-switch"><input type="checkbox" name="topics_enabled" ' + topics_checked + '><i></i></span></label>' +
               '<label class="tg-field">حالت آهسته ارسال پیام<select name="slow_mode_seconds">' + slow_options + '</select></label></div>') if room_type == "group" else ('<div class="tg-section"><div class="tg-section-title">تنظیمات کانال</div><label class="tg-switch-row"><span>نمایش امضای مدیر در پست‌ها</span><span class="tg-switch"><input type="checkbox" name="sign_messages" ' + sign_checked + '><i></i></span></label><p class="muted">در کانال فقط مالک و مدیران مجاز به انتشار هستند.</p></div>')}
-            <button class="tg-save" type="submit">ذخیره تغییرات</button>
+            <button class="tg-save" type="submit" disabled>تأیید تغییرات</button>
           </form>
+          <script>
+          (function(){
+            const form=document.querySelector('.tg-room-settings'),save=form&&form.querySelector('.tg-save');
+            if(!form||!save)return;
+            let changed=false;
+            function mark(){changed=true;save.disabled=false;save.textContent='تأیید تغییرات';}
+            form.querySelectorAll('input,textarea,select').forEach(el=>{el.addEventListener('input',mark);el.addEventListener('change',mark);});
+            form.addEventListener('submit',function(){if(!changed){return;}save.disabled=true;save.textContent='در حال ذخیره…';});
+          })();
+          </script>
+
 
           <div class="card">
             <h3>لینک دعوت</h3>
