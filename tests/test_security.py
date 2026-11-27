@@ -30,6 +30,57 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertEqual(response.json["status"], "not_ready")
         self.assertNotIn("SUPABASE_KEY", response.get_data(as_text=True))
 
+
+    def test_readiness_succeeds_when_supabase_auth_is_reachable(self):
+        from unittest.mock import Mock, patch
+
+        previous_url, previous_key = cyrus.URL, cyrus.KEY
+        cyrus.URL, cyrus.KEY = "https://project.example", "test-public-key"
+        try:
+            backend = Mock(ok=True, status_code=200)
+            with patch.object(cyrus.requests, "get", return_value=backend) as get:
+                response = self.client.get("/readyz")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json["status"], "ready")
+            self.assertIn("no-store", response.headers.get("Cache-Control", ""))
+            get.assert_called_once_with(
+                "https://project.example/auth/v1/settings",
+                headers={"apikey": "test-public-key", "Accept": "application/json"},
+                timeout=5,
+            )
+            self.assertNotIn("test-public-key", response.get_data(as_text=True))
+        finally:
+            cyrus.URL, cyrus.KEY = previous_url, previous_key
+
+    def test_readiness_fails_when_supabase_auth_returns_error(self):
+        from unittest.mock import Mock, patch
+
+        previous_url, previous_key = cyrus.URL, cyrus.KEY
+        cyrus.URL, cyrus.KEY = "https://project.example", "test-public-key"
+        try:
+            with patch.object(cyrus.requests, "get", return_value=Mock(ok=False)):
+                response = self.client.get("/readyz")
+            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.json["status"], "not_ready")
+            self.assertEqual(response.json["reason"], "backend")
+        finally:
+            cyrus.URL, cyrus.KEY = previous_url, previous_key
+
+    def test_readiness_fails_when_supabase_auth_times_out(self):
+        from unittest.mock import patch
+        import requests
+
+        previous_url, previous_key = cyrus.URL, cyrus.KEY
+        cyrus.URL, cyrus.KEY = "https://project.example", "test-public-key"
+        try:
+            with patch.object(cyrus.requests, "get", side_effect=requests.Timeout):
+                response = self.client.get("/readyz")
+            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.json["status"], "not_ready")
+            self.assertEqual(response.json["reason"], "backend")
+        finally:
+            cyrus.URL, cyrus.KEY = previous_url, previous_key
+
     def test_login_page_issues_csrf_token_and_accepts_valid_form(self):
         page = self.client.get("/login")
         self.assertEqual(page.status_code, 200)
