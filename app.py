@@ -3139,7 +3139,7 @@ def chat(conversation_id):
             if(!response.ok)throw new Error('updates unavailable');
             const data=await response.json();
             delay=7000;
-            if(data.latest_id&&newest&&data.latest_id!==newest){{
+            if(data.latest_id&&data.latest_id!==newest){{
               const distance=Math.max(0,document.documentElement.scrollHeight-window.scrollY-window.innerHeight);
               try{{sessionStorage.setItem('cyrus-chat-scroll-distance',String(distance));}}catch(e){{}}
               location.reload();return;
@@ -3184,8 +3184,14 @@ def chat_updates(conversation_id):
             params={"select":"user_id","conversation_id":"eq."+conversation_id,
                     "user_id":"eq."+str(session.get("user_id") or ""),"limit":"1"},
             headers=headers,timeout=10)
-        if not member.ok or not member.json():
+        if not member.ok:
             return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
+        if not member.json():
+            room=requests.get(URL+"/rest/v1/cyrus_conversations",
+                params={"select":"created_by","id":"eq."+conversation_id,"limit":"1"},
+                headers=headers,timeout=10)
+            if not room.ok or not room.json() or str(room.json()[0].get("created_by") or "")!=str(session.get("user_id") or ""):
+                return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
         latest=requests.get(URL+"/rest/v1/cyrus_messages",
             params={"select":"id,created_at","conversation_id":"eq."+conversation_id,
                     "order":"created_at.desc","limit":"1"},
