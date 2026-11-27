@@ -1606,7 +1606,7 @@ def chat(conversation_id):
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
             params={
-                "select": "id,sender_id,content,message_type,created_at,edited_at,metadata",
+                "select": "id,sender_id,content,message_type,attachment_url,created_at,edited_at,metadata",
                 "conversation_id": "eq." + conversation_id,
                 "order": "created_at.asc",
                 "limit": "200"
@@ -1700,6 +1700,19 @@ def chat(conversation_id):
         mine = str(msg.get("sender_id") or "") == current_user
         css_class = "mine" if mine else "theirs"
         body = cyrus_format_message_text(msg.get("content") or "")
+        attachment_url = str(msg.get("attachment_url") or "")
+        message_kind = str(msg.get("message_type") or "text")
+        if attachment_url:
+            safe_attachment = html.escape(attachment_url, quote=True)
+            safe_file_label = html.escape(str((msg.get("metadata") or {}).get("file_name") or msg.get("content") or "فایل"), quote=True)
+            if message_kind == "photo":
+                body = '<a href="' + safe_attachment + '" target="_blank" rel="noopener"><img class="cyrus-chat-photo" src="' + safe_attachment + '" alt="' + safe_file_label + '" loading="lazy"></a>' + (('<div>' + body + '</div>') if body else "")
+            elif message_kind == "video":
+                body = '<video class="cyrus-chat-video" controls preload="metadata" src="' + safe_attachment + '"></video>' + (('<div>' + body + '</div>') if body else "")
+            elif message_kind == "audio":
+                body = '<audio controls preload="metadata" src="' + safe_attachment + '"></audio>' + (('<div>' + body + '</div>') if body else "")
+            else:
+                body = '<a class="cyrus-chat-file" href="' + safe_attachment + '" target="_blank" rel="noopener" download="' + safe_file_label + '">📎 ' + safe_file_label + ' · دریافت فایل</a>' + (('<div>' + body + '</div>') if body and body != safe_file_label else "")
         stamp_raw = str(msg.get("created_at") or "")
         try:
             stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00")).astimezone()
@@ -1906,6 +1919,9 @@ def chat(conversation_id):
                 )
 
     send_box = (
+        f'<form class="media-upload-box" method="post" enctype="multipart/form-data" action="/chat/{conversation_id}/upload">'
+        '<label class="media-upload-label">＋ رسانه یا فایل<input type="file" name="media" accept="image/*,video/mp4,video/webm,audio/*,.pdf,.txt,.zip,.docx,.xlsx" required></label>'
+        '<button type="submit">ارسال فایل</button></form>'
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
         '<div id="cyrusReplyBar" class="cyrus-reply-composer" style="display:none">'
         '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
@@ -1946,6 +1962,13 @@ def chat(conversation_id):
         .message small{{display:flex;align-items:center;justify-content:flex-end;gap:5px;direction:ltr}}
         .message.context-open{{z-index:12;border-color:#e2bd6b;box-shadow:0 4px 20px #0006}}
         .send-box{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));flex:0 0 auto;margin:8px 0 0;min-height:54px;border-radius:27px;background:#172432;border:1px solid #2b4053;box-shadow:0 4px 18px #0006;}}
+        .media-upload-box{{display:flex;gap:8px;align-items:center;padding:7px 10px;margin:5px 0;border-radius:16px;background:#172432;border:1px solid #2b4053;}}
+        .media-upload-label{{display:flex;gap:7px;align-items:center;flex:1;font-size:13px;color:#b8cbdc;}}
+        .media-upload-label input{{max-width:170px;font-size:11px;}}
+        .media-upload-box button{{border:0;border-radius:12px;padding:8px 12px;background:#268bd0;color:#fff;}}
+        .cyrus-chat-photo{{display:block;max-width:min(65vw,320px);max-height:360px;border-radius:12px;object-fit:contain;}}
+        .cyrus-chat-video{{display:block;width:min(65vw,320px);max-height:360px;border-radius:12px;}}
+        .cyrus-chat-file{{display:inline-block;color:#8acbff;padding:8px 10px;border-radius:10px;background:#142b3d;}}
         .send-box input[name="content"]{{color:#edf4fa;line-height:1.5;}}
         .composer-emoji,.composer-send{{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;margin:0;padding:0;border-radius:50%;font-size:22px}}
         .composer-emoji{{background:transparent;color:#a9bdce;border:0}}
@@ -2186,6 +2209,94 @@ def remove_chat_from_list(conversation_id):
     except Exception:
         return "ارتباط با سرور برقرار نشد", 502
     return redirect(url_for("home"))
+
+
+@app.route("/chat/<conversation_id>/upload", methods=["POST"])
+def upload_chat_media(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+    file = request.files.get("media")
+    if not file or not file.filename:
+        return "فایلی انتخاب نشده است", 400
+    mime = (file.mimetype or "").lower().split(";")[0].strip()
+    kind_by_mime = {
+        "image/jpeg":"photo","image/png":"photo","image/webp":"photo","image/gif":"photo",
+        "video/mp4":"video","video/webm":"video",
+        "audio/mpeg":"audio","audio/mp4":"audio","audio/ogg":"audio","audio/webm":"audio",
+        "application/pdf":"document","text/plain":"document","application/zip":"document",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"document"
+    }
+    if mime not in kind_by_mime:
+        return "نوع فایل پشتیبانی نمی‌شود", 415
+    data = file.read(20 * 1024 * 1024 + 1)
+    if not data or len(data) > 20 * 1024 * 1024:
+        return "حجم فایل باید حداکثر ۲۰ مگابایت باشد", 413
+    current_user = str(session.get("user_id") or "")
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+               "Content-Type":"application/json","Prefer":"return=minimal"}
+    try:
+        room_response=requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"id,type,created_by,member_permissions","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=20)
+        if not room_response.ok or not room_response.json():
+            return "گفتگو پیدا نشد",404
+        room=room_response.json()[0]
+        member_response=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"role","conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user,"limit":"1"},
+            headers=headers,timeout=20)
+        member_rows=member_response.json() if member_response.ok else []
+        is_owner=str(room.get("created_by") or "")==current_user
+        role=str(member_rows[0].get("role") or "") if member_rows else ""
+        if not is_owner and not member_rows:
+            return "عضو این گفتگو نیستید",403
+        if room.get("type")=="channel" and not (is_owner or role in ("admin","owner")):
+            return "در این کانال اجازه انتشار فایل ندارید",403
+        if room.get("type")=="group" and role not in ("owner","admin"):
+            permissions=room.get("member_permissions") if isinstance(room.get("member_permissions"),dict) else {}
+            if not permissions.get("send_media",True):
+                return "ارسال رسانه برای اعضای عادی غیرفعال است",403
+        if room.get("type")=="private":
+            others=requests.get(URL+"/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+conversation_id},
+                headers=headers,timeout=20)
+            if not others.ok:
+                return "بررسی گفتگو ناموفق بود",503
+            for row in others.json():
+                other=str(row.get("user_id") or "")
+                if other and other!=current_user:
+                    blocked=cyrus_block_status(other,headers)
+                    if blocked is None:
+                        return "بررسی مسدودسازی ناموفق بود",503
+                    if blocked:
+                        return "این گفتگو مسدود است",403
+        filename=Path(file.filename).name[:180]
+        safe_name=re.sub(r"[^A-Za-z0-9._-]","_",filename) or "file"
+        ext=safe_name.rsplit(".",1)[-1].lower() if "." in safe_name else ""
+        allowed_ext={"jpeg":"jpg","png":"png","webp":"webp","gif":"gif","mp4":"mp4","webm":"webm","mpeg":"mp3","mp3":"mp3","ogg":"ogg","pdf":"pdf","txt":"txt","zip":"zip","docx":"docx","xlsx":"xlsx"}
+        ext=allowed_ext.get(ext, {"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif","video/mp4":"mp4","video/webm":"webm","audio/mpeg":"mp3","audio/mp4":"m4a","audio/ogg":"ogg","audio/webm":"webm","application/pdf":"pdf","text/plain":"txt","application/zip":"zip"}.get(mime,"bin"))
+        object_path=conversation_id+"/"+current_user+"/"+str(uuid.uuid4())+"."+ext
+        uploaded=requests.post(URL+"/storage/v1/object/cyrus-chat-files/"+object_path,data=data,
+            headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"false"},timeout=60)
+        if not uploaded.ok:
+            return page('<div class="container card"><h3>بارگذاری فایل انجام نشد</h3><p>'+html.escape(uploaded.text[:350])+'</p></div>'),502
+        public_url=URL+"/storage/v1/object/public/cyrus-chat-files/"+object_path
+        caption=str(request.form.get("caption") or "").strip()[:500]
+        message_type=kind_by_mime[mime]
+        message_response=requests.post(URL+"/rest/v1/cyrus_messages",
+            json={"conversation_id":conversation_id,"sender_id":current_user,"content":caption or filename,
+                  "message_type":message_type,"attachment_url":public_url,
+                  "metadata":{"file_name":filename,"mime_type":mime,"file_size":len(data)}},
+            headers=headers,timeout=30)
+        if not message_response.ok:
+            return page('<div class="container card"><h3>فایل بارگذاری شد اما پیام ثبت نشد</h3><p>'+html.escape(message_response.text[:350])+'</p></div>'),403
+        return redirect(url_for("chat",conversation_id=conversation_id))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/chat/<conversation_id>/send", methods=["POST"])
