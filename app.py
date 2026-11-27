@@ -2371,6 +2371,24 @@ def chat(conversation_id):
         if(event.target.closest('.message-context')) return;
         if(event.target.closest('button,form,select,input,a')) return;
         if(window.getSelection&&String(window.getSelection()).trim())return;
+        const clickedId=message&&message.dataset.messageId;
+        if(event.type==='click'&&clickedId&&cyrusSelectedMessages.size) {{
+          const rows=[...document.querySelectorAll('.message[data-message-id]')];
+          const anchorIndex=rows.findIndex(row=>row.dataset.messageId===cyrusSelectionAnchorId);
+          const targetIndex=rows.findIndex(row=>row.dataset.messageId===clickedId);
+          if(event.shiftKey&&anchorIndex>=0&&targetIndex>=0) {{
+            rows.slice(Math.min(anchorIndex,targetIndex),Math.max(anchorIndex,targetIndex)+1)
+              .forEach(row=>cyrusSelectedMessages.add(row.dataset.messageId));
+          }} else if(cyrusSelectedMessages.has(clickedId)) {{
+            cyrusSelectedMessages.delete(clickedId);
+          }} else {{
+            cyrusSelectedMessages.add(clickedId);
+          }}
+          cyrusSelectionAnchorId=clickedId;
+          cyrusUpdateMessageSelection();
+          event.preventDefault();event.stopPropagation();
+          return;
+        }}
         cyrusCloseMessageMenus(false);
         message.classList.add('context-open');
         message.setAttribute('aria-expanded','true');
@@ -2531,6 +2549,7 @@ def chat(conversation_id):
         cyrusCloseMessageMenus(false);
       }}
       const cyrusSelectedMessages=new Set();
+      let cyrusSelectionAnchorId=null;
       function cyrusSelectedMessageTexts() {{
         return [...document.querySelectorAll('.message[data-message-id]')]
           .filter(message=>cyrusSelectedMessages.has(message.dataset.messageId))
@@ -2566,10 +2585,11 @@ def chat(conversation_id):
         const id=button.dataset.id||'';
         if(!id)return;
         if(cyrusSelectedMessages.has(id))cyrusSelectedMessages.delete(id);else cyrusSelectedMessages.add(id);
+        cyrusSelectionAnchorId=id;
         cyrusUpdateMessageSelection();cyrusCloseMessageMenus(false);
       }}
       function cyrusClearMessageSelection() {{
-        cyrusSelectedMessages.clear();cyrusUpdateMessageSelection();
+        cyrusSelectedMessages.clear();cyrusSelectionAnchorId=null;cyrusUpdateMessageSelection();
       }}
       document.addEventListener('keydown',event=>{{
         if(event.key==='Escape'&&cyrusSelectedMessages.size)cyrusClearMessageSelection();
