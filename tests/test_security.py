@@ -81,6 +81,71 @@ class CyrusSecurityTests(unittest.TestCase):
         finally:
             cyrus.URL, cyrus.KEY = previous_url, previous_key
 
+    def test_expired_session_refreshes_and_rotates_tokens(self):
+        from unittest.mock import Mock, patch
+
+        with self.client.session_transaction() as state:
+            state.update(access_token="old-access", refresh_token="old-refresh",
+                         token_expires_at=0)
+        backend = Mock(status_code=200)
+        backend.json.return_value = {
+            "access_token": "new-access", "refresh_token": "new-refresh",
+            "expires_in": 1800,
+        }
+        with patch.object(cyrus.requests, "post", return_value=backend) as post:
+            response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        post.assert_called_once()
+        with self.client.session_transaction() as state:
+            self.assertEqual(state["access_token"], "new-access")
+            self.assertEqual(state["refresh_token"], "new-refresh")
+            self.assertGreater(state["token_expires_at"], 0)
+            self.assertTrue(state.permanent)
+
+    def test_revoked_refresh_token_clears_authentication(self):
+        from unittest.mock import Mock, patch
+
+        with self.client.session_transaction() as state:
+            state.update(access_token="old-access", refresh_token="revoked",
+                         token_expires_at=0, user_id="user-123")
+            state["csrf_token"] = "keep-csrf"
+        backend = Mock(status_code=400)
+        backend.json.return_value = {"error": "invalid_grant"}
+        with patch.object(cyrus.requests, "post", return_value=backend):
+            response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        with self.client.session_transaction() as state:
+            self.assertNotIn("access_token", state)
+            self.assertNotIn("refresh_token", state)
+            self.assertNotIn("user_id", state)
+            self.assertEqual(state.get("csrf_token"), "keep-csrf")
+
+    def test_expired_session_without_refresh_token_is_cleared(self):
+        with self.client.session_transaction() as state:
+            state.update(access_token="stale-access", token_expires_at=0,
+                         user_id="user-123")
+        response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        with self.client.session_transaction() as state:
+            self.assertNotIn("access_token", state)
+            self.assertNotIn("user_id", state)
+
+    def test_temporary_refresh_failure_preserves_session_for_retry(self):
+        from unittest.mock import Mock, patch
+
+        with self.client.session_transaction() as state:
+            state.update(access_token="old-access", refresh_token="old-refresh",
+                         token_expires_at=0, user_id="user-123")
+        backend = Mock(status_code=503)
+        backend.json.return_value = {"message": "temporarily unavailable"}
+        with patch.object(cyrus.requests, "post", return_value=backend):
+            response = self.client.get("/healthz")
+        self.assertEqual(response.status_code, 200)
+        with self.client.session_transaction() as state:
+            self.assertEqual(state.get("access_token"), "old-access")
+            self.assertEqual(state.get("refresh_token"), "old-refresh")
+            self.assertGreater(state["token_expires_at"], 0)
+
     def test_login_page_issues_csrf_token_and_accepts_valid_form(self):
         page = self.client.get("/login")
         self.assertEqual(page.status_code, 200)
