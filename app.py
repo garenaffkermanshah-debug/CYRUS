@@ -1218,12 +1218,18 @@ def public_user_profile(user_id):
     )
     saved_label = "حذف پروفایل ذخیره‌شده" if saved_profile else "ذخیره پروفایل"
     blocked_notice = '<p class="profile-blocked-note">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
-    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="/start-chat/{safe_id}">ارسال پیام</a>'
+    back_chat_id = str(request.args.get("from_chat") or "").strip()
+    try:
+        uuid.UUID(back_chat_id)
+    except ValueError:
+        back_chat_id = ""
+    back_href = "/chat/" + back_chat_id if back_chat_id else "/home"
+    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="/start-chat/{safe_id}" aria-label="ارسال پیام" title="ارسال پیام">➤</a>'
 
     content = f"""<main class="container cyrus-user-profile">
       <style>
-        .cyrus-user-profile{{padding:12px 12px 88px;max-width:560px}}
-        .user-profile-card{{position:relative;background:#111e2b;border:1px solid #263b50;border-radius:16px;padding:15px 16px 17px;overflow:visible}}
+        .cyrus-user-profile{{padding:0 0 88px;max-width:560px;background:#0d1722;min-height:calc(100dvh - 76px)}}
+        .user-profile-card{{position:relative;background:#111e2b;border:0;border-radius:0;padding:15px 16px 20px;overflow:visible}}
         .user-profile-top{{display:flex;align-items:center;justify-content:space-between;min-height:58px;direction:rtl}}
         .user-profile-photo{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:2px solid #2d8ecb;background:#172a3a;display:grid;place-items:center}}
         .user-profile-photo img{{width:100%;height:100%;object-fit:cover}}
@@ -1240,7 +1246,11 @@ def public_user_profile(user_id):
         .user-profile-name{{margin:13px 0 3px;text-align:right;color:#f0f4f7;font-size:20px;font-weight:500}}
         .user-profile-username{{text-align:right;color:#78b8e6;font-size:13px;direction:ltr;unicode-bidi:plaintext}}
         .user-profile-bio{{text-align:right;color:#c3cfda;font-size:14px;line-height:1.9;margin:11px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
-        .profile-primary-action{{display:block;text-align:center;margin:12px 0 0;padding:13px;border-radius:12px;background:#248bd0;color:#fff;text-decoration:none;font-size:15px}}
+        .profile-primary-action{{display:grid;place-items:center;margin:14px auto 18px;width:54px;height:54px;border-radius:50%;background:#248bd0;color:#fff;text-decoration:none;font-size:23px}}
+        .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:12px}}
+        .profile-media-tabs button{{flex:1;margin:0;padding:12px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:11px}}
+        .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
+        .profile-media-content{{padding:18px 14px;text-align:center;color:#8fa5b8;font-size:12px;line-height:1.8}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
         .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
         .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
@@ -1250,7 +1260,7 @@ def public_user_profile(user_id):
         .profile-contact-edit button{{margin-top:10px;width:100%;padding:12px;background:#248bd0;color:white;border:0;border-radius:9px}}
       </style>
       <section class="user-profile-card">
-        <a class="profile-back" href="/home" aria-label="بازگشت به بارگاه" title="بازگشت">➜</a>
+        <a class="profile-back" href="{back_href}" aria-label="بازگشت به گفتگو" title="بازگشت">➜</a>
         <div class="user-profile-top">
           <div class="user-profile-photo">{avatar_html}</div>
           <details class="profile-more">
@@ -1267,7 +1277,7 @@ def public_user_profile(user_id):
         <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
       </section>
       {send_link}
-      {blocked_notice}
+      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><div class="profile-media-content" id="profile-media-content">رسانه‌ها و فایل‌های گفتگو اینجا نمایش داده می‌شوند.</div>
       {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
     </main>
     <script>
@@ -3808,7 +3818,7 @@ def profile():
             <label>نام نمایشی</label>
             <input name="display_name" maxlength="40" minlength="2" value="{display_name}" required>
             <label>بیوگرافی</label>
-            <textarea name="bio" maxlength="250" rows="3">{bio}</textarea>
+            <textarea name="bio" maxlength="120" rows="3">{bio}</textarea>
             <button type="submit">ذخیره تغییرات</button>
           </form>
         </section>
@@ -4179,7 +4189,7 @@ def settings():
             textarea.value=value;
             if(key==='username'){{input.minLength=3;input.maxLength=24;input.removeAttribute('pattern');input.required=true;input.dir='ltr';}}
             else if(key==='display_name'){{input.minLength=2;input.maxLength=40;input.removeAttribute('pattern');input.required=true;input.dir='auto';}}
-            else{{textarea.maxLength=250;}}
+            else{{textarea.maxLength=120;}}
             overlay.classList.add('open');
             setTimeout(()=>{{(useBio?textarea:input).focus();}},40);
           }}
