@@ -38,7 +38,7 @@ def cyrus_manifest():
         "display": "standalone", "orientation": "portrait",
         "background_color": "#0d1722", "theme_color": "#0d1722",
         "icons": [
-            {"src": "/static/cyrus-app-icon.webp", "sizes": "1536x1536", "type": "image/webp", "purpose": "any"},
+            {"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
             {"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
         ]
     }
@@ -224,9 +224,9 @@ BASE = """
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="icon" href="/static/cyrus-app-icon.webp" type="image/webp" sizes="1536x1536">
 <link rel="icon" href="/static/cyrus-app-icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/static/cyrus-app-icon.webp">
+<link rel="icon" href="/static/cyrus-app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/cyrus-app-icon.svg">
 <title>CYRUS | شاهنشاهی ارتباطات</title>
 <style>
 *{box-sizing:border-box}
@@ -463,7 +463,7 @@ def page(content):
         header = """
         <header class="top cyrus-home-top">
          <div class="brand">
-          <div class="emblem"><img src="/static/cyrus-app-icon.webp" alt="نشان اصلی CYRUS" onerror="this.onerror=null;this.src='/static/cyrus-app-icon.svg'"></div>
+          <div class="emblem"><img src="/static/cyrus-cylinder.jpg" alt="منشور کوروش بزرگ"></div>
           <div><div class="logo">CYRUS</div><div class="sub">پیوند پارسیان · شکوه هخامنشی</div></div>
          </div>
          <div class="top-actions"><a href="/search" aria-label="جستجو">⌕</a></div>
@@ -771,7 +771,7 @@ def home():
         rows += f"""
         <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-unread="{unread}" data-title="{html.escape(str(room_title), quote=True)}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
              role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
-             onclick="if(!event.target.closest('.cyrus-remove-chat,.cyrus-archive-chat,.cyrus-pin-chat,.cyrus-mute-chat'))window.location.href='/chat/{room_id}'"
+             onclick="if(!event.target.closest('.cyrus-chat-actions'))window.location.href='/chat/{room_id}'"
              onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();window.location.href='/chat/{room_id}'}}"
              style="cursor:pointer">
           {avatar_html}
@@ -780,12 +780,14 @@ def home():
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
           {unread_badge}
-          <button type="button" class="cyrus-archive-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusArchiveToggle(this)">آرشیو</button>
-          <button type="button" class="cyrus-pin-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusTogglePinned(this)" aria-label="سنجاق گفتگو">سنجاق</button>
-          <button type="button" class="cyrus-mute-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusToggleMuted(this)" aria-label="بی‌صدا کردن گفتگو">بی‌صدا</button>
-          <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
-            <button type="submit">حذف گفتگو</button>
-          </form>
+          <div class="cyrus-chat-actions" role="menu" aria-label="عملیات گفتگو">
+            <button type="button" class="cyrus-archive-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusArchiveToggle(this)">آرشیو</button>
+            <button type="button" class="cyrus-pin-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusTogglePinned(this)">سنجاق</button>
+            <button type="button" class="cyrus-mute-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusToggleMuted(this)">بی‌صدا</button>
+            <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
+              <button type="submit" role="menuitem">حذف گفتگو</button>
+            </form>
+          </div>
         </div>"""
 
     if not rows and not error:
@@ -882,12 +884,15 @@ def home():
       cyrusApplyArchiveView();cyrusApplyListTools();
       </script>
       <style>
-        .cyrus-chat-row{{position:relative;touch-action:pan-y;min-height:64px;padding:8px 12px;background:transparent;border:0;border-bottom:1px solid #24313d;border-radius:0;box-shadow:none;gap:10px}} .cyrus-chat-row .avatar{{width:42px;height:42px;min-width:42px;flex:0 0 42px;font-size:18px}} .cyrus-chat-row .chat-info{{min-width:0;flex:1;padding:0 2px}} .cyrus-chat-row .chat-name{{font-size:14px;font-weight:600;color:#e8edf3;line-height:1.5}} .cyrus-chat-row .chat-preview{{font-size:12px;color:#94a5b4;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}} .cyrus-chat-row .unread-badge{{min-width:18px;height:18px;padding:0 5px;font-size:10px;display:flex;align-items:center;justify-content:center;border-radius:10px}} .cyrus-chat-row .cyrus-remove-chat button{{font-size:11px;padding:5px 8px}}
-        .cyrus-archive-chat{{width:auto;flex:0 0 auto;margin:0;padding:7px 9px;border:1px solid #34516a;border-radius:9px;background:#12263a;color:#b8d8ef;font-size:11px}}
+        .cyrus-chat-row{{position:relative;touch-action:pan-y;min-height:64px;padding:8px 12px;background:transparent;border:0;border-bottom:1px solid #24313d;border-radius:0;box-shadow:none;gap:10px}} .cyrus-chat-row .avatar{{width:42px;height:42px;min-width:42px;flex:0 0 42px;font-size:18px}} .cyrus-chat-row .chat-info{{min-width:0;flex:1;padding:0 2px}} .cyrus-chat-row .chat-name{{font-size:14px;font-weight:600;color:#e8edf3;line-height:1.5}} .cyrus-chat-row .chat-preview{{font-size:12px;color:#94a5b4;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}} .cyrus-chat-row .unread-badge{{min-width:18px;height:18px;padding:0 5px;font-size:10px;display:flex;align-items:center;justify-content:center;border-radius:10px}} .cyrus-chat-row .cyrus-chat-actions{{display:none;position:absolute;z-index:30;top:calc(100% - 2px);right:58px;width:158px;padding:5px;background:#0b1725;border:1px solid #30475d;border-radius:12px;box-shadow:0 12px 28px #0009;flex-direction:column;gap:0}}
+        .cyrus-chat-row.remove-open .cyrus-chat-actions{{display:flex}}
+        .cyrus-chat-actions button{{display:block;width:100%;margin:0;padding:11px 12px;text-align:right;border:0;border-bottom:1px solid #243748;border-radius:0;background:transparent;color:#dbe7f1;font:13px Tahoma}}
+        .cyrus-chat-actions button:last-child{{border-bottom:0}}
+        .cyrus-chat-actions .cyrus-remove-chat{{display:block;margin:0;padding:0}}
+        .cyrus-chat-actions .cyrus-remove-chat button{{color:#ffb9bd;border-bottom:0}}
         .cyrus-list-tools{{display:flex;gap:6px;align-items:center;padding:9px 12px;flex-wrap:wrap}}
         .cyrus-list-tools input{{flex:1 1 100%;min-width:0;margin:0;padding:10px 12px;background:#0b1826;border:1px solid #29445c;border-radius:10px;color:#fff;font:12px Tahoma}}
         .cyrus-list-tools button,.cyrus-list-tools select{{width:auto;flex:1 1 auto;margin:0;padding:8px 9px;background:#102337;border:1px solid #29445c;border-radius:9px;color:#b9d4e8;font:11px Tahoma}}
-        .cyrus-pin-chat,.cyrus-mute-chat{{width:auto;flex:0 0 auto;margin:0;padding:7px 8px;background:#102337;border:1px solid #29445c;border-radius:9px;color:#b9d4e8;font:10px Tahoma}}
         .cyrus-chat-row.cyrus-is-pinned .chat-name:before{{content:'📌 ';font-size:10px}}
         .cyrus-chat-row.cyrus-is-muted .chat-preview:after{{content:'  · بی‌صدا';color:#6e91aa;font-size:10px}}
         .cyrus-chat-row.cyrus-is-unread{{background:rgba(31,93,139,.13)}}
@@ -899,14 +904,19 @@ def home():
       (()=>{{
         document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
           let timer=null;
-          const start=()=>{{timer=setTimeout(()=>{{row.classList.add('remove-open');}},600);}};
+          const open=()=>{{document.querySelectorAll('.cyrus-chat-row.remove-open').forEach(r=>{{if(r!==row)r.classList.remove('remove-open');}});row.classList.add('remove-open');}};
+          const start=()=>{{timer=setTimeout(open,550);}};
           const cancel=()=>{{if(timer)clearTimeout(timer);timer=null;}};
           row.addEventListener('touchstart',start,{{passive:true}});
           row.addEventListener('touchend',cancel);
           row.addEventListener('touchmove',cancel,{{passive:true}});
-          row.addEventListener('contextmenu',e=>{{e.preventDefault();row.classList.add('remove-open');}});
-          row.addEventListener('click',e=>{{if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-remove-chat')){{e.preventDefault();row.classList.remove('remove-open');}}}});
+          row.addEventListener('pointerdown',e=>{{if(e.pointerType==='mouse')start();}});
+          row.addEventListener('pointerup',cancel);
+          row.addEventListener('pointerleave',cancel);
+          row.addEventListener('contextmenu',e=>{{e.preventDefault();open();}});
+          row.addEventListener('click',e=>{{if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-chat-actions')){{e.preventDefault();row.classList.remove('remove-open');}}}});
         }});
+        document.addEventListener('click',e=>{{if(!e.target.closest('.cyrus-chat-row'))document.querySelectorAll('.cyrus-chat-row.remove-open').forEach(r=>r.classList.remove('remove-open'));}});
       }})();
       </script>
       <p class="error">{html.escape(error)}</p>
