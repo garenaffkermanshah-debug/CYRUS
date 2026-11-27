@@ -5370,6 +5370,16 @@ def upload_profile_avatar():
     data = file.read(5 * 1024 * 1024 + 1)
     if not data or len(data) > 5 * 1024 * 1024:
         return redirect("/settings?avatar_error=حجم%20عکس%20باید%20حداکثر%205%20مگابایت%20باشد")
+
+    # پسوند و MIME ارسالی به‌تنهایی قابل اعتماد نیست؛ امضای واقعی فایل را بررسی کن.
+    valid_image = (
+        (mime == "image/jpeg" and data.startswith(b"\\xff\\xd8\\xff")) or
+        (mime == "image/png" and data.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or
+        (mime == "image/webp" and len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP")
+    )
+    if not valid_image:
+        return redirect("/settings?avatar_error=محتوای%20فایل%20با%20نوع%20تصویر%20هماهنگ%20نیست")
+
     uid = str(session.get("user_id") or "")
     key_path = uid + "/profile." + extensions[mime]
     headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"true"}
