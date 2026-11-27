@@ -2897,15 +2897,23 @@ async function cyrusToggleVoiceRecord(b){
     const discard=document.createElement("button");discard.type="button";discard.textContent="ضبط دوباره";discard.style.cssText="border:1px solid #754d4d;border-radius:10px;padding:8px 10px;background:#321e25;color:#ffb5a8";
     const cleanup=()=>{URL.revokeObjectURL(player.src);preview.remove();if(button){button.hidden=false;button.disabled=false;}};
     discard.addEventListener("click",()=>{cleanup();});
-    send.addEventListener("click",async()=>{
-     send.disabled=true;discard.disabled=true;send.textContent="در حال ارسال…";
+    const progress=document.createElement("progress");progress.max=100;progress.value=0;progress.style.cssText="width:100%;height:7px;display:none";
+    const cancelUpload=document.createElement("button");cancelUpload.type="button";cancelUpload.textContent="لغو ارسال";cancelUpload.hidden=true;cancelUpload.style.cssText="border:1px solid #754d4d;border-radius:10px;padding:7px 9px;background:#321e25;color:#ffb5a8";
+    let voiceXhr=null;
+    cancelUpload.addEventListener("click",()=>{if(voiceXhr)voiceXhr.abort();});
+    send.addEventListener("click",()=>{
+     send.disabled=true;discard.disabled=true;send.textContent="در حال ارسال…";progress.style.display="block";cancelUpload.hidden=false;
      const uploadForm=document.getElementById("cyrusMediaUpload"),form=new FormData(uploadForm);form.delete("media");form.append("media",blob,"voice."+ext);
      if(button)button.disabled=true;
-     try{const res=await fetch(uploadForm.action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok){cleanup();location.reload();}else{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}}
-     catch(err){send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";alert("ارتباط برای ارسال صدا برقرار نشد");}
-     finally{if(button)button.disabled=false;}
+     voiceXhr=new XMLHttpRequest();voiceXhr.open("POST",uploadForm.action);voiceXhr.withCredentials=true;
+     voiceXhr.upload.onprogress=e=>{if(e.lengthComputable)progress.value=Math.round(e.loaded/e.total*100);};
+     voiceXhr.onload=()=>{if(voiceXhr.status>=200&&voiceXhr.status<400){cleanup();location.reload();}else{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";cancelUpload.hidden=true;alert("ارسال پیام صوتی ناموفق بود ("+voiceXhr.status+")");}};
+     voiceXhr.onerror=()=>{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";cancelUpload.hidden=true;alert("ارتباط برای ارسال صدا برقرار نشد");};
+     voiceXhr.onabort=()=>{send.disabled=false;discard.disabled=false;send.textContent="ارسال دوباره";cancelUpload.hidden=true;progress.style.display="none";progress.value=0;};
+     voiceXhr.onloadend=()=>{voiceXhr=null;if(button)button.disabled=false;};
+     voiceXhr.send(form);
     });
-    preview.append(player,send,discard);status.appendChild(preview);
+    preview.append(player,send,discard,progress,cancelUpload);status.appendChild(preview);
    }
   };
   cyrusRecorder.start(500);cyrusVoiceStartedAt=Date.now();cyrusVoiceUi(true,0);
