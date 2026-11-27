@@ -474,7 +474,6 @@ def page(content):
             ("/home", '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 36c1-8 7-12 11-12s10 4 11 12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M17 19c0-7 3-11 7-11s7 4 7 11c0 5-3 9-7 9s-7-4-7-9Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 18c1-8 5-12 9-12 6 0 9 5 10 12l-5-3-4-5-5 5Z" fill="currentColor" opacity=".7"/><path d="M19 22h.1M29 22h.1" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>', "بارگاه"),
             ("/contacts", '<svg viewBox="0 0 48 48"><path d="M8 39V17l8-8 8 8v22M24 39V17l8-8 8 8v22M5 39h38" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="23" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 34c1-5 3-7 6-7s5 2 6 7M32 23a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM26 34c1-5 3-7 6-7s5 2 6 7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>', "خویشان"),
             ("/search", '<svg viewBox="0 0 48 48"><circle cx="21" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m31 30 11 11M14 20h14M21 13v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="21" cy="20" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>', "کاوش"),
-            ("/profile", '<svg viewBox="0 0 48 48"><path d="M7 41V7h34v34H7Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="24" cy="18" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 37c2-8 7-12 13-12s11 4 13 12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 10h20M14 38h20" stroke="currentColor" stroke-width="1.2" opacity=".6"/></svg>', "نگاره"),
             ("/settings", '<svg viewBox="0 0 48 48"><path d="M24 5 28 10 34 9 36 15 42 18 39 24 42 30 36 33 34 39 28 38 24 43 20 38 14 39 12 33 6 30 9 24 6 18 12 15 14 9 20 10Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="24" cy="24" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="24" cy="24" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>', "فرمان")
         ]
         links = ""
@@ -5973,6 +5972,33 @@ def cyrus_block_status(other_user_id, headers):
     return None
 
 
+@app.route("/settings/chat", methods=["GET"])
+def chat_settings():
+    if not session.get("access_token"):
+        return redirect("/login")
+    content = """
+    <main style="max-width:430px;margin:0 auto;min-height:calc(100dvh - 76px);background:#17212b;color:#f5f5f5;padding-bottom:24px;font-family:Roboto,Tahoma,sans-serif">
+      <header style="height:56px;display:flex;align-items:center;gap:20px;padding:0 18px;border-bottom:1px solid #263440">
+        <a href="/settings" aria-label="بازگشت" style="color:#e7edf2;text-decoration:none;font-size:26px">‹</a>
+        <span style="font-size:20px;font-weight:500">تنظیمات گفتگو</span>
+      </header>
+      <section style="padding:18px 16px 8px">
+        <div style="color:#6ab5ee;font-size:14px;margin-bottom:12px">گفتگوها</div>
+        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">اندازهٔ متن پیام‌ها <span style="float:left;color:#9eabb6">۱۶</span></div>
+        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">پس‌زمینهٔ گفتگو <span style="float:left;color:#9eabb6">›</span></div>
+        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">گوشه‌های پیام <span style="float:left;color:#9eabb6">›</span></div>
+      </section>
+      <section style="padding:18px 16px 8px">
+        <div style="color:#6ab5ee;font-size:14px;margin-bottom:12px">رسانه</div>
+        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">پخش خودکار GIF <span style="float:left;color:#8b9aa7">خاموش</span></div>
+        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">پخش خودکار ویدیو <span style="float:left;color:#8b9aa7">خاموش</span></div>
+        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">انیمیشن‌ها <span style="float:left;color:#8b9aa7">روشن</span></div>
+      </section>
+    </main>
+    """
+    return page(content)
+
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     if not session.get("access_token"):
@@ -6113,6 +6139,7 @@ def settings():
         <section class="setting-buttons">
           <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
+          <a class="s-button" href="/settings/chat"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="button-title">تنظیمات گفتگو</span><span>‹</span></a>
           <a class="s-button" href="/account/export"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></span><span class="button-title">دریافت نسخهٔ پشتیبان اطلاعات حساب</span><span>‹</span></a>
           <a class="s-button" href="/blocked-users"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0M4 4l16 16"/></svg></span><span class="button-title">کاربران مسدودشده و حریم خصوصی</span><span>‹</span></a>
           <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
