@@ -3114,7 +3114,7 @@ def public_channels():
         response = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,title,created_by,created_at,is_public",
+                "select": "id,title,created_by,created_at,is_public,invite_code",
                 "type": "eq.channel",
                 "is_public": "eq.true",
                 "order": "created_at.desc",
@@ -3159,10 +3159,11 @@ def public_channels():
                     f'<a class="action" href="/chat/{cid}">مشاهده کانال</a>'
                 )
             else:
-                action = (
-                    f'<form method="post" action="/channels/join/{cid}">'
-                    '<button type="submit">عضویت در کانال</button></form>'
-                )
+                invite_code = str(channel.get("invite_code") or "")
+                if invite_code:
+                    action = '<a class="action" href="/invite/' + quote(invite_code) + '">مشاهده و پیوستن</a>'
+                else:
+                    action = '<span class="muted">لینک عضویت در دسترس نیست</span>'
 
             rows += (
                 '<div class="card"><h3>' + title + '</h3>'
@@ -3205,28 +3206,23 @@ def join_public_channel(conversation_id):
 
     headers = {
         "apikey": KEY,
-        "Authorization": "Bearer " + session["access_token"],
-        "Content-Type": "application/json"
+        "Authorization": "Bearer " + session["access_token"]
     }
-
     try:
-        result = requests.post(
-            URL + "/rest/v1/rpc/cyrus_channel_join",
-            json={"p_conversation_id": conversation_id},
-            headers=headers,
-            timeout=20
+        channel_response = requests.get(
+            URL + "/rest/v1/cyrus_conversations",
+            params={"select":"invite_code,type,is_public","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers, timeout=20
         )
-        if not result.ok:
-            return page(
-                '<div class="container card"><p>عضویت انجام نشد</p>'
-                '<a href="/channels">بازگشت به کانال‌ها</a></div>'
-            ), 400
-
-        outcome = result.json()
-        if outcome == "requested":
-            return redirect("/channels?request_sent=1")
-        return redirect(url_for("chat", conversation_id=conversation_id))
-
+        if not channel_response.ok or not channel_response.json():
+            return "کانال پیدا نشد", 404
+        channel = channel_response.json()[0]
+        if channel.get("type") != "channel" or not channel.get("is_public"):
+            return "این کانال عمومی نیست", 403
+        code = str(channel.get("invite_code") or "")
+        if not code:
+            return "لینک پیوستن این کانال در دسترس نیست", 404
+        return redirect("/invite/" + quote(code))
     except Exception:
         return "ارتباط با سرور برقرار نشد", 502
 
