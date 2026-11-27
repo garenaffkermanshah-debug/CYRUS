@@ -1808,6 +1808,77 @@ def toggle_user_block(user_id):
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
 
 
+@app.route("/account/export")
+def export_account_data():
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id=str(session.get("user_id") or "")
+    try:
+        own_id=str(uuid.UUID(own_id))
+    except ValueError:
+        return "نشست حساب معتبر نیست",401
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Accept":"application/json"}
+    def fetch_rows(table, params, label):
+        collected=[]
+        offset=0
+        while True:
+            query={**params,"limit":"1000","offset":str(offset)}
+            response=requests.get(URL+"/rest/v1/"+table,params=query,headers={**headers,"Range":str(offset)+"-"+str(offset+999)},timeout=25)
+            if not response.ok:
+                raise RuntimeError(label+" unavailable")
+            batch=response.json()
+            if not isinstance(batch,list):
+                raise RuntimeError(label+" invalid response")
+            collected.extend(batch)
+            if len(batch)<1000:
+                break
+            offset+=1000
+            if offset>=10000:
+                raise RuntimeError(label+" exceeds export safety limit")
+        return collected
+    try:
+        profile=fetch_rows("cyrus_profiles",{"select":"*","id":"eq."+own_id},"profile")
+        memberships=fetch_rows("cyrus_members",{"select":"*","user_id":"eq."+own_id},"memberships")
+        room_ids=[]
+        for row in memberships:
+            try:
+                room_ids.append(str(uuid.UUID(str(row.get("conversation_id") or ""))))
+            except ValueError:
+                continue
+        room_ids=list(dict.fromkeys(room_ids))
+        conversations=[]
+        messages=[]
+        for start in range(0,len(room_ids),35):
+            batch=room_ids[start:start+35]
+            expr="in.("+",".join(batch)+")"
+            conversations.extend(fetch_rows("cyrus_conversations",{"select":"*","id":expr},"conversations"))
+            messages.extend(fetch_rows("cyrus_messages",{"select":"*","conversation_id":expr,"order":"created_at.asc"},"messages"))
+        contacts=fetch_rows("cyrus_contacts",{"select":"*","owner_id":"eq."+own_id},"contacts")
+        saved_messages=fetch_rows("cyrus_saved_messages",{"select":"*","user_id":"eq."+own_id},"saved messages")
+        saved_profiles=fetch_rows("cyrus_saved_profiles",{"select":"*","owner_id":"eq."+own_id},"saved profiles")
+        blocked_users=fetch_rows("cyrus_user_blocks",{"select":"*","blocker_id":"eq."+own_id},"blocked users")
+        payload={
+            "product":"CYRUS","export_version":1,
+            "exported_at":datetime.now(timezone.utc).isoformat(),
+            "account":{"user_id":own_id,"email":str(session.get("cyrus_login_email") or "")},
+            "data":{
+                "profile":profile,"memberships":memberships,"conversations":conversations,
+                "messages":messages,"contacts":contacts,"saved_messages":saved_messages,
+                "saved_profiles":saved_profiles,"blocked_users":blocked_users
+            },
+            "notes":["فقط اطلاعاتی صادر می‌شود که حساب فعلی طبق مجوزهای پایگاه داده اجازه خواندن آن را دارد.",
+                     "فایل‌های پیوست به‌صورت نشانی ثبت شده‌اند و محتوای فایل‌ها داخل این خروجی قرار نگرفته است."]
+        }
+        body=__import__("json").dumps(payload,ensure_ascii=False,indent=2,default=str)
+        filename="cyrus-account-export-"+datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")+".json"
+        return Response(body,mimetype="application/json",headers={
+            "Content-Disposition":'attachment; filename="'+filename+'"',
+            "Cache-Control":"no-store, no-cache, must-revalidate"
+        })
+    except Exception:
+        return page('<main class="container card"><h3>خروجی اطلاعات آماده نشد</h3><p>ارتباط با سرور یا دسترسی به بخشی از اطلاعات کامل نبود. برای جلوگیری از تحویل فایل ناقص، خروجی صادر نشد.</p><a href="/settings">بازگشت به تنظیمات</a></main>'),502
+
+
 @app.route("/blocked-users")
 def blocked_users():
     if not session.get("access_token"):
@@ -5598,6 +5669,7 @@ def settings():
         <section class="setting-buttons">
           <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
+          <a class="s-button" href="/account/export"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></span><span class="button-title">دریافت نسخهٔ پشتیبان اطلاعات حساب</span><span>‹</span></a>
           <a class="s-button" href="/blocked-users"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0M4 4l16 16"/></svg></span><span class="button-title">کاربران مسدودشده و حریم خصوصی</span><span>‹</span></a>
           <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
           <a class="s-button" href="https://t.me/CyrusSupport_Aria" target="_blank" rel="noopener noreferrer"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M21.5 3.5 18 20.2a1.5 1.5 0 0 1-2.4.8l-4.7-3.5-2.3 2.2a1 1 0 0 1-1.7-.6l-.8-5.2L2.4 11a1.4 1.4 0 0 1 .1-2.6L20 2.8a1.2 1.2 0 0 1 1.5.7Z"/><path d="m6.2 13.7 11.2-8.1-6.5 11.9"/></svg></span><span class="button-title">پشتیبانی رسمی سرزمین‌های پارس</span><span>‹</span></a>
