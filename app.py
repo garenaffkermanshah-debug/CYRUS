@@ -116,7 +116,7 @@ def cyrus_verified_badge_html(size=19):
     return ('<svg class="cyrus-verified-badge" viewBox="0 0 24 24" width="' + str(px) + '" height="' + str(px) + '" '
             'role="img" aria-label="کانال رسمی تأییدشده" title="کانال رسمی تأییدشده" '
             'style="display:inline-block;vertical-align:-3px;flex:0 0 auto">'
-            '<path d="M7 1.2H17L22.8 7V17L17 22.8H7L1.2 17V7Z" fill="#229ED9"/>'
+            '<path d="M7 1.2H17L22.5 6.7L23 15L17 22.8H7L1 15L1.5 6.7Z" fill="#229ED9"/>'
             '<path d="M7.1 12.1l3.1 3.1 6.8-6.7" fill="none" stroke="#fff" stroke-width="2.15" '
             'stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
