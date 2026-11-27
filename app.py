@@ -469,18 +469,19 @@ def page(content):
          <div class="top-actions"><a href="/search" aria-label="جستجو">⌕</a></div>
         </header>"""
     if session.get("access_token") and not is_chat:
+        # آیکون‌های اختصاصی کلاسیک CYRUS؛ عنوان‌ها و مسیرها حفظ شده‌اند.
         items = [
-            ("/home", "𓆃", "بارگاه"),
-            ("/contacts", "𓅃", "خویشان"),
-            ("/search", "⌕", "کاوش"),
-            ("/profile", "♙", "نگاره"),
-            ("/settings", "𓊹", "فرمان")
+            ("/home", '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M13 36c1-8 7-12 11-12s10 4 11 12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M17 19c0-7 3-11 7-11s7 4 7 11c0 5-3 9-7 9s-7-4-7-9Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M15 18c1-8 5-12 9-12 6 0 9 5 10 12l-5-3-4-5-5 5Z" fill="currentColor" opacity=".7"/><path d="M19 22h.1M29 22h.1" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>', "بارگاه"),
+            ("/contacts", '<svg viewBox="0 0 48 48"><path d="M8 39V17l8-8 8 8v22M24 39V17l8-8 8 8v22M5 39h38" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="16" cy="23" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 34c1-5 3-7 6-7s5 2 6 7M32 23a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM26 34c1-5 3-7 6-7s5 2 6 7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>', "خویشان"),
+            ("/search", '<svg viewBox="0 0 48 48"><circle cx="21" cy="20" r="13" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="m31 30 11 11M14 20h14M21 13v14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="21" cy="20" r="5" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>', "کاوش"),
+            ("/profile", '<svg viewBox="0 0 48 48"><path d="M7 41V7h34v34H7Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="24" cy="18" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M11 37c2-8 7-12 13-12s11 4 13 12" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 10h20M14 38h20" stroke="currentColor" stroke-width="1.2" opacity=".6"/></svg>', "نگاره"),
+            ("/settings", '<svg viewBox="0 0 48 48"><path d="M24 5 28 10 34 9 36 15 42 18 39 24 42 30 36 33 34 39 28 38 24 43 20 38 14 39 12 33 6 30 9 24 6 18 12 15 14 9 20 10Z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="24" cy="24" r="10" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="24" cy="24" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>', "فرمان")
         ]
         links = ""
         for href, icon, label in items:
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}" aria-label="{label}"><span class="nav-icon" aria-hidden="true">{icon}</span><span>{label}</span></a>'
-        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a span{{font-size:10px;line-height:1.3}}.bottom a .nav-icon{{font-size:23px;line-height:1.1;font-family:serif}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
+        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a span{{font-size:10px;line-height:1.3}}.bottom a .nav-icon{{font-size:23px;line-height:1.1;font-family:serif;display:grid;place-items:center}}.bottom a .nav-icon svg{{width:27px;height:27px;display:block;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
     return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
