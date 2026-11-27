@@ -2639,28 +2639,28 @@ def manage_room(conversation_id):
           </section>
 
           <style>
-            .tg-room-settings{margin:0 0 14px;padding:0;background:#101a25;border:0;border-radius:0;color:#e8edf2;overflow:hidden}
-            .tg-room-settings .tg-section-title{padding:17px 16px 9px;color:#6ab5ee;font-size:14px;font-weight:600}
-            .tg-room-settings .tg-section{padding:0 16px;border-bottom:8px solid #09131e}
-            .tg-room-settings .tg-field{display:block;padding:13px 0;border-bottom:1px solid #263442;font-size:14px;color:#e3eaf0}
-            .tg-room-settings .tg-field:last-child{border-bottom:0}
-            .tg-room-settings .tg-field input[type=text],.tg-room-settings .tg-field input:not([type]),.tg-room-settings .tg-field textarea,.tg-room-settings .tg-field select{display:block;width:100%;margin:8px 0 0;padding:12px;background:#0a141f;border:1px solid #263b4d;border-radius:9px;color:#f1f5f8;font:inherit}
-            .tg-room-settings .tg-field textarea{resize:vertical}
-            .tg-room-settings .tg-switch-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px;padding:10px 0;border-bottom:1px solid #263442;color:#e2eaf1;font-size:14px}
-            .tg-room-settings .tg-switch-row:last-child{border-bottom:0}
-            .tg-room-settings .tg-switch{position:relative;flex:0 0 43px;width:43px;height:26px;border-radius:15px;background:#43515e;transition:background .18s;direction:ltr}
-            .tg-room-settings .tg-switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:2}
-            .tg-room-settings .tg-switch i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#f4f6f8;transition:transform .18s}
-            .tg-room-settings .tg-switch:has(input:checked){background:#248bd2}
-            .tg-room-settings .tg-switch input:checked+i{transform:translateX(17px)}
-            .tg-room-settings .tg-permissions{margin:0;background:#101a25}
-            .tg-room-settings .tg-permissions summary{display:flex;align-items:center;justify-content:space-between;padding:16px;cursor:pointer;list-style:none;color:#e8edf2;font-size:14px}
-            .tg-room-settings .tg-permissions summary::-webkit-details-marker{display:none}
-            .tg-room-settings .tg-permissions summary .tg-chevron{color:#7f94a7;transition:transform .18s}
-            .tg-room-settings .tg-permissions[open] summary .tg-chevron{transform:rotate(180deg)}
-            .tg-room-settings .tg-permissions-body{padding:0 16px 10px}
-            .tg-room-settings .tg-save{display:block;width:calc(100% - 32px);margin:16px auto;padding:13px;border:0;border-radius:10px;background:#248bd2;color:white;font-size:15px;font-weight:500}
-            .tg-room-settings hr{display:none}
+            .tg-room-settings{{margin:0 0 14px;padding:0;background:#101a25;border:0;border-radius:0;color:#e8edf2;overflow:hidden}}
+            .tg-room-settings .tg-section-title{{padding:17px 16px 9px;color:#6ab5ee;font-size:14px;font-weight:600}}
+            .tg-room-settings .tg-section{{padding:0 16px;border-bottom:8px solid #09131e}}
+            .tg-room-settings .tg-field{{display:block;padding:13px 0;border-bottom:1px solid #263442;font-size:14px;color:#e3eaf0}}
+            .tg-room-settings .tg-field:last-child{{border-bottom:0}}
+            .tg-room-settings .tg-field input[type=text],.tg-room-settings .tg-field input:not([type]),.tg-room-settings .tg-field textarea,.tg-room-settings .tg-field select{{display:block;width:100%;margin:8px 0 0;padding:12px;background:#0a141f;border:1px solid #263b4d;border-radius:9px;color:#f1f5f8;font:inherit}}
+            .tg-room-settings .tg-field textarea{{resize:vertical}}
+            .tg-room-settings .tg-switch-row{{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px;padding:10px 0;border-bottom:1px solid #263442;color:#e2eaf1;font-size:14px}}
+            .tg-room-settings .tg-switch-row:last-child{{border-bottom:0}}
+            .tg-room-settings .tg-switch{{position:relative;flex:0 0 43px;width:43px;height:26px;border-radius:15px;background:#43515e;transition:background .18s;direction:ltr}}
+            .tg-room-settings .tg-switch input{{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:2}}
+            .tg-room-settings .tg-switch i{{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#f4f6f8;transition:transform .18s}}
+            .tg-room-settings .tg-switch:has(input:checked){{background:#248bd2}}
+            .tg-room-settings .tg-switch input:checked+i{{transform:translateX(17px)}}
+            .tg-room-settings .tg-permissions{{margin:0;background:#101a25}}
+            .tg-room-settings .tg-permissions summary{{display:flex;align-items:center;justify-content:space-between;padding:16px;cursor:pointer;list-style:none;color:#e8edf2;font-size:14px}}
+            .tg-room-settings .tg-permissions summary::-webkit-details-marker{{display:none}}
+            .tg-room-settings .tg-permissions summary .tg-chevron{{color:#7f94a7;transition:transform .18s}}
+            .tg-room-settings .tg-permissions[open] summary .tg-chevron{{transform:rotate(180deg)}}
+            .tg-room-settings .tg-permissions-body{{padding:0 16px 10px}}
+            .tg-room-settings .tg-save{{display:block;width:calc(100% - 32px);margin:16px auto;padding:13px;border:0;border-radius:10px;background:#248bd2;color:white;font-size:15px;font-weight:500}}
+            .tg-room-settings hr{{display:none}}
           </style>
           <form class="tg-room-settings" method="post">
             <input type="hidden" name="action" value="save_settings">
