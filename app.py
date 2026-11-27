@@ -4470,7 +4470,7 @@ def join_by_invite(invite_code):
             join_approval = bool(preview.get("join_approval"))
             notice = ""
             button = "درخواست عضویت" if join_approval else "پیوستن"
-            button_html = '<div class="invite-pending">درخواست عضویت شما در انتظار تأیید است.</div>' if pending else '<form method="post"><button type="submit">' + button + '</button></form>'
+            button_html = ('<div class="invite-pending">درخواست عضویت شما در انتظار تأیید است.</div><form method="post"><input type="hidden" name="action" value="cancel_request"><button type="submit" class="invite-cancel">لغو درخواست عضویت</button></form>') if pending else '<form method="post"><button type="submit">' + button + '</button></form>'
             content = f"""
             <main class="container cyrus-invite-preview">
               <style>
@@ -4486,6 +4486,7 @@ def join_by_invite(invite_code):
                 .invite-join{{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom));margin:12px;padding:12px;background:#111e2b;border:1px solid #263442;border-radius:14px}}
                 .invite-join form{{margin:0}}
                 .invite-join button{{width:100%;margin:0;padding:13px;background:#248bd2;color:white;border:0;border-radius:10px;font-size:15px}}
+                .invite-join .invite-cancel{{background:#263747;color:#d4e0e9;margin-top:8px}}
                 .invite-pending{{margin:12px;padding:13px;background:#111e2b;border:1px solid #263442;border-radius:12px;color:#9fc7e5;text-align:center;font-size:13px;line-height:1.8}}
               </style>
               <div class="invite-topbar"><a href="/home" aria-label="بازگشت">‹</a><span>پیش‌نمایش {kind}</span></div>
@@ -4504,6 +4505,17 @@ def join_by_invite(invite_code):
             return page('<div class="container card"><p>دریافت پیش‌نمایش دعوت ناموفق بود.</p><a href="/home">بازگشت</a></div>'), 502
 
     try:
+        if request.form.get("action") == "cancel_request":
+            cancelled = requests.post(
+                URL + "/rest/v1/rpc/cyrus_invite_cancel_request",
+                json={"p_invite_code": invite_code},
+                headers=headers,
+                timeout=20
+            )
+            if not cancelled.ok:
+                return page('<div class="container card"><p>لغو درخواست انجام نشد.</p><a href="/invite/' + html.escape(invite_code, quote=True) + '">بازگشت</a></div>'), 400
+            return redirect("/invite/" + quote(invite_code))
+
         result = requests.post(
             URL + "/rest/v1/rpc/cyrus_invite_join",
             json={"p_invite_code": invite_code},
