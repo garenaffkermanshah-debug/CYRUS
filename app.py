@@ -2211,6 +2211,54 @@ def remove_chat_from_list(conversation_id):
     return redirect(url_for("home"))
 
 
+@app.route("/chat/media/<conversation_id>/<owner_id>/<object_name>")
+def serve_chat_media(conversation_id, owner_id, object_name):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+        uuid.UUID(owner_id)
+    except ValueError:
+        return "شناسه فایل نامعتبر است",400
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,180}",object_name):
+        return "نام فایل نامعتبر است",400
+    current_user=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json"}
+    try:
+        room=requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"id,type,created_by,is_public","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=20)
+        if not room.ok or not room.json():
+            return "گفتگو پیدا نشد",404
+        room_data=room.json()[0]
+        member=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user,"limit":"1"},
+            headers=headers,timeout=20)
+        allowed=(str(room_data.get("created_by") or "")==current_user or
+                 (member.ok and bool(member.json())) or
+                 (room_data.get("type")=="channel" and room_data.get("is_public") is True))
+        if not allowed:
+            return "برای دریافت این فایل به عضویت گفتگو نیاز دارید",403
+        object_path=conversation_id+"/"+owner_id+"/"+object_name
+        signed=requests.post(URL+"/storage/v1/object/sign/cyrus-chat-files/"+object_path,
+            json={"expiresIn":3600},headers=headers,timeout=20)
+        if not signed.ok:
+            return "لینک امن فایل ایجاد نشد",403
+        payload=signed.json() if signed.content else {}
+        signed_url=str(payload.get("signedURL") or payload.get("signedUrl") or "")
+        if not signed_url:
+            return "پاسخ ذخیره‌سازی نامعتبر بود",502
+        if signed_url.startswith("/storage/v1/"):
+            signed_url=URL+signed_url
+        elif signed_url.startswith("/object/"):
+            signed_url=URL+"/storage/v1"+signed_url
+        elif not signed_url.startswith("http"):
+            return "لینک فایل نامعتبر است",502
+        return redirect(signed_url,code=302)
+    except Exception:
+        return "ارتباط با سرور ذخیره‌سازی برقرار نشد",502
+
+
 @app.route("/chat/<conversation_id>/upload", methods=["POST"])
 def upload_chat_media(conversation_id):
     if not session.get("access_token"):
@@ -2284,7 +2332,7 @@ def upload_chat_media(conversation_id):
             headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"false"},timeout=60)
         if not uploaded.ok:
             return page('<div class="container card"><h3>بارگذاری فایل انجام نشد</h3><p>'+html.escape(uploaded.text[:350])+'</p></div>'),502
-        public_url=URL+"/storage/v1/object/public/cyrus-chat-files/"+object_path
+        public_url=request.host_url.rstrip("/")+"/chat/media/"+object_path
         caption=str(request.form.get("caption") or "").strip()[:500]
         message_type=kind_by_mime[mime]
         message_response=requests.post(URL+"/rest/v1/cyrus_messages",
