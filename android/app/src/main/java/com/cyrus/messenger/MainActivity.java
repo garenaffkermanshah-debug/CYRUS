@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private ValueCallback<Uri[]> fileChooserCallback;
     private static final int FILE_CHOOSER_REQUEST = 4312;
-    private static final String HOME = "https://cyrus.ethiodeploy.app/";
+    private static final String HOME = "https://cyrus.cyrus.prod.page/";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,7 +65,7 @@ public class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
                 String host = uri.getHost();
-                if (host != null && (host.equals("cyrus.ethiodeploy.app") || host.endsWith(".ethiodeploy.app"))) {
+                if (host != null && (host.equals("cyrus.cyrus.prod.page") || host.equals("cyrus.prod.page"))) {
                     return false;
                 }
                 if ("https".equalsIgnoreCase(uri.getScheme())) {
