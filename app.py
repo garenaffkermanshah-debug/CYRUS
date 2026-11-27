@@ -2409,29 +2409,29 @@ def toggle_message_pin(message_id):
     if not session.get("access_token"):
         return redirect("/login")
     conversation_id = str(request.form.get("conversation_id") or "")
-    current_user = str(session.get("user_id") or "")
     try:
-        uuid.UUID(message_id); uuid.UUID(conversation_id)
+        uuid.UUID(message_id)
+        uuid.UUID(conversation_id)
     except ValueError:
         return "شناسه پیام یا گفتگو نامعتبر است", 400
-    headers = {"apikey":KEY, "Authorization":"Bearer "+session["access_token"],
-               "Content-Type":"application/json", "Prefer":"return=minimal"}
+    headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"],
+               "Content-Type": "application/json"}
     try:
         found = requests.get(URL + "/rest/v1/cyrus_messages",
-            params={"select":"id,conversation_id,sender_id,metadata","id":"eq."+message_id,"limit":"1"},
+            params={"select":"id,conversation_id,metadata","id":"eq."+message_id,"limit":"1"},
             headers=headers, timeout=15)
         if not found.ok or not found.json() or str(found.json()[0].get("conversation_id")) != conversation_id:
             return "پیام پیدا نشد", 404
-        msg=found.json()[0]
-        if str(msg.get("sender_id") or "") != current_user:
-            return "فعلاً فقط پیام خودتان را می‌توانید سنجاق کنید.", 403
-        meta=msg.get("metadata") if isinstance(msg.get("metadata"),dict) else {}
-        meta=dict(meta); meta["pinned"]=not bool(meta.get("pinned"))
-        saved=requests.patch(URL+"/rest/v1/cyrus_messages",
-            params={"id":"eq."+message_id},json={"metadata":meta},headers=headers,timeout=15)
-        if not saved.ok:
-            return "سنجاق پیام انجام نشد؛ مجوز ویرایش پیام را بررسی کنید.", 403
-        return redirect(url_for("chat",conversation_id=conversation_id))
+        meta = found.json()[0].get("metadata") if isinstance(found.json()[0].get("metadata"), dict) else {}
+        pin = not bool(meta.get("pinned"))
+        result = requests.post(URL + "/rest/v1/rpc/cyrus_pin_message",
+            json={"p_conversation_id":conversation_id,"p_message_id":message_id,"p_pin":pin},
+            headers=headers, timeout=20)
+        if not result.ok:
+            return page('<div class="container card"><h3>سنجاق پیام انجام نشد</h3><p>' +
+                html.escape(result.text[:400]) + '</p><a href="/chat/' +
+                html.escape(conversation_id, quote=True) + '">بازگشت</a></div>'), 403
+        return redirect(url_for("chat", conversation_id=conversation_id))
     except Exception:
         return "ارتباط با سرور برقرار نشد", 502
 
