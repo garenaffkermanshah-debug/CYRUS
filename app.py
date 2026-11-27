@@ -5300,6 +5300,7 @@ def manage_room(conversation_id):
             return "این گفتگو گروه یا کانال نیست", 400
 
         owner = str(room.get("created_by") or "") == current
+        is_official_room = conversation_id == cyrus_official_channel_id()
 
         mr = requests.get(
             URL + "/rest/v1/cyrus_members",
@@ -5348,11 +5349,15 @@ def manage_room(conversation_id):
 
         if request.method == "POST":
             action = request.form.get("action", "")
+            if is_official_room and action in ("transfer_owner", "leave", "delete", "rename"):
+                return "نام و مالکیت کانال رسمی امپراتوری پارس قابل تغییر نیست و کانال قابل حذف یا ترک نیست.", 403
             data = {"p_conversation_id": conversation_id}
             rpc = None
 
             if action == "save_settings":
                 title = request.form.get("title", "").strip()
+                if is_official_room:
+                    title = "امپراتوری پارس"
                 description = request.form.get("description", "").strip()
                 avatar_url = str(room.get("avatar_url") or "")
                 uploaded_avatar, avatar_error = cyrus_upload_room_avatar(conversation_id, request.files.get("avatar_file"), session["access_token"])
