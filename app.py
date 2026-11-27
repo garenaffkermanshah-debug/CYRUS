@@ -1854,11 +1854,13 @@ def chat(conversation_id):
     room_invite_url = request.host_url.rstrip("/") + "/invite/" + room_invite_code if room_invite_code else ""
     room_invite_safe = html.escape(room_invite_url, quote=True)
     if room_type in ("group", "channel"):
+        can_manage_room = is_room_owner or str(member_history_row.get("role") or "") in ("owner","admin")
+        room_manage_menu = '<a href="/rooms/' + html.escape(conversation_id,quote=True) + '/manage">مدیریت</a>' if can_manage_room else ''
         room_more_html = (
             '<div class="tg-chat-menu-wrap"><button type="button" class="chat-header-more" aria-label="گزینه‌ها" onclick="cyrusToggleRoomMenu(event)">⋮</button>'
             '<div class="tg-chat-menu" id="cyrusRoomMenu" hidden>'
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
-            '<a href="/rooms/' + html.escape(conversation_id,quote=True) + '/manage">مدیریت</a>'
+            + room_manage_menu
             + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
             + ('' if is_room_owner else '<form method="post" action="/rooms/' + html.escape(conversation_id,quote=True) + '/leave" onsubmit="return confirm(\'از این مجموعه خارج می‌شوید؟\')"><button type="submit">ترک ' + ("گروه" if room_type=="group" else "کانال") + '</button></form>')
             + '</div></div>'
