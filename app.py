@@ -47,7 +47,7 @@ def cyrus_manifest():
 @app.route("/service-worker.js")
 def cyrus_service_worker():
     worker = r"""const CACHE='cyrus-static-v2';
-const STATIC=['/static/cyrus-app-icon.svg','/static/cyrus-cylinder.jpg','/static/cyrus-tomb.jpg'];
+const STATIC=['/static/cyrus-app-icon.webp','/static/cyrus-app-icon.svg','/static/cyrus-cylinder.jpg','/static/cyrus-tomb.jpg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{
