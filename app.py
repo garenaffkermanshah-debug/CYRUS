@@ -660,7 +660,7 @@ def home():
                 pass
 
         rows += f"""
-        <div class="chat-row cyrus-chat-row" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
+        <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
              role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
              onclick="if(!event.target.closest('.cyrus-remove-chat'))window.location.href='/chat/{room_id}'"
              onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();window.location.href='/chat/{room_id}'}}"
