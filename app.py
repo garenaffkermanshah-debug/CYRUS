@@ -1568,7 +1568,7 @@ def chat(conversation_id):
         room = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,title,type,created_by,description,avatar_url,history_visible",
+                "select": "id,title,type,created_by,description,avatar_url,history_visible,invite_code",
                 "id": "eq." + conversation_id
             },
             headers=headers,
@@ -1850,6 +1850,21 @@ def chat(conversation_id):
         f'<img src="{room_avatar_url}" alt="">'
         if room_avatar_url else '<div class="room-avatar-symbol">𓊹</div>'
     )
+    room_invite_code = str(room_data_for_history.get("invite_code") or "")
+    room_invite_url = request.host_url.rstrip("/") + "/invite/" + room_invite_code if room_invite_code else ""
+    room_invite_safe = html.escape(room_invite_url, quote=True)
+    if room_type in ("group", "channel"):
+        room_more_html = (
+            '<div class="tg-chat-menu-wrap"><button type="button" class="chat-header-more" aria-label="گزینه‌ها" onclick="cyrusToggleRoomMenu(event)">⋮</button>'
+            '<div class="tg-chat-menu" id="cyrusRoomMenu" hidden>'
+            '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
+            '<a href="/rooms/' + html.escape(conversation_id,quote=True) + '/manage">مدیریت</a>'
+            + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
+            + '<form method="post" action="/rooms/' + html.escape(conversation_id,quote=True) + '/leave" onsubmit="return confirm(\'از این مجموعه خارج می‌شوید؟\')"><button type="submit">ترک ' + ("گروه" if room_type=="group" else "کانال") + '</button></form>'
+            + '</div></div>'
+        )
+    else:
+        room_more_html = '<a class="chat-header-more" href="' + html.escape(room_profile_href,quote=True) + '" aria-label="پروفایل">⋮</a>'
     room_header = f"""
     <section class="room-header cyrus-chat-header">
       <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
@@ -1858,8 +1873,13 @@ def chat(conversation_id):
         <h2>{room_title}</h2>
         <span class="room-type">{room_last_seen if room_type == 'private' else room_subtitle}</span>
       </a>
-      <a class="chat-header-more" href="{html.escape(room_profile_href, quote=True)}" aria-label="پروفایل">⋮</a>
-    </section>"""
+      {room_more_html}
+    </section>
+    <script>
+      function cyrusToggleRoomMenu(e){{e.stopPropagation();const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=!m.hidden;}}
+      document.addEventListener('click',function(e){{const m=document.getElementById('cyrusRoomMenu');if(m&&!e.target.closest('.tg-chat-menu-wrap'))m.hidden=true;}});
+      function cyrusCopyRoomInvite(){{const u="{room_invite_safe}";if(!u)return;const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;navigator.clipboard.writeText(u).then(()=>alert('لینک دعوت کپی شد')).catch(()=>prompt('لینک دعوت',u));}}
+    </script>"""
 
     channel_can_post = True
     if room_type == "channel":
@@ -1941,6 +1961,15 @@ def chat(conversation_id):
         .cyrus-blocked-composer button{{width:auto;margin:0;padding:8px 18px;background:transparent;color:#69b9f7;border:0;border-radius:18px;font-size:14px}}
 
         .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
+        .tg-chat-menu-wrap{{position:relative;flex:0 0 auto}}
+        .tg-chat-menu-wrap .chat-header-more{{width:40px;height:40px;display:grid;place-items:center;background:transparent;border:0;border-radius:50%;color:#e9f0f5;font-size:25px;text-decoration:none;cursor:pointer}}
+        .tg-chat-menu{{position:absolute;top:46px;left:0;min-width:190px;padding:6px;background:#1b2b3a;border:1px solid #31475a;border-radius:12px;box-shadow:0 8px 28px #0008;z-index:30}}
+        .tg-chat-menu[hidden]{{display:none}}
+        .tg-chat-menu a,.tg-chat-menu button{{display:block;width:100%;padding:12px 13px;background:transparent;border:0;border-radius:7px;text-align:right;color:#eaf1f6;text-decoration:none;font-size:14px;white-space:nowrap}}
+        .tg-chat-menu a:active,.tg-chat-menu button:active{{background:#2b4053}}
+        .tg-chat-menu form{{margin:0;border-top:1px solid #304252}}
+        .tg-chat-menu form button{{color:#f28b82}}
+
         .room-avatar{{width:43px;height:43px;flex:0 0 43px;border-radius:50%;overflow:hidden;border:0;background:#26394a;display:flex;align-items:center;justify-content:center}}
         .room-avatar img{{width:100%;height:100%;object-fit:cover}}
         .room-avatar-symbol{{font-size:23px;color:#d8b46a}}
@@ -3199,6 +3228,25 @@ def public_channels():
             '<div class="container card"><p>دریافت کانال‌ها ناموفق بود</p>'
             '<a href="/">بازگشت</a></div>'
         ), 502
+
+
+@app.route("/rooms/<conversation_id>/leave", methods=["POST"])
+def leave_room_from_chat(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه مجموعه نامعتبر است", 400
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json"}
+    try:
+        result = requests.post(URL+"/rest/v1/rpc/cyrus_manage_leave_room",
+            json={"p_conversation_id":conversation_id},headers=headers,timeout=20)
+        if not result.ok:
+            return page('<div class="container card"><p>خروج از مجموعه انجام نشد.</p><a href="/chat/'+html.escape(conversation_id,quote=True)+'">بازگشت</a></div>'),400
+        return redirect("/home")
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/channels/join/<conversation_id>", methods=["POST"])
