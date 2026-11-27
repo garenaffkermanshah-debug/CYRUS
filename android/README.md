@@ -9,3 +9,5 @@ gradle --no-daemon assembleDebug
 ```
 
 APK output: `app/build/outputs/apk/debug/app-debug.apk`
+
+Build workflow is configured in GitHub Actions and uploads the debug APK as `CYRUS-debug-APK`.
