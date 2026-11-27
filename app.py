@@ -2698,7 +2698,7 @@ def manage_room(conversation_id):
             return "فقط مالک یا مدیر اجازه مدیریت دارد", 403
 
         join_requests = []
-        if room_type == "channel":
+        if room_type in ("group", "channel"):
             try:
                 jr = requests.post(
                     URL + "/rest/v1/rpc/cyrus_manage_list_join_requests",
@@ -3009,7 +3009,7 @@ def manage_room(conversation_id):
             </form>
           </div>
 
-          {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if room_type == "channel" and join_requests else ''}
+          {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if join_requests else ''}
 
           <h3>اعضا ({len(members)})</h3>
           {rows}
