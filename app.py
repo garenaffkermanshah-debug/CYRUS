@@ -1896,7 +1896,9 @@ def chat(conversation_id):
 
         meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
         reply_source = html.escape(str(meta.get("reply_to_content") or ""))
-        reply_preview = f'<div class="reply-preview">↪ پاسخ به: {reply_source}</div>' if reply_source else ""
+        reply_target_id = html.escape(str(meta.get("reply_to_id") or ""), quote=True)
+        reply_preview = (f'<button type="button" class="reply-preview" data-reply-target="{reply_target_id}" onclick="cyrusJumpToMessage(event,this)">↪ پاسخ به: {reply_source}</button>' if reply_source else "")
+        message_created_iso = html.escape(str(msg.get("created_at") or ""), quote=True)
         forwarded_label = '<small class="forwarded-label">↗ پیام انتقال‌یافته</small>' if meta.get("forwarded_from_message_id") else ""
         pinned_label = '<small class="pinned-label">📌 سنجاق‌شده</small>' if meta.get("pinned") else ""
         controls = (
@@ -1906,6 +1908,10 @@ def chat(conversation_id):
             + '</div><div class="context-actions">'
             + f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}"><span>↶</span> پاسخ</button>'
             + f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}"><span>▢</span> کپی</button>'
+            + f'<button type="button" onclick="cyrusCopyTimestamp(this)" data-created="{message_created_iso}"><span>◷</span> کپی زمان</button>'
+            + f'<button type="button" onclick="cyrusCopyMessageLink(this)" data-id="{msg_id}"><span>🔗</span> پیوند پیام</button>'
+            + f'<button type="button" onclick="cyrusShareMessage(this)" data-content="{raw_content}" data-id="{msg_id}"><span>↗</span> اشتراک‌گذاری</button>'
+            + f'<button type="button" onclick="cyrusToggleMessageSelection(this)" data-id="{msg_id}"><span>☑</span> انتخاب پیام</button>'
             + '<button type="button" onclick="cyrusShowForward(this)"><span>↪</span> هدایت</button>'
             + f'<form class="forward-form" method="post" action="/chat/message/{msg_id}/forward" style="display:none">'
             + f'<select name="conversation_id" required>{forward_options}</select><button type="submit">ارسال</button></form>'
@@ -2168,6 +2174,8 @@ def chat(conversation_id):
         .message .message-body a.chat-inline-link{{color:#8acbff;text-decoration:underline;text-underline-offset:2px;}}
         .message small{{display:flex;align-items:center;justify-content:flex-end;gap:5px;direction:ltr}}
         .message.context-open{{z-index:12;border-color:#e2bd6b;box-shadow:0 4px 20px #0006}}
+        .message.cyrus-message-selected{{outline:2px solid #55a9e8!important;background:#18314a!important}}
+        .reply-preview{{display:block;width:100%;text-align:right;border:0;border-inline-start:3px solid #5ba8e8;background:#13283a;color:#9fd0f5;padding:6px 9px;margin:0 0 7px;border-radius:5px;font:inherit;font-size:11px;cursor:pointer;overflow-wrap:anywhere}}
         .send-box{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));flex:0 0 auto;margin:8px 0 0;min-height:54px;border-radius:27px;background:#172432;border:1px solid #2b4053;box-shadow:0 4px 18px #0006;}}
         .media-upload-box{{display:flex;gap:8px;align-items:center;padding:7px 10px;margin:5px 0;border-radius:16px;background:#172432;border:1px solid #2b4053;}}
         .media-upload-label{{display:flex;gap:7px;align-items:center;flex:1;font-size:13px;color:#b8cbdc;}}
@@ -2458,6 +2466,102 @@ def chat(conversation_id):
           cyrusToast('متن پیام کپی شد');cyrusCloseMessageMenus(false);
         }}catch(e){{window.prompt('متن پیام را برای کپی انتخاب کنید:',value);}}
       }}
+      async function cyrusCopyValue(value,successText) {{
+        try {{
+          if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(value);
+          else{{const area=document.createElement('textarea');area.value=value;area.style.cssText='position:fixed;opacity:0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('copy unavailable');}}
+          cyrusToast(successText);return true;
+        }}catch(e){{window.prompt('متن را برای کپی انتخاب کنید:',value);return false;}}
+      }}
+      async function cyrusCopyTimestamp(button) {{
+        const value=button.dataset.created||'';
+        if(!value)return cyrusToast('زمان پیام در دسترس نیست');
+        const date=new Date(value);
+        const formatted=Number.isNaN(date.getTime())?value:date.toLocaleString('fa-IR');
+        await cyrusCopyValue(formatted,'زمان پیام کپی شد');
+        cyrusCloseMessageMenus(false);
+      }}
+      async function cyrusCopyMessageLink(button) {{
+        const id=button.dataset.id||'';
+        if(!id)return;
+        const link=location.origin+location.pathname+'?message='+encodeURIComponent(id);
+        await cyrusCopyValue(link,'پیوند پیام کپی شد');
+        cyrusCloseMessageMenus(false);
+      }}
+      async function cyrusShareMessage(button) {{
+        const id=button.dataset.id||'',text=button.dataset.content||'';
+        const url=location.origin+location.pathname+'?message='+encodeURIComponent(id);
+        try{{if(navigator.share){{await navigator.share({{title:'پیام در CYRUS',text:text,url:url}});cyrusCloseMessageMenus(false);return;}}}}
+        catch(e){{if(e&&e.name==='AbortError')return;}}
+        await cyrusCopyValue(url,'پیوند پیام برای اشتراک‌گذاری کپی شد');
+        cyrusCloseMessageMenus(false);
+      }}
+      function cyrusJumpToMessage(event,button) {{
+        event.preventDefault();event.stopPropagation();
+        const id=button.dataset.replyTarget||'';
+        const target=id&&document.getElementById('message-'+id);
+        if(!target){{cyrusToast('پیام اصلی در این گفتگو موجود نیست');return;}}
+        target.scrollIntoView({{behavior:'smooth',block:'center'}});
+        target.classList.add('search-jump-highlight');
+        clearTimeout(target._cyrusHighlightTimer);
+        target._cyrusHighlightTimer=setTimeout(()=>target.classList.remove('search-jump-highlight'),2600);
+        cyrusCloseMessageMenus(false);
+      }}
+      const cyrusSelectedMessages=new Set();
+      let cyrusSelectionBar=null;
+      function cyrusEnsureSelectionBar() {{
+        if(cyrusSelectionBar)return;
+        cyrusSelectionBar=document.createElement('div');
+        cyrusSelectionBar.className='cyrus-selection-bar';
+        cyrusSelectionBar.setAttribute('role','toolbar');
+        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-clear>لغو</button>';
+        cyrusSelectionBar.style.cssText='position:fixed;z-index:50;bottom:calc(84px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#102033;border:1px solid #42617a;border-radius:18px;box-shadow:0 8px 30px #0008;color:#eaf3fa';
+        cyrusSelectionBar.querySelector('[data-copy]').addEventListener('click',async()=>{{
+          const texts=[...cyrusSelectedMessages].map(id=>document.getElementById('message-'+id)).filter(Boolean).map(m=>m.dataset.content||'');
+          if(texts.length)await cyrusCopyValue(texts.join('\n\n'),'متن پیام‌های انتخاب‌شده کپی شد');
+        }});
+        cyrusSelectionBar.querySelector('[data-clear]').addEventListener('click',cyrusClearMessageSelection);
+        document.body.appendChild(cyrusSelectionBar);
+      }}
+      function cyrusUpdateMessageSelection() {{
+        const count=cyrusSelectedMessages.size;
+        document.querySelectorAll('.message[data-message-id]').forEach(m=>{{
+          const selected=cyrusSelectedMessages.has(m.dataset.messageId);
+          m.classList.toggle('cyrus-message-selected',selected);
+          m.setAttribute('aria-selected',String(selected));
+        }});
+        if(!count){{if(cyrusSelectionBar)cyrusSelectionBar.remove();cyrusSelectionBar=null;return;}}
+        cyrusEnsureSelectionBar();
+        cyrusSelectionBar.querySelector('.cyrus-selection-count').textContent=count+' پیام انتخاب شد';
+      }}
+      function cyrusToggleMessageSelection(button) {{
+        const id=button.dataset.id||'';
+        if(!id)return;
+        if(cyrusSelectedMessages.has(id))cyrusSelectedMessages.delete(id);else cyrusSelectedMessages.add(id);
+        cyrusUpdateMessageSelection();cyrusCloseMessageMenus(false);
+      }}
+      function cyrusClearMessageSelection() {{
+        cyrusSelectedMessages.clear();cyrusUpdateMessageSelection();
+      }}
+      document.addEventListener('keydown',event=>{{
+        if(event.key==='Escape'&&cyrusSelectedMessages.size)cyrusClearMessageSelection();
+        if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='c'&&cyrusSelectedMessages.size) {{
+          const active=document.activeElement;
+          if(active&&['INPUT','TEXTAREA'].includes(active.tagName))return;
+          event.preventDefault();
+          const texts=[...cyrusSelectedMessages].map(id=>document.getElementById('message-'+id)).filter(Boolean).map(m=>m.dataset.content||'');
+          if(texts.length)cyrusCopyValue(texts.join('\n\n'),'متن پیام‌های انتخاب‌شده کپی شد');
+        }}
+      }});
+      window.addEventListener('scroll',()=>cyrusCloseMessageMenus(false),{{passive:true}});
+      window.addEventListener('resize',()=>cyrusCloseMessageMenus(false));
+      document.addEventListener('contextmenu',event=>{{
+        const message=event.target.closest('.message');
+        if(message&&!event.target.closest('.message-context,button,form,a,input,select')){{event.preventDefault();cyrusOpenMessageMenu(event,message);}}
+      }});
+      document.addEventListener('keydown',event=>{{
+        if((event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10'))&&document.activeElement?.classList.contains('message')){{event.preventDefault();cyrusOpenMessageMenu(event,document.activeElement);}}
+      }});
       function cyrusShowForward(button) {{
         const form=button.parentElement.querySelector(".forward-form");
         if(form){{form.style.display=form.style.display==="none"?"flex":"none";if(form.style.display!=="none")form.querySelector('select')?.focus();}}
