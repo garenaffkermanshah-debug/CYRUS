@@ -2861,12 +2861,42 @@ def chat(conversation_id):
         '<button type="button" onclick="cyrusShareLocation()"><span>⌖</span> موقعیت مکانی</button>'
         '<button type="button" onclick="cyrusShareContact()"><span>♙</span> مخاطب</button></div></div>'
         '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
-        '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled>➤</button></form>'
+        '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><span id="cyrusVoiceStatus" class="cyrus-voice-status" aria-live="polite"></span><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button type="button" id="cyrusVoiceCancel" class="composer-voice-cancel" hidden onclick="cyrusCancelVoiceRecord()">لغو ضبط</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled>➤</button></form>'
         '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
         'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.multiple=true;i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
         'function cyrusShareLocation(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;if(!navigator.geolocation){alert("موقعیت مکانی پشتیبانی نمی‌شود");return;}navigator.geolocation.getCurrentPosition(p=>{const i=document.querySelector(".send-box input[name=content]");i.value="موقعیت مکانی: https://maps.google.com/?q="+p.coords.latitude+","+p.coords.longitude;i.focus();},()=>alert("اجازهٔ مکان را به مرورگر بدهید"),{timeout:12000});}function cyrusShareContact(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;const n=prompt("نام مخاطب");if(!n)return;const p=prompt("شماره تماس");if(!p)return;const i=document.querySelector(".send-box input[name=content]");i.value="مخاطب: "+n+" | شماره: "+p;i.focus();}'
-        'let cyrusRecorder=null,cyrusVoiceChunks=[];async function cyrusToggleVoiceRecord(b){if(cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusRecorder.stop();b.textContent="🎙";b.classList.remove("recording");return;}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});cyrusVoiceChunks=[];cyrusRecorder=new MediaRecorder(stream);cyrusRecorder.ondataavailable=e=>{if(e.data&&e.data.size)cyrusVoiceChunks.push(e.data)};cyrusRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(cyrusVoiceChunks,{type:cyrusRecorder.mimeType||"audio/webm"});if(!blob.size){alert("ضبط صدا خالی بود");return;}const form=new FormData();form.append("media",blob,"voice.webm");b.disabled=true;b.textContent="…";try{const res=await fetch(document.getElementById("cyrusMediaUpload").action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok)location.reload();else alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}catch(err){alert("ارتباط برای ارسال صدا برقرار نشد");}finally{b.disabled=false;b.textContent="🎙";}};cyrusRecorder.start();b.textContent="■";b.classList.add("recording");}catch(err){alert("برای ضبط صدا، اجازهٔ میکروفون را به مرورگر بدهید");}}'
-        'document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});'
+        'let cyrusRecorder=null,cyrusVoiceChunks=[],cyrusVoiceTimer=null,cyrusVoiceStartedAt=0,cyrusVoiceStream=null,cyrusVoiceCancelled=false;
+function cyrusVoiceUi(recording,seconds){const b=document.getElementById("cyrusVoiceButton"),cancel=document.getElementById("cyrusVoiceCancel"),status=document.getElementById("cyrusVoiceStatus");if(b){b.textContent=recording?"■":"🎙";b.classList.toggle("recording",recording);b.setAttribute("aria-label",recording?"پایان ضبط و ارسال":"ضبط پیام صوتی");}if(cancel)cancel.hidden=!recording;if(status)status.textContent=recording?"در حال ضبط · "+Math.floor(seconds/60).toString().padStart(2,"0")+":"+Math.floor(seconds%60).toString().padStart(2,"0"):"";}
+function cyrusStopVoiceTracks(){if(cyrusVoiceStream){cyrusVoiceStream.getTracks().forEach(t=>t.stop());cyrusVoiceStream=null;}if(cyrusVoiceTimer){clearInterval(cyrusVoiceTimer);cyrusVoiceTimer=null;}}
+function cyrusCancelVoiceRecord(){if(!cyrusRecorder||cyrusRecorder.state==="inactive")return;cyrusVoiceCancelled=true;cyrusRecorder.stop();cyrusStopVoiceTracks();cyrusVoiceChunks=[];cyrusVoiceUi(false,0);}
+async function cyrusToggleVoiceRecord(b){
+ if(cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusVoiceCancelled=false;cyrusRecorder.stop();return;}
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){alert("ضبط صدا در این مرورگر پشتیبانی نمی‌شود");return;}
+ try{
+  cyrusVoiceStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  cyrusVoiceChunks=[];cyrusVoiceCancelled=false;
+  const preferred=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/webm"];
+  const mime=preferred.find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t));
+  cyrusRecorder=new MediaRecorder(cyrusVoiceStream,mime?{mimeType:mime}:{});
+  cyrusRecorder.ondataavailable=e=>{if(e.data&&e.data.size)cyrusVoiceChunks.push(e.data);};
+  cyrusRecorder.onerror=()=>{cyrusVoiceCancelled=true;cyrusStopVoiceTracks();cyrusVoiceUi(false,0);alert("خطا در ضبط پیام صوتی");};
+  cyrusRecorder.onstop=async()=>{
+   const cancelled=cyrusVoiceCancelled,recorder=cyrusRecorder;
+   cyrusStopVoiceTracks();cyrusVoiceUi(false,0);
+   if(cancelled){cyrusVoiceChunks=[];return;}
+   const blob=new Blob(cyrusVoiceChunks,{type:recorder.mimeType||"audio/webm"});cyrusVoiceChunks=[];
+   if(!blob.size){alert("ضبط صدا خالی بود");return;}
+   const ext=blob.type.includes("ogg")?"ogg":blob.type.includes("mp4")?"m4a":"webm";
+   const form=new FormData();form.append("media",blob,"voice."+ext);
+   const button=document.getElementById("cyrusVoiceButton");if(button)button.disabled=true;
+   try{const res=await fetch(document.getElementById("cyrusMediaUpload").action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok)location.reload();else alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}
+   catch(err){alert("ارتباط برای ارسال صدا برقرار نشد");}
+   finally{if(button)button.disabled=false;}
+  };
+  cyrusRecorder.start(500);cyrusVoiceStartedAt=Date.now();cyrusVoiceUi(true,0);
+  cyrusVoiceTimer=setInterval(()=>{const elapsed=Math.floor((Date.now()-cyrusVoiceStartedAt)/1000);cyrusVoiceUi(true,elapsed);if(elapsed>=300&&cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusVoiceCancelled=false;cyrusRecorder.stop();}},250);
+ }catch(err){cyrusStopVoiceTracks();cyrusVoiceUi(false,0);alert("برای ضبط صدا، اجازهٔ میکروفون را به مرورگر بدهید");}
+}document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});'
         """(function(){
           const form=document.querySelector(".send-box"),input=form&&form.querySelector("input[name=content]"),send=form&&form.querySelector(".composer-send"),counter=document.getElementById("cyrusComposerCounter");
           if(!form||!input||!send)return;
@@ -2929,7 +2959,7 @@ def chat(conversation_id):
         .send-box input[name="content"]{{color:#edf4fa;line-height:1.5;}}.cyrus-composer-counter{{position:absolute;bottom:-18px;right:16px;color:#8fa5b8;font-size:10px;pointer-events:none}}.composer-send:disabled{{opacity:.45;cursor:default}}
         .composer-emoji,.composer-send{{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;margin:0;padding:0;border-radius:50%;font-size:22px}}
         .composer-emoji{{background:transparent;color:#a9bdce;border:0}}
-        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}}.composer-voice.recording{{background:#a83232;color:#fff;animation:cyrusVoicePulse 1s infinite}}@keyframes cyrusVoicePulse{{50%{{opacity:.55}}}}
+        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}.cyrus-voice-status{font-size:10px;color:#8fc8f1;white-space:nowrap}.composer-voice-cancel{width:auto;padding:7px 9px;margin:0;border:1px solid #754d4d;border-radius:12px;background:#321e25;color:#ffb5a8;font-size:10px}.composer-voice-cancel[hidden]{display:none}.composer-voice.recording{background:#9d3434;color:#fff;animation:cyrusVoicePulse 1s infinite alternate}@keyframes cyrusVoicePulse{to{opacity:.55}}}.composer-voice.recording{{background:#a83232;color:#fff;animation:cyrusVoicePulse 1s infinite}}@keyframes cyrusVoicePulse{{50%{{opacity:.55}}}}
         .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
         .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
         .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20;display:none}}
