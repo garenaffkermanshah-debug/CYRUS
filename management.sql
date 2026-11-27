@@ -434,3 +434,47 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.cyrus_invite_cancel_request(text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.cyrus_invite_cancel_request(text) TO authenticated;
+
+
+-- CYRUS privacy hardening: public discovery must never expose private channels.
+DROP POLICY IF EXISTS cyrus_public_channels_read ON public.cyrus_conversations;
+CREATE POLICY cyrus_public_channels_read
+ON public.cyrus_conversations
+FOR SELECT TO authenticated
+USING (type='channel' AND coalesce(is_public,false)=true);
+
+DROP POLICY IF EXISTS cyrus_public_channel_posts_read ON public.cyrus_messages;
+CREATE POLICY cyrus_public_channel_posts_read
+ON public.cyrus_messages
+FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM public.cyrus_conversations c
+    WHERE c.id=cyrus_messages.conversation_id
+      AND c.type='channel'
+      AND coalesce(c.is_public,false)=true
+  )
+);
+
+-- A removed member must not retain edit/delete access to old room messages.
+DROP POLICY IF EXISTS cyrus_messages_edit ON public.cyrus_messages;
+CREATE POLICY cyrus_messages_edit
+ON public.cyrus_messages
+FOR UPDATE TO authenticated
+USING (
+  sender_id=(SELECT auth.uid())
+  AND public.cyrus_is_member(conversation_id)
+)
+WITH CHECK (
+  sender_id=(SELECT auth.uid())
+  AND public.cyrus_is_member(conversation_id)
+);
+
+DROP POLICY IF EXISTS cyrus_messages_delete_own ON public.cyrus_messages;
+CREATE POLICY cyrus_messages_delete_own
+ON public.cyrus_messages
+FOR DELETE TO authenticated
+USING (
+  sender_id=(SELECT auth.uid())
+  AND public.cyrus_is_member(conversation_id)
+);
