@@ -23,6 +23,7 @@
 - `PORT` = `8080`
 - `SUPABASE_URL` = نشانی پروژه Supabase
 - `SUPABASE_KEY` = فقط کلید عمومی anon یا publishable
+- `SUPABASE_SERVICE_ROLE_KEY` = کلید مدیریتی service_role پروژه؛ فقط در Secrets سرور، هرگز در کد، GitHub یا مرورگر
 - `SECRET_KEY` = یک راز تصادفی طولانی و ثابت
 - `COOKIE_SECURE` = `1`
 
@@ -33,9 +34,9 @@
 پس از پایان build، نشانی HTTPS برنامه را باز کنید و این دو مسیر را بررسی کنید:
 
 - `/healthz` باید پاسخ زنده بودن برنامه را بدهد.
-- `/readyz` باید آماده بودن اتصال Supabase Auth را نشان دهد.
+- `/readyz` باید آماده بودن اتصال Supabase Auth و وجود هر سه متغیر `SUPABASE_URL`، `SUPABASE_KEY` و `SUPABASE_SERVICE_ROLE_KEY` را نشان دهد.
 
-اگر `/readyz` خطای 503 داد، ابتدا مقدارهای `SUPABASE_URL` و `SUPABASE_KEY` را در Secrets میزبان بررسی کنید. کلید عمومی درست پروژه CYRUS را وارد کنید.
+اگر `/readyz` خطای 503 با `reason=configuration` داد، هر سه متغیر را در Secrets میزبان بررسی کنید. اگر خطای backend بود، نشانی پروژه و کلید عمومی را بررسی کنید. خطای «بررسی تنظیمات امنیتی حساب» هنگام ورود نیز معمولاً یعنی کلید service_role در سرور تنظیم نشده یا جدول `cyrus_account_security`/دسترسی service_role از بخش امنیتی `management.sql` آماده نیست.
 
 ## ۴. پیش از دعوت دیگران
 
