@@ -2569,8 +2569,10 @@ def conversation_profile(conversation_id):
             if pr.ok: profiles={str(p.get("id")):p for p in pr.json() if isinstance(p,dict)}
     except Exception:
         return page('<main class="container"><div class="empty">ارتباط با سرور برقرار نشد</div></main>'),502
+    is_official_profile = str(room.get("type") or "") == "channel" and conversation_id == cyrus_official_channel_id()
     kind={"group":"گروه","channel":"کانال"}.get(str(room.get("type") or ""),"گفتگوی خصوصی")
     title=html.escape(str(room.get("title") or "گفتگو"))
+    title_html = title + (cyrus_verified_badge_html(20) if is_official_profile else "")
     desc=html.escape(str(room.get("description") or ""))
     avatar=str(room.get("avatar_url") or "")
     avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="">') if avatar else '<div class="rp-avatar-fallback">𓊹</div>'
@@ -2579,6 +2581,16 @@ def conversation_profile(conversation_id):
     myrole=next((str(m.get("role") or "") for m in members if str(m.get("user_id") or "")==me),"")
     manager=owner or myrole in ("owner","admin")
     gear='<a class="rp-gear" href="/rooms/'+html.escape(conversation_id,quote=True)+'/manage" aria-label="مدیریت کانال">⚙</a>' if manager else '<span class="rp-gear-space"></span>'
+    profile_menu = ''
+    if is_official_profile:
+        safe_room_id = html.escape(conversation_id, quote=True)
+        profile_menu = ('<div class="rp-menu-wrap"><button class="rp-menu-button" type="button" aria-label="منوی کانال" onclick="cyrusOfficialProfileMenu(event)">⋮</button>'
+            '<div class="rp-menu" id="rp-official-menu" hidden>'
+            '<button type="button" onclick="cyrusOfficialShare()">اشتراک‌گذاری کانال</button>'
+            '<button type="button" onclick="cyrusOfficialCopy()">کپی لینک کانال</button>'
+            '<a href="/chat/' + safe_room_id + '">رفتن به گفتگو</a>'
+            '<a href="/rooms/' + safe_room_id + '/manage">مدیریت کانال</a>'
+            '</div></div>')
     code=str(room.get("invite_code") or "")
     invite=request.host_url.rstrip("/")+"/invite/"+code if code else ""
     invite_html=('<a class="rp-link" href="'+html.escape(invite,quote=True)+'">'+html.escape(invite)+'</a>' if invite else '<span class="rp-link">لینک در دسترس نیست</span>')
