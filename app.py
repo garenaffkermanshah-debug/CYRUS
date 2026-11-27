@@ -1201,7 +1201,7 @@ def public_user_profile(user_id):
     display_name = contact_name or name
     block_label = "رفع مسدودیت" if blocked_by_me else "مسدود کردن کاربر"
     contact_action = (
-        '<button type="button" onclick="document.getElementById(\\'cyrusEditContact\\').open=true">ویرایش مخاطب</button>'
+        '<button type="button" onclick="document.getElementById(&quot;cyrusEditContact&quot;).open=true">ویرایش مخاطب</button>'
         if is_contact else
         f'<form method="post" action="/user/{safe_id}/contact"><button type="submit">افزودن مخاطب</button></form>'
     )
