@@ -3542,7 +3542,7 @@ def manage_room(conversation_id):
           <div class="card">
             <h3>لینک دعوت</h3>
             <input id="invite-link" readonly value="{invite_safe}">
-            <button type="button" onclick="cyrusCopyInvite()">کپی لینک</button><script>function cyrusCopyInvite(){const v=document.getElementById('invite-link').value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert('لینک کپی شد')).catch(()=>prompt('لینک دعوت',v));else prompt('لینک دعوت',v);}</script>
+            <button type="button" onclick="cyrusCopyInvite()">کپی لینک</button><script>function cyrusCopyInvite(){{const v=document.getElementById("invite-link").value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert("لینک کپی شد")).catch(()=>prompt("لینک دعوت",v));else prompt("لینک دعوت",v);}}</script>
             <form method="post" onsubmit="return confirm('لینک قبلی از کار می‌افتد. ادامه می‌دهید؟')">
               <input type="hidden" name="action" value="rotate_invite">
               <button>ساخت لینک جدید</button>
