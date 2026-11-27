@@ -3740,7 +3740,8 @@ async function cyrusToggleVoiceRecord(b){
           gold:'linear-gradient(160deg,#302417,#70512b,#171a20)'
         };
         const chat=document.querySelector('.container:has(.cyrus-chat-header)');
-        if(chat&&walls[p.wall])chat.style.setProperty('background',walls[p.wall],'important');
+        if(chat&&p.customWallpaper){chat.style.setProperty('background-image','linear-gradient(rgba(5,12,21,.58),rgba(5,12,21,.72)),url("'+p.customWallpaper+'")','important');chat.style.setProperty('background-size','cover','important');chat.style.setProperty('background-position','center','important');chat.style.setProperty('background-attachment','fixed','important');}
+        else if(chat&&walls[p.wall]){chat.style.setProperty('background',walls[p.wall],'important');chat.style.removeProperty('background-image');}
         document.documentElement.classList.toggle('cyrus-chat-prefs-no-animation',p.animations===false);
         const input=document.querySelector('.send-box input[name="content"]');
         if(input&&!input.dataset.cyrusEnterPrefBound){
@@ -6151,7 +6152,10 @@ def chat_settings():
           <button class="tgcs-wall" data-wall="green" aria-label="سبز" aria-pressed="false" style="background:linear-gradient(160deg,#102c28,#286454,#0b1d22)"></button>
           <button class="tgcs-wall" data-wall="purple" aria-label="بنفش" aria-pressed="false" style="background:linear-gradient(160deg,#251a3b,#514078,#151426)"></button>
           <button class="tgcs-wall" data-wall="gold" aria-label="طلایی" aria-pressed="false" style="background:linear-gradient(160deg,#302417,#70512b,#171a20)"></button>
-        </div></div>
+          <button type="button" class="tgcs-wall" id="tgcs-gallery-open" aria-label="انتخاب عکس از گالری" title="انتخاب عکس از گالری" style="background:#263747;color:#e8edf4;font-size:23px;display:grid;place-items:center">＋</button>
+          <button type="button" class="tgcs-wall" id="tgcs-gallery-remove" aria-label="حذف عکس شخصی" title="حذف عکس شخصی" style="background:#263747;color:#e8edf4;font-size:15px;display:grid;place-items:center">×</button>
+          <input id="tgcs-gallery-file" type="file" accept="image/*" hidden>
+        </div><span class="tgcs-sub">برای استفاده از عکس گوشی، علامت ＋ را بزن.</span></div>
       </section>
       <section class="tgcs-section">
         <h2 class="tgcs-title">رسانه</h2>
@@ -6166,8 +6170,26 @@ def chat_settings():
       const defaults={size:16,bubble:true,enter:false,video:false,animations:true,wall:'default'};
       let prefs={...defaults};try{prefs={...prefs,...JSON.parse(localStorage.getItem(key)||'{}')}}catch(e){}
       const ids={size:'tgcs-size',bubble:'tgcs-bubble',enter:'tgcs-enter',video:'tgcs-video',animations:'tgcs-animations'};
+      const gallery=document.getElementById('tgcs-gallery-file');
+      document.getElementById('tgcs-gallery-open').addEventListener('click',()=>gallery.click());
+      document.getElementById('tgcs-gallery-remove').addEventListener('click',()=>{prefs.customWallpaper='';prefs.wall='default';save();document.getElementById('tgcs-status').textContent='عکس پس‌زمینه حذف شد';});
+      gallery.addEventListener('change',()=>{
+        const file=gallery.files&&gallery.files[0];if(!file)return;
+        if(!file.type.startsWith('image/')){document.getElementById('tgcs-status').textContent='لطفاً یک فایل تصویری انتخاب کن';gallery.value='';return;}
+        if(file.size>12*1024*1024){document.getElementById('tgcs-status').textContent='حجم عکس باید کمتر از ۱۲ مگابایت باشد';gallery.value='';return;}
+        const img=new Image(),url=URL.createObjectURL(file);
+        img.onload=()=>{
+          const max=1400,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+          const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+          canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+          try{prefs.customWallpaper=canvas.toDataURL('image/jpeg',.78);prefs.wall='default';save();document.getElementById('tgcs-status').textContent='عکس گالری برای پس‌زمینه ذخیره شد';}
+          catch(e){document.getElementById('tgcs-status').textContent='ذخیرهٔ عکس ممکن نشد؛ عکس کوچک‌تری انتخاب کن';}
+          URL.revokeObjectURL(url);gallery.value='';
+        };
+        img.onerror=()=>{URL.revokeObjectURL(url);gallery.value='';document.getElementById('tgcs-status').textContent='خواندن عکس ناموفق بود';};img.src=url;
+      });
       Object.keys(ids).forEach(k=>{const el=document.getElementById(ids[k]);if(!el)return;if(el.type==='checkbox')el.checked=!!prefs[k];else el.value=String(prefs[k]);});
-      function show(){document.getElementById('tgcs-size-value').textContent=prefs.size;document.getElementById('tgcs-bubble-value').textContent=prefs.bubble?'گرد':'زاویه‌دار';document.querySelectorAll('.tgcs-wall').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.wall===prefs.wall)));}
+      function show(){document.getElementById('tgcs-size-value').textContent=prefs.size;document.getElementById('tgcs-bubble-value').textContent=prefs.bubble?'گرد':'زاویه‌دار';document.querySelectorAll('.tgcs-wall[data-wall]').forEach(b=>b.setAttribute('aria-pressed',String(!prefs.customWallpaper&&b.dataset.wall===prefs.wall)));const custom=!!prefs.customWallpaper;const open=document.getElementById('tgcs-gallery-open');open.style.background=custom?'center/cover no-repeat url("'+prefs.customWallpaper+'")':'#263747';open.textContent=custom?'✓':'＋';}
       function save(){try{localStorage.setItem(key,JSON.stringify(prefs));}catch(e){}show();document.getElementById('tgcs-status').textContent='ذخیره شد';}
       Object.keys(ids).forEach(k=>{const el=document.getElementById(ids[k]);if(!el)return;el.addEventListener('input',()=>{prefs[k]=el.type==='checkbox'?el.checked:Number(el.value);save();});el.addEventListener('change',()=>{prefs[k]=el.type==='checkbox'?el.checked:Number(el.value);save();});});
       document.querySelectorAll('.tgcs-wall').forEach(b=>b.addEventListener('click',()=>{prefs.wall=b.dataset.wall;save();}));
