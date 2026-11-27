@@ -478,3 +478,31 @@ USING (
   sender_id=(SELECT auth.uid())
   AND public.cyrus_is_member(conversation_id)
 );
+
+
+-- SECURITY DEFINER RPCs must never be callable by anonymous visitors.
+-- Signed-in access is retained; each function performs its own auth/role checks.
+REVOKE ALL ON FUNCTION public.cyrus_channel_join(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_channel_join(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_channel_record_view(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_channel_record_view(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_is_member(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_is_member(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_add_member(uuid,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_add_member(uuid,uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_delete_room(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_delete_room(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_leave_room(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_leave_room(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_list_join_requests(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_list_join_requests(uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_remove_member(uuid,uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_remove_member(uuid,uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_rename_room(uuid,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_rename_room(uuid,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_set_role(uuid,uuid,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_set_role(uuid,uuid,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_manage_update_room_settings(uuid,text,text,text,boolean,boolean,boolean,boolean,integer,boolean,boolean,jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_update_room_settings(uuid,text,text,text,boolean,boolean,boolean,boolean,integer,boolean,boolean,jsonb) TO authenticated;
+REVOKE ALL ON FUNCTION public.cyrus_room_actor_role(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_room_actor_role(uuid) TO authenticated;
