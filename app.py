@@ -3592,10 +3592,35 @@ def chat_updates(conversation_id):
             return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
         if not member.json():
             room=requests.get(URL+"/rest/v1/cyrus_conversations",
-                params={"select":"created_by","id":"eq."+conversation_id,"limit":"1"},
+                params={"select":"created_by,type","id":"eq."+conversation_id,"limit":"1"},
                 headers=headers,timeout=10)
             if not room.ok or not room.json() or str(room.json()[0].get("created_by") or "")!=str(session.get("user_id") or ""):
                 return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
+            room_type=str(room.json()[0].get("type") or "")
+        else:
+            room=requests.get(URL+"/rest/v1/cyrus_conversations",
+                params={"select":"type","id":"eq."+conversation_id,"limit":"1"},
+                headers=headers,timeout=10)
+            if not room.ok or not room.json():
+                return app.response_class('{"error":"conversation_unavailable"}',status=502,mimetype="application/json")
+            room_type=str(room.json()[0].get("type") or "")
+        # پس از مسدودسازی، حتی اطلاعات آخرین پیام هم نباید از مسیر polling افشا شود.
+        if room_type=="private":
+            peers=requests.get(URL+"/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+conversation_id},
+                headers=headers,timeout=10)
+            if not peers.ok:
+                return app.response_class('{"error":"block_check_failed"}',status=503,mimetype="application/json")
+            other_ids=[str(item.get("user_id") or "") for item in peers.json()
+                       if str(item.get("user_id") or "")!=str(session.get("user_id") or "")]
+            if not other_ids:
+                return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
+            for other_id in other_ids:
+                blocked=cyrus_block_status(other_id,headers)
+                if blocked is None:
+                    return app.response_class('{"error":"block_check_failed"}',status=503,mimetype="application/json")
+                if blocked:
+                    return app.response_class('{"error":"conversation_blocked"}',status=403,mimetype="application/json")
         latest=requests.get(URL+"/rest/v1/cyrus_messages",
             params={"select":"id,created_at,sender_id,content,message_type","conversation_id":"eq."+conversation_id,
                     "order":"created_at.desc","limit":"1"},
