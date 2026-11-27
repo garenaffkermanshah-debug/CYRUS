@@ -643,7 +643,7 @@ def home():
 
       <div class="chat-list">{rows}</div>
       <style>
-        .cyrus-chat-row{{position:relative;touch-action:pan-y}}
+        .cyrus-chat-row{{position:relative;touch-action:pan-y;min-height:64px;padding:8px 12px;background:transparent;border:0;border-bottom:1px solid #24313d;border-radius:0;box-shadow:none;gap:10px}} .cyrus-chat-row .avatar{{width:42px;height:42px;min-width:42px;flex:0 0 42px;font-size:18px}} .cyrus-chat-row .chat-info{{min-width:0;flex:1;padding:0 2px}} .cyrus-chat-row .chat-name{{font-size:14px;font-weight:600;color:#e8edf3;line-height:1.5}} .cyrus-chat-row .chat-preview{{font-size:12px;color:#94a5b4;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}} .cyrus-chat-row .unread-badge{{min-width:18px;height:18px;padding:0 5px;font-size:10px;display:flex;align-items:center;justify-content:center;border-radius:10px}} .cyrus-chat-row .cyrus-remove-chat button{{font-size:11px;padding:5px 8px}}
         .cyrus-remove-chat{{display:none;margin:0}}
         .cyrus-remove-chat button{{width:auto;margin:0;padding:7px 10px;font-size:12px;background:#48252a;border:1px solid #a34a55;color:#ffd9dd}}
         .cyrus-chat-row.remove-open .cyrus-remove-chat{{display:block}}
@@ -1773,14 +1773,24 @@ def chat(conversation_id):
             if other_id:
                 person_response = requests.get(
                     URL + "/rest/v1/cyrus_profiles",
-                    params={"select":"display_name,username,avatar_url,last_seen_at","id":"eq."+other_id,"limit":"1"},
+                    params={"select":"display_name,username,avatar_url","id":"eq."+other_id,"limit":"1"},
                     headers=headers, timeout=15
                 )
                 if person_response.ok and person_response.json():
                     person = person_response.json()[0]
                     room_title_text = str(person.get("display_name") or person.get("username") or room_title_text)
                     room_avatar_source = str(person.get("avatar_url") or room_avatar_source)
-                    seen_raw = str(person.get("last_seen_at") or "")
+                    try:
+                        saved_contact_response = requests.get(
+                            URL + "/rest/v1/cyrus_contacts",
+                            params={"select":"contact_name","owner_id":"eq."+str(current_user),"contact_user_id":"eq."+other_id,"limit":"1"},
+                            headers=headers, timeout=12
+                        )
+                        if saved_contact_response.ok and saved_contact_response.json():
+                            room_title_text = str(saved_contact_response.json()[0].get("contact_name") or room_title_text)
+                    except Exception:
+                        pass
+                    seen_raw = ""
                     if seen_raw:
                         try:
                             seen_dt = datetime.fromisoformat(seen_raw.replace("Z", "+00:00")).astimezone()
