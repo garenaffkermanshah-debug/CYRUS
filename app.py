@@ -4117,13 +4117,28 @@ def manage_room(conversation_id):
                     uuid.UUID(uid)
                 except ValueError:
                     return "شناسه عضو نامعتبر است", 400
+                if uid == current:
+                    return "برای خروج از گفتگو از گزینه ترک گروه استفاده کنید", 400
+                target_member = next((m for m in members if str(m.get("user_id") or "") == uid), None)
+                if not target_member:
+                    return "عضو موردنظر در این گفتگو نیست", 404
+                target_role = str(target_member.get("role") or "member")
+                if target_role == "owner" or uid == str(room.get("created_by") or ""):
+                    return "امکان تغییر یا حذف مالک وجود ندارد؛ ابتدا مالکیت منتقل شود", 403
 
                 data["p_user_id"] = uid
                 if action == "remove":
+                    # An administrator may remove ordinary members only.
+                    if not owner and target_role != "member":
+                        return "مدیر فقط اجازه حذف اعضای عادی را دارد", 403
                     rpc = "cyrus_manage_remove_member"
                 else:
                     if not owner:
                         return "فقط مالک می‌تواند مدیر تعیین یا عزل کند", 403
+                    if action == "promote" and target_role != "member":
+                        return "فقط عضو عادی را می‌توان به مدیریت ارتقا داد", 400
+                    if action == "demote" and target_role != "admin":
+                        return "این کاربر مدیر نیست", 400
                     rpc = "cyrus_manage_set_role"
                     data["p_role"] = "admin" if action == "promote" else "member"
 
