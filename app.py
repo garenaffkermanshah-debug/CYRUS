@@ -2024,6 +2024,102 @@ def export_account_data():
         return page('<main class="container card"><h3>خروجی اطلاعات آماده نشد</h3><p>ارتباط با سرور یا دسترسی به بخشی از اطلاعات کامل نبود. برای جلوگیری از تحویل فایل ناقص، خروجی صادر نشد.</p><a href="/settings">بازگشت به تنظیمات</a></main>'),502
 
 
+@app.route("/privacy-security", methods=["GET"])
+def privacy_security():
+    if not session.get("access_token"):
+        return redirect("/login")
+    content = """
+    <main class="cyrus-privacy-page">
+      <style>
+        .cyrus-privacy-page{max-width:430px;min-height:calc(100dvh - 76px);margin:0 auto;padding:0 0 90px;background:#17212b;color:#eaf0f5;font:14px Roboto,Tahoma,sans-serif}
+        .cps-head{height:56px;display:flex;align-items:center;gap:20px;padding:0 16px;background:#17212b;position:sticky;top:0;z-index:4}
+        .cps-head a{font-size:27px;color:#e8edf4;text-decoration:none;line-height:1}
+        .cps-head h1{font-size:20px;font-weight:500;margin:0}
+        .cps-account{padding:15px 16px 17px;background:#202d3a;border-bottom:1px solid #263440}
+        .cps-account strong{display:block;font-size:14px;font-weight:500;color:#f1f5f8}
+        .cps-account p{margin:6px 0 0;font-size:12px;line-height:1.7;color:#9eafbd}
+        .cps-section{padding:18px 16px 6px}
+        .cps-title{color:#6ab5ee;font-size:14px;margin:0 0 10px;font-weight:500}
+        .cps-row{min-height:58px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #263440;padding:9px 0;cursor:pointer}
+        .cps-row:last-child{border-bottom:0}
+        .cps-icon{width:27px;flex:0 0 27px;text-align:center;font-size:21px;color:#8abde5}
+        .cps-main{flex:1;min-width:0}
+        .cps-name{font-size:14px;color:#eaf0f5}
+        .cps-value{font-size:12px;color:#8fa5b7;margin-top:4px;line-height:1.5}
+        .cps-chevron{font-size:23px;color:#71899b}
+        .cps-switch{appearance:none;width:38px;height:22px;flex:0 0 38px;border-radius:14px;background:#52616e;position:relative;margin:0;cursor:pointer}
+        .cps-switch:before{content:"";position:absolute;width:18px;height:18px;top:2px;right:2px;border-radius:50%;background:#eaf0f5;transition:transform .16s}
+        .cps-switch:checked{background:#58a9e6}
+        .cps-switch:checked:before{transform:translateX(-16px)}
+        .cps-note{padding:10px 16px 0;font-size:12px;line-height:1.8;color:#8fa5b7}
+        .cps-sheet-bg{position:fixed;inset:0;z-index:50;background:#0008;display:none;align-items:flex-end;justify-content:center;padding:12px 12px calc(82px + env(safe-area-inset-bottom))}
+        .cps-sheet-bg.open{display:flex}
+        .cps-sheet{width:100%;max-width:430px;border-radius:18px;background:#202d3a;border:1px solid #354757;padding:18px 16px;box-shadow:0 18px 55px #0008}
+        .cps-sheet h2{font-size:18px;font-weight:500;text-align:right;color:#edf3f8;margin:0 0 7px}
+        .cps-sheet p{font-size:12px;line-height:1.8;color:#9fb1bf;margin:0 0 14px}
+        .cps-choice{display:flex;align-items:center;gap:12px;min-height:48px;border-bottom:1px solid #344553;cursor:pointer}
+        .cps-choice:last-of-type{border-bottom:0}
+        .cps-choice input{width:18px;height:18px;margin:0;accent-color:#58a9e6}
+        .cps-sheet button{width:100%;margin:15px 0 0;padding:12px;border:0;border-radius:12px;background:#2e91d0;color:#fff;font:inherit}
+        .cps-blocked{display:flex;align-items:center;gap:14px;padding:14px 16px;margin:12px 16px 0;background:#202d3a;border-radius:12px;color:#eaf0f5;text-decoration:none}
+        .cps-blocked span:first-child{font-size:22px;color:#8abde5}
+        .cps-blocked small{display:block;margin-top:4px;font-size:12px;color:#8fa5b7}
+        @media(min-width:700px){.cyrus-privacy-page{border-inline:1px solid #263440}}
+      </style>
+      <header class="cps-head"><a href="/settings" aria-label="بازگشت">‹</a><h1>حریم خصوصی و امنیت</h1></header>
+      <section class="cps-account"><strong>حریم خصوصی حساب CYRUS</strong><p>تنظیم کن چه کسانی بتوانند اطلاعات و راه‌های ارتباطی تو را ببینند. گزینه‌های این صفحه در همین مرورگر ذخیره می‌شوند.</p></section>
+      <section class="cps-section">
+        <h2 class="cps-title">حریم خصوصی</h2>
+        <div class="cps-row" data-pref="phone" data-title="شماره تلفن" data-desc="نمایش شماره تلفن در CYRUS در حال حاضر قابلیت حساب تلفنی ندارد؛ این انتخاب صرفاً برای ذخیره ترجیح توست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">♙</span><span class="cps-main"><span class="cps-name">شماره تلفن</span><span class="cps-value" data-value>مخاطبان من</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="lastseen" data-title="آخرین بازدید و آنلاین بودن" data-desc="نمایش وضعیت حضور در رابط فعلی هنوز به این گزینه متصل نیست؛ این مقدار ترجیح ذخیره‌شده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">◷</span><span class="cps-main"><span class="cps-name">آخرین بازدید و آنلاین بودن</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="photo" data-title="تصویر پروفایل" data-desc="این انتخاب فعلاً ذخیره می‌شود؛ دسترسی تصاویر پروفایل در سرور هنوز بر اساس آن محدود نشده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">▣</span><span class="cps-main"><span class="cps-name">تصویر پروفایل</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="calls" data-title="تماس‌ها" data-desc="قابلیت تماس صوتی و تصویری هنوز در CYRUS فعال نیست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">☎</span><span class="cps-main"><span class="cps-name">تماس‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="groups" data-title="گروه‌ها و کانال‌ها" data-desc="دعوت‌پذیری گروه‌ها و کانال‌ها هنوز به این ترجیح متصل نشده است." data-options="همه|مخاطبان من"><span class="cps-icon">♧</span><span class="cps-main"><span class="cps-name">گروه‌ها و کانال‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="forward" data-title="پیام‌های فورواردشده" data-desc="کنترل نمایش پیوند به حساب در پیام‌های فورواردشده در نسخه فعلی هنوز پشتیبانی نمی‌شود." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">➦</span><span class="cps-main"><span class="cps-name">پیام‌های فورواردشده</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+      </section>
+      <section class="cps-section">
+        <h2 class="cps-title">امنیت</h2>
+        <label class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">قفل با رمز عبور هنوز در دسترس نیست</span></span><input class="cps-switch" type="checkbox" disabled aria-label="قفل برنامه"></label>
+        <label class="cps-row"><span class="cps-icon">✓</span><span class="cps-main"><span class="cps-name">تأیید دومرحله‌ای</span><span class="cps-value">برای حساب CYRUS هنوز راه‌اندازی نشده</span></span><input class="cps-switch" type="checkbox" disabled aria-label="تأیید دومرحله‌ای"></label>
+        <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">مدیریت نشست‌ها در نسخه فعلی موجود نیست</span></span><span class="cps-chevron">›</span></div>
+      </section>
+      <a class="cps-blocked" href="/blocked-users"><span>⊘</span><span class="cps-main"><span class="cps-name">کاربران مسدودشده</span><small>مشاهده و رفع مسدودیت کاربران</small></span><span class="cps-chevron">›</span></a>
+      <p class="cps-note">توجه: ظاهر و دسته‌بندی‌ها از الگوی تلگرام الهام گرفته شده‌اند؛ گزینه‌هایی که توضیح «هنوز پشتیبانی نمی‌شود» دارند، فعلاً فقط نمایشی/ترجیح محلی هستند و محدودیت امنیتی واقعی اعمال نمی‌کنند.</p>
+      <div class="cps-sheet-bg" id="cps-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="cps-sheet-title"><section class="cps-sheet"><h2 id="cps-sheet-title"></h2><p id="cps-sheet-desc"></p><div id="cps-sheet-options"></div><button type="button" id="cps-sheet-save">ذخیره</button></section></div>
+      <script>
+      (function(){
+        const key='cyrus-privacy-preferences-v1';
+        let prefs={};
+        try{prefs=JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(_e){prefs={};}
+        const rows=[...document.querySelectorAll('[data-pref]')];
+        function paint(){rows.forEach(row=>{const k=row.dataset.pref;const value=prefs[k]||row.querySelector('[data-value]').textContent;row.querySelector('[data-value]').textContent=value;});}
+        paint();
+        const bg=document.getElementById('cps-sheet-bg'),title=document.getElementById('cps-sheet-title'),desc=document.getElementById('cps-sheet-desc'),opts=document.getElementById('cps-sheet-options');
+        let active=null,chosen='';
+        rows.forEach(row=>row.addEventListener('click',()=>{
+          active=row;chosen=prefs[row.dataset.pref]||row.querySelector('[data-value]').textContent;
+          title.textContent=row.dataset.title;desc.textContent=row.dataset.desc;opts.replaceChildren();
+          (row.dataset.options||'').split('|').filter(Boolean).forEach(value=>{
+            const label=document.createElement('label');label.className='cps-choice';
+            const radio=document.createElement('input');radio.type='radio';radio.name='cps-choice';radio.value=value;radio.checked=value===chosen;
+            radio.addEventListener('change',()=>chosen=value);label.append(radio,document.createTextNode(value));opts.append(label);
+          });bg.classList.add('open');
+        }));
+        document.getElementById('cps-sheet-save').addEventListener('click',()=>{
+          if(!active)return;prefs[active.dataset.pref]=chosen;
+          try{localStorage.setItem(key,JSON.stringify(prefs));}catch(_e){}
+          paint();bg.classList.remove('open');active=null;
+        });
+        bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
+        document.addEventListener('keydown',e=>{if(e.key==='Escape')bg.classList.remove('open');});
+        document.getElementById('cps-sessions').addEventListener('click',()=>alert('مدیریت نشست‌های فعال هنوز در CYRUS پیاده‌سازی نشده است.'));
+      })();
+      </script>
+    </main>
+    """
+    return page(content)
+
+
 @app.route("/blocked-users")
 def blocked_users():
     if not session.get("access_token"):
@@ -6205,7 +6301,7 @@ def settings():
           {avatar_notice}
           <a class="s-button" href="/settings/chat"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="button-title">تنظیمات گفتگو</span><span>‹</span></a>
           <a class="s-button" href="/account/export"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></span><span class="button-title">دریافت نسخهٔ پشتیبان اطلاعات حساب</span><span>‹</span></a>
-          <a class="s-button" href="/blocked-users"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0M4 4l16 16"/></svg></span><span class="button-title">کاربران مسدودشده و حریم خصوصی</span><span>‹</span></a>
+          <a class="s-button" href="/privacy-security"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0M4 4l16 16"/></svg></span><span class="button-title">حریم خصوصی و امنیت</span><span>‹</span></a>
           <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
           <a class="s-button" href="https://t.me/CyrusSupport_Aria" target="_blank" rel="noopener noreferrer"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M21.5 3.5 18 20.2a1.5 1.5 0 0 1-2.4.8l-4.7-3.5-2.3 2.2a1 1 0 0 1-1.7-.6l-.8-5.2L2.4 11a1.4 1.4 0 0 1 .1-2.6L20 2.8a1.2 1.2 0 0 1 1.5.7Z"/><path d="m6.2 13.7 11.2-8.1-6.5 11.9"/></svg></span><span class="button-title">پشتیبانی رسمی سرزمین‌های پارس</span><span>‹</span></a>
           <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
