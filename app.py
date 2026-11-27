@@ -2102,10 +2102,13 @@ def chat(conversation_id):
         '<button type="button" onclick="cyrusPickMedia(\'photo\')"><span>▧</span> عکس و ویدئو</button>'
         '<button type="button" onclick="cyrusPickMedia(\'music\')"><span>♫</span> موسیقی و صدا</button>'
         '<button type="button" onclick="cyrusPickMedia(\'file\')"><span>▤</span> فایل</button></div></div>'
+        '<button type="button" onclick="cyrusShareLocation()"><span>⌖</span> موقعیت مکانی</button>'
+        '<button type="button" onclick="cyrusShareContact()"><span>♙</span> مخاطب</button>'
         '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
         '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
         'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
+        'function cyrusShareLocation(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;if(!navigator.geolocation){alert("موقعیت مکانی پشتیبانی نمی‌شود");return;}navigator.geolocation.getCurrentPosition(p=>{const i=document.querySelector(".send-box input[name=content]");i.value="موقعیت مکانی: https://maps.google.com/?q="+p.coords.latitude+","+p.coords.longitude;i.focus();},()=>alert("اجازهٔ مکان را به مرورگر بدهید"),{timeout:12000});}function cyrusShareContact(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;const n=prompt("نام مخاطب");if(!n)return;const p=prompt("شماره تماس");if(!p)return;const i=document.querySelector(".send-box input[name=content]");i.value="مخاطب: "+n+" | شماره: "+p;i.focus();}'
         'document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});'
         'document.addEventListener("click",function(e){const m=document.getElementById("cyrusAttachMenu");if(m&&!e.target.closest(".composer-attach-wrap"))m.hidden=true;});</script>'
         if (room_type != "channel" or channel_can_post) and not room_blocked else
