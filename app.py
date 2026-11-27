@@ -2919,7 +2919,33 @@ async function cyrusToggleVoiceRecord(b){
   cyrusRecorder.start(500);cyrusVoiceStartedAt=Date.now();cyrusVoiceUi(true,0);
   cyrusVoiceTimer=setInterval(()=>{const elapsed=Math.floor((Date.now()-cyrusVoiceStartedAt)/1000);cyrusVoiceUi(true,elapsed);if(elapsed>=300&&cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusVoiceCancelled=false;cyrusRecorder.stop();}},250);
  }catch(err){cyrusStopVoiceTracks();cyrusVoiceUi(false,0);alert("برای ضبط صدا، اجازهٔ میکروفون را به مرورگر بدهید");}
-}document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});"""
+}(function(){
+ const form=document.getElementById("cyrusMediaUpload"),input=document.getElementById("cyrusMediaInput");
+ if(!form||!input)return;
+ const panel=document.createElement("div");panel.id="cyrusMediaProgress";panel.hidden=true;
+ panel.style.cssText="position:fixed;z-index:9998;bottom:calc(82px + env(safe-area-inset-bottom));left:12px;right:12px;max-width:620px;margin:auto;padding:12px 14px;border:1px solid #34516a;border-radius:14px;background:#102235;color:#e6edf4;box-shadow:0 8px 28px #0009;font:13px Tahoma";
+ const label=document.createElement("div");label.style.cssText="margin-bottom:8px";
+ const bar=document.createElement("progress");bar.max=100;bar.value=0;bar.style.cssText="width:100%;height:8px;display:block;margin-bottom:9px";
+ const cancel=document.createElement("button");cancel.type="button";cancel.textContent="لغو بارگذاری";cancel.style.cssText="border:1px solid #754d4d;border-radius:9px;padding:7px 12px;background:#321e25;color:#ffb5a8";
+ panel.append(label,bar,cancel);document.body.appendChild(panel);
+ let xhr=null;
+ function finish(){xhr=null;cancel.disabled=false;input.disabled=false;}
+ cancel.addEventListener("click",()=>{if(xhr)xhr.abort();});
+ input.addEventListener("change",()=>{
+  if(!input.files||!input.files.length)return;
+  const count=input.files.length;
+  if(count>10){alert("در هر نوبت حداکثر ۱۰ فایل می‌توانید انتخاب کنید");input.value="";return;}
+  xhr=new XMLHttpRequest();xhr.open("POST",form.action);xhr.withCredentials=true;
+  input.disabled=true;cancel.disabled=false;panel.hidden=false;bar.value=0;
+  label.textContent="در حال آماده‌سازی "+count.toLocaleString("fa-IR")+" فایل…";
+  xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);bar.value=p;label.textContent="در حال بارگذاری فایل‌ها · "+p.toLocaleString("fa-IR")+"٪";}};
+  xhr.onload=()=>{if(xhr.status>=200&&xhr.status<400){label.textContent="بارگذاری انجام شد؛ گفتگو در حال به‌روزرسانی است…";bar.value=100;location.reload();}else{panel.hidden=true;alert("بارگذاری ناموفق بود ("+xhr.status+")؛ فایل‌ها را دوباره انتخاب کنید.");input.value="";finish();}};
+  xhr.onerror=()=>{panel.hidden=true;alert("ارتباط هنگام بارگذاری قطع شد؛ دوباره تلاش کنید.");input.value="";finish();};
+  xhr.onabort=()=>{panel.hidden=true;label.textContent="بارگذاری لغو شد";input.value="";finish();};
+  xhr.onloadend=()=>{if(xhr&&xhr.readyState===4&&xhr.status>=200&&xhr.status<400)finish();};
+  xhr.send(new FormData(form));
+ });
+})();"""
         """(function(){
           const form=document.querySelector(".send-box"),input=form&&form.querySelector("input[name=content]"),send=form&&form.querySelector(".composer-send"),counter=document.getElementById("cyrusComposerCounter");
           if(!form||!input||!send)return;
