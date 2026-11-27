@@ -1,5 +1,5 @@
 import os, secrets, requests, html, uuid, time, hashlib, re
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from pathlib import Path
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
@@ -114,6 +114,44 @@ def cyrus_update_last_seen():
             session["last_seen_ping_at"] = now
     except Exception:
         pass
+
+@app.before_request
+def cyrus_protect_state_changes():
+    # مرورگرهای جدید مبدأ درخواست‌های تغییردهندهٔ داده را اعلام می‌کنند.
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    fetch_site = str(request.headers.get("Sec-Fetch-Site") or "").lower()
+    if fetch_site == "cross-site":
+        return "درخواست از مبدأ غیرمجاز پذیرفته نشد", 403
+    origin = request.headers.get("Origin", "").strip()
+    referer = request.headers.get("Referer", "").strip()
+    source = origin or referer
+    if not source:
+        # برای مرورگرها/کلاینت‌های قدیمی که این سرآیندها را نمی‌فرستند،
+        # سازگاری حفظ می‌شود؛ SameSite=Lax همچنان فعال است.
+        return
+    try:
+        parsed = urlsplit(source)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return "مبدأ درخواست معتبر نیست", 403
+        if parsed.netloc.lower() != request.host.lower():
+            return "درخواست از مبدأ غیرمجاز پذیرفته نشد", 403
+        if request.is_secure and parsed.scheme != "https":
+            return "درخواست ناامن پذیرفته نشد", 403
+    except Exception:
+        return "مبدأ درخواست معتبر نیست", 403
+
+
+@app.after_request
+def cyrus_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self)")
+    if request.is_secure or request.headers.get("X-Forwarded-Proto", "").split(",")[0].strip().lower() == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
+
 
 @app.after_request
 def cyrus_disable_dynamic_page_cache(response):
