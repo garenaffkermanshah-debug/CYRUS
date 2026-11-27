@@ -3427,7 +3427,7 @@ def manage_room(conversation_id):
                     )
 
             rows += (
-                '<div class="tg-member-row"><div class="tg-member-person">' + avatar_html
+                '<div class="tg-member-row" data-member-search="{html.escape((str(profile.get("display_name") or profile.get("username") or "") + " " + str(profile.get("username") or "")).lower(), quote=True)}" data-member-role="{html.escape(role, quote=True)}"><div class="tg-member-person">' + avatar_html
                 + '<span><b>' + display_name + '</b><small>' + ('@' + username_text if username_text else '') + '</small></span></div>'
                 + '<div class="tg-member-role">' + safe_role + '</div><div class="tg-member-actions">' + controls + '</div></div>'
             )
@@ -3460,7 +3460,7 @@ def manage_room(conversation_id):
 
           <style>
             .tg-room-settings{{margin:0 0 14px;padding:0;background:#101a25;border:0;border-radius:0;color:#e8edf2;overflow:hidden}}
-            .tg-member-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:#111e2b;border-bottom:1px solid #263442;color:#eaf1f6}}
+            .tg-member-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:#111e2b;border-bottom:1px solid #263442;color:#eaf1f6}}.cyrus-member-tools{{padding:12px;background:#0e1a26;border-radius:12px;margin:10px 0 14px}}.cyrus-member-tools input{{width:100%;box-sizing:border-box;padding:11px;border-radius:9px;border:1px solid #2b4256;background:#091521;color:#fff}}.cyrus-member-filters{{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}}.cyrus-member-filters button{{border:0;border-radius:16px;padding:7px 12px;background:#22384b;color:#b8c9d8;font-size:12px}}.cyrus-member-filters button.active{{background:#268bd0;color:#fff}}.cyrus-member-tools small{{color:#8ea5b8;font-size:11px}}.tg-member-row[hidden]{{display:none!important}}.cyrus-field-counter{{display:block;text-align:left;color:#8ea5b8;font-size:10px;margin-top:3px}}
             .tg-member-person{{display:flex;align-items:center;gap:11px;min-width:0;flex:1}}
             .tg-member-avatar{{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;background:#26394a;display:grid;place-items:center}}
             .tg-member-avatar-fallback{{color:#d8b46a;font-size:21px}}
@@ -3560,9 +3560,13 @@ def manage_room(conversation_id):
 
           {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if join_requests else ''}
 
-          <h3>اعضا ({len(members)})</h3>
-          {rows}
-
+          <h3>اعضا (<span id="cyrusMemberTotal">{len(members)}</span>)</h3>
+          <div class="cyrus-member-tools"><input id="cyrusMemberSearch" type="search" placeholder="جستجوی نام یا نام کاربری عضو"><div class="cyrus-member-filters"><button type="button" data-role="all" class="active">همه</button><button type="button" data-role="admin">مدیران</button><button type="button" data-role="member">اعضا</button><button type="button" id="cyrusMemberReset">پاک‌کردن</button></div><small id="cyrusMemberCount"></small></div>
+          <div id="cyrusMemberRows">{rows}</div>
+          <script>
+          (function(){{const s=document.getElementById('cyrusMemberSearch'),w=document.getElementById('cyrusMemberRows'),n=document.getElementById('cyrusMemberCount'),bs=[...document.querySelectorAll('.cyrus-member-filters [data-role]')],r=document.getElementById('cyrusMemberReset');if(!s||!w)return;let role='all';function apply(){{const q=s.value.trim().toLocaleLowerCase();let shown=0;w.querySelectorAll('.tg-member-row').forEach(x=>{{const ok=(!q||(x.dataset.memberSearch||'').includes(q))&&(role==='all'||x.dataset.memberRole===role);x.hidden=!ok;if(ok)shown++;}});if(n)n.textContent='نمایش '+shown+' از '+w.querySelectorAll('.tg-member-row').length+' عضو';}}s.addEventListener('input',apply);bs.forEach(b=>b.addEventListener('click',()=>{{role=b.dataset.role;bs.forEach(x=>x.classList.toggle('active',x===b));apply();}}));r.addEventListener('click',()=>{{s.value='';role='all';bs.forEach(x=>x.classList.toggle('active',x.dataset.role==='all'));apply();s.focus();}});apply();}})();
+          (function(){{const f=document.querySelector('.tg-room-settings'),save=f&&f.querySelector('.tg-save');if(!f)return;let dirty=false;function mark(){{dirty=true;if(save){{save.disabled=false;save.textContent='تأیید تغییرات';}}}}f.querySelectorAll('input,textarea,select').forEach(x=>{{x.addEventListener('input',mark);x.addEventListener('change',mark);}});f.addEventListener('submit',()=>{{dirty=false;if(save){{save.disabled=true;save.textContent='در حال ذخیره…';}}}});window.addEventListener('beforeunload',e=>{{if(dirty){{e.preventDefault();e.returnValue='';}}}});[[f.querySelector('[name=title]'),60],[f.querySelector('[name=description]'),500]].forEach(([x,m])=>{{if(!x)return;const b=document.createElement('small');b.className='cyrus-field-counter';b.textContent=x.value.length+'/'+m;x.after(b);x.addEventListener('input',()=>b.textContent=x.value.length+'/'+m);}});}})();
+          </script>
           <div class="card">
             <h3>خروج از مجموعه</h3>
             <form method="post" onsubmit="return confirm('خارج می‌شوید؟')">
