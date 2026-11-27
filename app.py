@@ -1895,19 +1895,29 @@ def export_account_data():
         saved_messages=fetch_rows("cyrus_saved_messages",{"select":"*","user_id":"eq."+own_id},"saved messages")
         saved_profiles=fetch_rows("cyrus_saved_profiles",{"select":"*","owner_id":"eq."+own_id},"saved profiles")
         blocked_users=fetch_rows("cyrus_user_blocks",{"select":"*","blocker_id":"eq."+own_id},"blocked users")
+        export_data={
+            "profile":profile,"memberships":memberships,"conversations":conversations,
+            "messages":messages,"message_reactions":reactions,"contacts":contacts,
+            "saved_messages":saved_messages,"saved_profiles":saved_profiles,"blocked_users":blocked_users
+        }
+        json_module=__import__("json")
+        canonical_data=json_module.dumps(export_data,ensure_ascii=False,sort_keys=True,separators=(",",":"),default=str)
+        record_counts={key:len(value) if isinstance(value,list) else 1 for key,value in export_data.items()}
         payload={
-            "product":"CYRUS","export_version":1,
+            "product":"CYRUS","export_version":2,
             "exported_at":datetime.now(timezone.utc).isoformat(),
             "account":{"user_id":own_id,"email":str(session.get("cyrus_login_email") or "")},
-            "data":{
-                "profile":profile,"memberships":memberships,"conversations":conversations,
-                "messages":messages,"message_reactions":reactions,"contacts":contacts,
-                "saved_messages":saved_messages,"saved_profiles":saved_profiles,"blocked_users":blocked_users
+            "data":export_data,
+            "integrity":{
+                "algorithm":"sha256",
+                "data_sha256":hashlib.sha256(canonical_data.encode("utf-8")).hexdigest(),
+                "record_counts":record_counts
             },
             "notes":["فقط اطلاعاتی صادر می‌شود که حساب فعلی طبق مجوزهای پایگاه داده اجازه خواندن آن را دارد.",
+                     "برای بررسی سلامت داده‌ها، از SHA-256 بخش data با JSON مرتب‌شده و جداکننده‌های فشرده استفاده کنید.",
                      "فایل‌های پیوست به‌صورت نشانی ثبت شده‌اند و محتوای فایل‌ها داخل این خروجی قرار نگرفته است."]
         }
-        body=__import__("json").dumps(payload,ensure_ascii=False,indent=2,default=str)
+        body=json_module.dumps(payload,ensure_ascii=False,indent=2,default=str)
         filename="cyrus-account-export-"+datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")+".json"
         return Response(body,mimetype="application/json",headers={
             "Content-Disposition":'attachment; filename="'+filename+'"',
