@@ -3923,6 +3923,19 @@ def manage_room(conversation_id):
                     rpc = "cyrus_manage_set_role"
                     data["p_role"] = "admin" if action == "promote" else "member"
 
+            elif action == "transfer_owner":
+                if not owner:
+                    return "فقط مالک فعلی می‌تواند مالکیت را منتقل کند", 403
+                uid = request.form.get("user_id", "")
+                try:
+                    uuid.UUID(uid)
+                except ValueError:
+                    return "شناسه مالک جدید نامعتبر است", 400
+                if uid == current:
+                    return "انتخاب مالک فعلی امکان‌پذیر نیست", 400
+                rpc = "cyrus_manage_transfer_ownership"
+                data["p_user_id"] = uid
+
             elif action == "rename":
                 title = request.form.get("title", "").strip()
                 if not 2 <= len(title) <= 60:
@@ -4015,6 +4028,13 @@ def manage_room(conversation_id):
                         '<form method="post" onsubmit="return confirm(&quot;دسترسی مدیریت این عضو برداشته شود؟&quot;)"><input type="hidden" name="action" value="demote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>عزل مدیر</button></form>'
+                    )
+                if owner and role in ("member", "admin"):
+                    controls += (
+                        '<form method="post" onsubmit="return confirm(&quot;با انتقال مالکیت، شما مدیر می‌شوید و این عضو مالک مجموعه خواهد شد. ادامه می‌دهید؟&quot;)">'
+                        '<input type="hidden" name="action" value="transfer_owner">'
+                        '<input type="hidden" name="user_id" value="' + safe_uid + '">'
+                        '<button>انتقال مالکیت</button></form>'
                     )
                 if owner or (my_role == "admin" and role == "member"):
                     controls += (
