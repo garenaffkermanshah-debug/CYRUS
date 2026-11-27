@@ -3275,7 +3275,7 @@ async function cyrusToggleVoiceRecord(b){
           searchBox.innerHTML='<input type="search" placeholder="جستجو در تمام پیام‌های گفتگو" aria-label="جستجو در گفتگو"><span class="cyrus-search-count">۰/۰</span><button type="button" data-dir="-1" aria-label="نتیجهٔ قبلی">↑</button><button type="button" data-dir="1" aria-label="نتیجهٔ بعدی">↓</button><button type="button" data-close aria-label="بستن جستجو">×</button><div class="cyrus-search-remote" aria-live="polite" hidden></div>';
           const header=document.querySelector('.room-header');if(header)header.after(searchBox);
           searchInput=searchBox.querySelector('input');
-          let searchDebounce=null;searchInput.addEventListener('input',()=>{clearTimeout(searchDebounce);searchDebounce=setTimeout(runSearch,220);});
+          let searchDebounce=null;searchInput.addEventListener('input',()=>{{clearTimeout(searchDebounce);searchDebounce=setTimeout(runSearch,220);}});
           searchBox.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>moveMatch(Number(b.dataset.dir))));
           searchBox.querySelector('[data-close]').addEventListener('click',closeSearch);
         }}
