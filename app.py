@@ -3408,13 +3408,13 @@ def manage_room(conversation_id):
             if uid != str(room.get("created_by") or ""):
                 if owner and role == "member":
                     controls += (
-                        '<form method="post"><input type="hidden" name="action" value="promote">'
+                        '<form method="post" onsubmit="return confirm('این عضو مدیر شود؟')"><input type="hidden" name="action" value="promote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>تعیین مدیر</button></form>'
                     )
                 if owner and role == "admin":
                     controls += (
-                        '<form method="post"><input type="hidden" name="action" value="demote">'
+                        '<form method="post" onsubmit="return confirm('دسترسی مدیریت این عضو برداشته شود؟')"><input type="hidden" name="action" value="demote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>عزل مدیر</button></form>'
                     )
@@ -3542,7 +3542,7 @@ def manage_room(conversation_id):
           <div class="card">
             <h3>لینک دعوت</h3>
             <input id="invite-link" readonly value="{invite_safe}">
-            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value).then(()=>alert('لینک کپی شد'))">کپی لینک</button>
+            <button type="button" onclick="cyrusCopyInvite()">کپی لینک</button><script>function cyrusCopyInvite(){const v=document.getElementById('invite-link').value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert('لینک کپی شد')).catch(()=>prompt('لینک دعوت',v));else prompt('لینک دعوت',v);}</script>
             <form method="post" onsubmit="return confirm('لینک قبلی از کار می‌افتد. ادامه می‌دهید؟')">
               <input type="hidden" name="action" value="rotate_invite">
               <button>ساخت لینک جدید</button>
