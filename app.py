@@ -2071,6 +2071,7 @@ def chat(conversation_id):
             '<button type="button" onclick="cyrusToggleMute()">بی‌صدا کردن</button>'
             '<button type="button" onclick="cyrusTogglePin()">سنجاق / برداشتن سنجاق</button>'
             '<button type="button" onclick="cyrusSearchInChat()">جستجو در گفتگو</button>'
+            '<form method="post" action="/chat/' + html.escape(conversation_id,quote=True) + '/mark-unread"><button type="submit">علامت‌گذاری به‌عنوان خوانده‌نشده</button></form>'
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
             + room_manage_menu
             + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
@@ -2078,7 +2079,14 @@ def chat(conversation_id):
             + '</div></div>'
         )
     else:
-        room_more_html = '<a class="chat-header-more" href="' + html.escape(room_profile_href,quote=True) + '" aria-label="پروفایل">⋮</a>'
+        room_more_html = (
+            '<div class="tg-chat-menu-wrap"><button type="button" class="chat-header-more" aria-label="گزینه‌های گفتگو" onclick="cyrusToggleRoomMenu(event)">⋮</button>'
+            '<div class="tg-chat-menu" id="cyrusRoomMenu" hidden>'
+            '<button type="button" onclick="cyrusSearchInChat()">جستجو در گفتگو</button>'
+            '<form method="post" action="/chat/' + html.escape(conversation_id,quote=True) + '/mark-unread"><button type="submit">علامت‌گذاری به‌عنوان خوانده‌نشده</button></form>'
+            '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات مخاطب</a>'
+            '</div></div>'
+        )
     room_header = f"""
     <section class="room-header cyrus-chat-header">
       <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
@@ -3049,6 +3057,44 @@ def send_message(conversation_id):
 
     return redirect(url_for("chat", conversation_id=conversation_id))
 
+
+
+@app.route("/chat/<conversation_id>/mark-unread", methods=["POST"])
+def mark_conversation_unread(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+
+    uid = str(session.get("user_id") or "")
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session.get("access_token", ""),
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    try:
+        membership = requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"conversation_id", "conversation_id":"eq."+conversation_id,
+                    "user_id":"eq."+uid, "limit":"1"},
+            headers=headers, timeout=15
+        )
+        if not membership.ok or not membership.json():
+            return "عضو این گفتگو نیستید", 403
+        updated = requests.patch(
+            URL + "/rest/v1/cyrus_members",
+            params={"conversation_id":"eq."+conversation_id, "user_id":"eq."+uid},
+            json={"last_read_at":"1970-01-01T00:00:00+00:00"},
+            headers=headers, timeout=15
+        )
+        if not updated.ok:
+            return "علامت‌گذاری گفتگو انجام نشد", 502
+        return redirect(url_for("home"))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
 
 
 @app.route("/chat/<conversation_id>/delete-selected", methods=["POST"])
