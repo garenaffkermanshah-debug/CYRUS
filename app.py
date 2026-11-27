@@ -103,23 +103,24 @@ URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
 # Server-only Supabase Auth admin key; never expose this to clients.
 ADMIN_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+# شناسهٔ عمومی و ثابت کانال رسمی امپراتوری پارس
+CYRUS_OFFICIAL_CHANNEL_ID = "593beab2-c136-4434-84df-eb64bde32c99"
 
 
 def cyrus_official_channel_id():
-    """Return the single server-designated official channel, never client-controlled."""
-    if not ADMIN_KEY or not URL:
-        return ""
-    try:
-        response = requests.get(
-            URL + "/rest/v1/cyrus_official_channels",
-            params={"select":"channel_id", "singleton":"eq.true", "limit":"1"},
-            headers=cyrus_security_headers(), timeout=12
-        )
-        if response.ok and response.json():
-            return str(response.json()[0].get("channel_id") or "")
-    except Exception:
-        pass
-    return ""
+    """Resolve the official channel, falling back to its verified fixed ID."""
+    if ADMIN_KEY and URL:
+        try:
+            response = requests.get(
+                URL + "/rest/v1/cyrus_official_channels",
+                params={"select":"channel_id", "singleton":"eq.true", "limit":"1"},
+                headers=cyrus_security_headers(), timeout=12
+            )
+            if response.ok and response.json():
+                return str(response.json()[0].get("channel_id") or CYRUS_OFFICIAL_CHANNEL_ID)
+        except Exception:
+            pass
+    return CYRUS_OFFICIAL_CHANNEL_ID
 
 
 def cyrus_ensure_official_membership(user_id):
