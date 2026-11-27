@@ -1757,6 +1757,9 @@ def chat(conversation_id):
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
     room_last_seen = "آخرین بازدید نامشخص"
     room_blocked = False
+    room_blocked_by_me = False
+    room_blocked_by_other = False
+    room_other_user_id = ""
     room_profile_href = "/conversation/" + conversation_id + "/profile"
     if room_type == "private":
         try:
@@ -1773,6 +1776,7 @@ def chat(conversation_id):
                         other_id = candidate
                         break
             if other_id:
+                room_other_user_id = other_id
                 person_response = requests.get(
                     URL + "/rest/v1/cyrus_profiles",
                     params={"select":"display_name,username,avatar_url,last_seen_at","id":"eq."+other_id,"limit":"1"},
@@ -1815,6 +1819,14 @@ def chat(conversation_id):
                     block_status = cyrus_block_status(other_id, headers)
                     room_blocked = block_status is True
                     if room_blocked:
+                        # RLS exposes only blocks created by the current account; identify which side blocked.
+                        own_block = requests.get(
+                            URL + "/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+str(current_user),"blocked_id":"eq."+other_id,"limit":"1"},
+                            headers=headers, timeout=12
+                        )
+                        room_blocked_by_me = bool(own_block.ok and own_block.json())
+                        room_blocked_by_other = not room_blocked_by_me
                         room_last_seen = "این گفتگو مسدود است"
                     room_profile_href = "/user/" + other_id + "?from_chat=1"
         except Exception:
@@ -1871,8 +1883,12 @@ def chat(conversation_id):
         '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>'
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
         if (room_type != "channel" or channel_can_post) and not room_blocked else
-        ('<div class="card"><p>این گفتگو مسدود است؛ برای ادامه ابتدا از پروفایل کاربر رفع مسدودیت کنید.</p></div>' if room_blocked else
-        '<div class="card"><p>این کانال عمومی است؛ اعضا فقط می‌توانند پست‌ها را مشاهده کنند.</p></div>')
+        (
+            ('<div class="cyrus-blocked-composer"><p>این کاربر را مسدود کرده‌اید.</p><form method="post" action="/user/' + html.escape(room_other_user_id, quote=True) + '/block"><button type="submit">رفع مسدودیت</button></form></div>' if room_blocked_by_me else
+             '<div class="cyrus-blocked-composer"><p>امکان ارسال پیام وجود ندارد.</p></div>')
+            if room_blocked else
+            '<div class="cyrus-blocked-composer"><p>این کانال فقط برای مالک و مدیران امکان انتشار پیام دارد.</p></div>'
+        )
     )
 
     room_manage_link = (
@@ -1907,6 +1923,11 @@ def chat(conversation_id):
         .send-box .composer-send:disabled{{opacity:.55;cursor:wait}}
         @media(max-width:520px){{.container:has(.cyrus-chat-header){{padding-inline:8px}}.message{{max-width:88%}}.messages-area{{gap:7px}}}}
         .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
+        .cyrus-blocked-composer{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));margin:8px 0 0;padding:13px 16px;background:#172432;border:1px solid #2b4053;border-radius:24px;text-align:center;color:#a9bac8;font-size:13px}}
+        .cyrus-blocked-composer p{{margin:0 0 8px;line-height:1.7}}
+        .cyrus-blocked-composer form{{margin:0}}
+        .cyrus-blocked-composer button{{width:auto;margin:0;padding:8px 18px;background:transparent;color:#69b9f7;border:0;border-radius:18px;font-size:14px}}
+
         .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
         .room-avatar{{width:43px;height:43px;flex:0 0 43px;border-radius:50%;overflow:hidden;border:0;background:#26394a;display:flex;align-items:center;justify-content:center}}
         .room-avatar img{{width:100%;height:100%;object-fit:cover}}
