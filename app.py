@@ -922,12 +922,28 @@ def register():
                 session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
                 session.permanent = True
                 session["user_id"] = data["user"]["id"]
-                requests.post(URL + "/rest/v1/cyrus_profiles",
-                    json={"id":data["user"]["id"],"username":username,"display_name":username},
-                    headers={"apikey":KEY,"Authorization":"Bearer "+data["access_token"],
-                    "Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
-                    timeout=20)
-                return redirect(url_for("home"))
+                profile_created = False
+                try:
+                    profile_response = requests.post(
+                        URL + "/rest/v1/cyrus_profiles",
+                        json={"id":data["user"]["id"],"username":username,"display_name":username},
+                        headers={"apikey":KEY,"Authorization":"Bearer "+data["access_token"],
+                        "Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
+                        timeout=20
+                    )
+                    profile_created = profile_response.ok
+                except Exception:
+                    profile_created = False
+
+                # اگر نام کاربری تکراری باشد یا ارتباط لحظه‌ای قطع شود،
+                # پروفایل با نام جایگزین امن ساخته می‌شود.
+                if not profile_created:
+                    profile_created = bool(cyrus_ensure_profile(email))
+                if profile_created:
+                    return redirect(url_for("home"))
+
+                session.clear()
+                error = "حساب ساخته شد، اما ایجاد نمایه کامل نشد. دوباره وارد شوید تا ساخت نمایه تکرار شود."
             if code in (200, 201) and data.get("user"):
                 error = "حساب ساخته شد، اما تأیید ایمیل لازم است. تا زمانی که ایمیل تأیید دریافت و تأیید نشود، ورود انجام نمی‌شود."
             else:
