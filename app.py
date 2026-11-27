@@ -1858,6 +1858,68 @@ def cyrus_format_message_text(value):
     return "".join(pieces)
 
 
+@app.route("/chat/<conversation_id>/search")
+def search_chat_messages(conversation_id):
+    if not session.get("access_token"):
+        return app.response_class('{"error":"unauthorized"}', status=401, mimetype="application/json")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return app.response_class('{"error":"invalid_conversation"}', status=400, mimetype="application/json")
+
+    query = str(request.args.get("q") or "").strip()
+    query = re.sub(r"[^\\w\\s@.-]", " ", query, flags=re.UNICODE)
+    query = " ".join(query.split())[:80]
+    if len(query) < 2:
+        return app.response_class('{"results":[]}', mimetype="application/json")
+
+    headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"]}
+    user_id = str(session.get("user_id") or "")
+    try:
+        room_response = requests.get(
+            URL + "/rest/v1/cyrus_conversations",
+            params={"select":"id,created_by,history_visible","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers, timeout=15
+        )
+        if not room_response.ok or not room_response.json():
+            return app.response_class('{"error":"not_found"}', status=404, mimetype="application/json")
+        room = room_response.json()[0]
+        member_response = requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"joined_at","conversation_id":"eq."+conversation_id,"user_id":"eq."+user_id,"limit":"1"},
+            headers=headers, timeout=15
+        )
+        is_owner = str(room.get("created_by") or "") == user_id
+        if not member_response.ok or (not member_response.json() and not is_owner):
+            return app.response_class('{"error":"forbidden"}', status=403, mimetype="application/json")
+        joined_at = member_response.json()[0].get("joined_at") if member_response.ok and member_response.json() else None
+        params = {
+            "select":"id,content,created_at,sender_id,message_type",
+            "conversation_id":"eq."+conversation_id,
+            "content":"ilike.*"+query+"*",
+            "order":"created_at.desc",
+            "limit":"50"
+        }
+        if not room.get("history_visible", True) and joined_at:
+            params["created_at"] = "gte."+str(joined_at)
+        result = requests.get(URL + "/rest/v1/cyrus_messages", params=params, headers=headers, timeout=20)
+        if not result.ok:
+            return app.response_class('{"error":"search_failed"}', status=502, mimetype="application/json")
+        rows = []
+        for item in result.json():
+            rows.append({
+                "id": str(item.get("id") or ""),
+                "content": str(item.get("content") or "")[:240],
+                "created_at": item.get("created_at"),
+                "sender_id": str(item.get("sender_id") or ""),
+                "message_type": str(item.get("message_type") or "text")
+            })
+        payload = __import__("json").dumps({"results":rows}, ensure_ascii=False)
+        return app.response_class(payload, mimetype="application/json")
+    except Exception:
+        return app.response_class('{"error":"server_error"}', status=502, mimetype="application/json")
+
+
 @app.route("/chat/<conversation_id>")
 def chat(conversation_id):
     if not session.get("access_token"):
@@ -2372,8 +2434,9 @@ def chat(conversation_id):
       function cyrusToggleMute(){{const v=cyrusSharedToggle('cyrus_muted_chats_v1',"{conversation_id}");cyrusUpdateRoomMenu();cyrusRoomToast(v?'گفتگو بی‌صدا شد':'صدای گفتگو فعال شد');}}
       function cyrusTogglePin(){{const v=cyrusSharedToggle('cyrus_pinned_chats_v1',"{conversation_id}");cyrusUpdateRoomMenu();cyrusRoomToast(v?'گفتگو سنجاق شد':'سنجاق گفتگو برداشته شد');}}
       let cyrusRoomSearchItems=[],cyrusRoomSearchIndex=-1,cyrusRoomSearchTerm='',cyrusRoomSearchLastFocus=null;
-      function cyrusSearchInChat(){{const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;let box=document.getElementById('cyrusRoomSearch');if(!box){{box=document.createElement('div');box.id='cyrusRoomSearch';box.style.cssText='position:fixed;z-index:1000;top:70px;left:10px;right:10px;max-width:560px;margin:auto;padding:12px;background:#0d1b2a;border:1px solid #34516a;border-radius:14px;display:flex;gap:6px;align-items:center;box-shadow:0 8px 30px #0009';box.innerHTML='<input id="cyrusRoomSearchInput" aria-label="عبارت جستجو" placeholder="جستجو در پیام‌ها…" style="flex:1;min-width:0;background:#07121e;color:#fff;border:1px solid #30485e;border-radius:9px;padding:10px;font:14px Tahoma"><span id="cyrusRoomSearchCount" aria-live="polite" style="white-space:nowrap;color:#a9bed0;font:12px Tahoma">۰/۰</span><button type="button" id="cyrusRoomSearchPrev" aria-label="نتیجه قبلی" style="width:auto;margin:0;padding:8px">↑</button><button type="button" id="cyrusRoomSearchNext" aria-label="نتیجه بعدی" style="width:auto;margin:0;padding:8px">↓</button><button type="button" id="cyrusRoomSearchClose" aria-label="بستن" style="width:auto;margin:0;padding:8px;background:#25394d;color:#fff">×</button>';document.body.appendChild(box);box.querySelector('#cyrusRoomSearchInput').addEventListener('input',cyrusRoomSearchUpdate);box.querySelector('#cyrusRoomSearchInput').addEventListener('keydown',e=>{{if(e.key==='Enter'){{e.preventDefault();cyrusRoomSearchMove(e.shiftKey?-1:1);}}}});box.querySelector('#cyrusRoomSearchPrev').addEventListener('click',()=>cyrusRoomSearchMove(-1));box.querySelector('#cyrusRoomSearchNext').addEventListener('click',()=>cyrusRoomSearchMove(1));box.querySelector('#cyrusRoomSearchClose').addEventListener('click',cyrusRoomSearchClose);}}cyrusRoomSearchLastFocus=document.activeElement;box.style.display='flex';const input=box.querySelector('input');input.focus();input.select();if(input.value)cyrusRoomSearchUpdate();}}
+      function cyrusSearchInChat(){{const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;let box=document.getElementById('cyrusRoomSearch');if(!box){{box=document.createElement('div');box.id='cyrusRoomSearch';box.style.cssText='position:fixed;z-index:1000;top:70px;left:10px;right:10px;max-width:560px;margin:auto;padding:12px;background:#0d1b2a;border:1px solid #34516a;border-radius:14px;display:flex;gap:6px;align-items:center;box-shadow:0 8px 30px #0009';box.innerHTML='<input id="cyrusRoomSearchInput" aria-label="عبارت جستجو" placeholder="جستجو در همه پیام‌های گفتگو…" style="flex:1;min-width:0;background:#07121e;color:#fff;border:1px solid #30485e;border-radius:9px;padding:10px;font:14px Tahoma"><span id="cyrusRoomSearchCount" aria-live="polite" style="white-space:nowrap;color:#a9bed0;font:12px Tahoma">۰/۰</span><button type="button" id="cyrusRoomSearchPrev" aria-label="نتیجه قبلی" style="width:auto;margin:0;padding:8px">↑</button><button type="button" id="cyrusRoomSearchNext" aria-label="نتیجه بعدی" style="width:auto;margin:0;padding:8px">↓</button><button type="button" id="cyrusRoomSearchClose" aria-label="بستن" style="width:auto;margin:0;padding:8px;background:#25394d;color:#fff">×</button><div id="cyrusRoomSearchRemote" style="position:absolute;top:54px;right:0;left:0;max-height:55vh;overflow:auto;background:#102235;border:1px solid #34516a;border-radius:10px"></div>';document.body.appendChild(box);box.querySelector('#cyrusRoomSearchInput').addEventListener('input',()=>{{cyrusRoomSearchUpdate();clearTimeout(window.cyrusRemoteSearchTimer);window.cyrusRemoteSearchTimer=setTimeout(cyrusRoomRemoteSearch,350);}});box.querySelector('#cyrusRoomSearchInput').addEventListener('keydown',e=>{{if(e.key==='Enter'){{e.preventDefault();cyrusRoomSearchMove(e.shiftKey?-1:1);}}}});box.querySelector('#cyrusRoomSearchPrev').addEventListener('click',()=>cyrusRoomSearchMove(-1));box.querySelector('#cyrusRoomSearchNext').addEventListener('click',()=>cyrusRoomSearchMove(1));box.querySelector('#cyrusRoomSearchClose').addEventListener('click',cyrusRoomSearchClose);}}cyrusRoomSearchLastFocus=document.activeElement;box.style.display='flex';const input=box.querySelector('input');input.focus();input.select();if(input.value)cyrusRoomSearchUpdate();}}
       function cyrusRoomSearchUpdate(){{const input=document.getElementById('cyrusRoomSearchInput');cyrusRoomSearchTerm=(input.value||'').trim().toLocaleLowerCase();cyrusRoomSearchItems=Array.from(document.querySelectorAll('.message')).filter(x=>cyrusRoomSearchTerm&&x.textContent.toLocaleLowerCase().includes(cyrusRoomSearchTerm));cyrusRoomSearchIndex=cyrusRoomSearchItems.length?0:-1;const count=document.getElementById('cyrusRoomSearchCount');if(count)count.textContent=cyrusRoomSearchItems.length?('۱/'+cyrusRoomSearchItems.length):'۰/۰';const box=document.getElementById('cyrusRoomSearch');if(box)box.dataset.noResults=cyrusRoomSearchTerm&&!cyrusRoomSearchItems.length?'true':'false';cyrusRoomSearchShow();}}
+      async function cyrusRoomRemoteSearch(){{const input=document.getElementById('cyrusRoomSearchInput'),panel=document.getElementById('cyrusRoomSearchRemote');if(!input||!panel)return;const q=input.value.trim();if(q.length<2){{panel.innerHTML='';return;}}panel.innerHTML='<div style="padding:10px;color:#9db2c4;font:12px Tahoma">در حال جستجو در تاریخچه…</div>';try{{const response=await fetch('/chat/{conversation_id}/search?q='+encodeURIComponent(q),{{credentials:'same-origin',headers:{{'Accept':'application/json'}}}});if(!response.ok)throw new Error('search');const data=await response.json();if(input.value.trim()!==q)return;const results=Array.isArray(data.results)?data.results:[];if(!results.length){{panel.innerHTML='<div style="padding:12px;color:#9db2c4;font:12px Tahoma">نتیجه‌ای پیدا نشد</div>';return;}}panel.innerHTML=results.map(item=>{{const id=encodeURIComponent(item.id||''),txt=String(item.content||'').replace(/[&<>"]/g,ch=>({{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}}[ch]));const dt=item.created_at?new Date(item.created_at).toLocaleString('fa-IR'):'';return '<a href="/chat/{conversation_id}?message='+id+'" style="display:block;padding:10px 12px;border-bottom:1px solid #263d52;color:#e6edf4;text-decoration:none;font:12px Tahoma"><div style="color:#82bfe9;margin-bottom:4px">'+dt+'</div>'+txt+'</a>';}}).join('');}}catch(_e){{panel.innerHTML='<div style="padding:12px;color:#e6a5a5;font:12px Tahoma">جستجو انجام نشد؛ دوباره تلاش کنید</div>';}}}}
       function cyrusRoomSearchShow(){{document.querySelectorAll('.message').forEach(x=>{{x.style.outline='';x.style.outlineOffset='';x.removeAttribute('data-cyrus-search-active');}});if(cyrusRoomSearchIndex<0||!cyrusRoomSearchItems.length)return;const x=cyrusRoomSearchItems[cyrusRoomSearchIndex];x.style.outline='2px solid #e5bd69';x.style.outlineOffset='2px';x.setAttribute('data-cyrus-search-active','1');x.scrollIntoView({{behavior:'smooth',block:'center'}});const c=document.getElementById('cyrusRoomSearchCount');if(c)c.textContent=(cyrusRoomSearchIndex+1)+'/'+cyrusRoomSearchItems.length;}}
       function cyrusRoomSearchMove(step){{if(!cyrusRoomSearchItems.length)return;cyrusRoomSearchIndex=(cyrusRoomSearchIndex+step+cyrusRoomSearchItems.length)%cyrusRoomSearchItems.length;cyrusRoomSearchShow();}}
       function cyrusRoomSearchClose(){{const box=document.getElementById('cyrusRoomSearch');if(box){{box.style.display='none';box.dataset.noResults='false';}}document.querySelectorAll('.message').forEach(x=>{{x.style.outline='';x.style.outlineOffset='';x.removeAttribute('data-cyrus-search-active');}});cyrusRoomSearchItems=[];cyrusRoomSearchIndex=-1;cyrusRoomSearchTerm='';if(cyrusRoomSearchLastFocus&&cyrusRoomSearchLastFocus.focus)cyrusRoomSearchLastFocus.focus();}}
