@@ -2079,6 +2079,33 @@ def chat(conversation_id):
         except (TypeError, ValueError):
             return None
 
+    # Group/channel messages need visible sender identity, not just anonymous bubbles.
+    sender_profiles = {}
+    if str(room_data_for_history.get("type") or "") in ("group", "channel"):
+        sender_ids = list(dict.fromkeys(
+            str(item.get("sender_id") or "") for item in messages
+            if item.get("sender_id") and str(item.get("sender_id")) != current_user
+        ))[:200]
+        if sender_ids:
+            try:
+                sender_profile_response = requests.get(
+                    URL + "/rest/v1/cyrus_profiles",
+                    params={
+                        "select": "id,display_name,username,avatar_url",
+                        "id": "in.(" + ",".join(sender_ids) + ")"
+                    },
+                    headers=headers,
+                    timeout=15
+                )
+                if sender_profile_response.ok:
+                    sender_profiles = {
+                        str(profile.get("id") or ""): profile
+                        for profile in sender_profile_response.json()
+                        if isinstance(profile, dict)
+                    }
+            except Exception:
+                sender_profiles = {}
+
     message_rows = ""
     previous_message_date = None
 
@@ -2138,6 +2165,19 @@ def chat(conversation_id):
                 read_status_html = '<span class="message-read-status" title="تعداد اعضای خواننده">✓✓ '+str(readers)+'</span>'
 
         meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
+        sender_label_html = ""
+        if not mine and str(room_data_for_history.get("type") or "") in ("group", "channel"):
+            sender_profile = sender_profiles.get(str(msg.get("sender_id") or ""), {})
+            sender_name = str(sender_profile.get("display_name") or sender_profile.get("username") or "عضو")
+            sender_avatar = str(sender_profile.get("avatar_url") or "")
+            if sender_avatar:
+                sender_avatar_html = '<img src="' + html.escape(sender_avatar, quote=True) + '" alt="" loading="lazy" style="width:20px;height:20px;border-radius:50%;object-fit:cover">'
+            else:
+                sender_avatar_html = '<span style="width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;background:#29445a;color:#e5bd69;font-size:11px">𓅃</span>'
+            sender_label_html = (
+                '<div class="cyrus-message-sender" style="display:flex;align-items:center;gap:6px;margin:0 0 5px;color:#8fc9f2;font-size:11px">'
+                + sender_avatar_html + '<span>' + html.escape(sender_name) + '</span></div>'
+            )
         reply_source = html.escape(str(meta.get("reply_to_content") or ""))
         reply_target_id = html.escape(str(meta.get("reply_to_id") or ""), quote=True)
         reply_preview = (f'<button type="button" class="reply-preview" data-reply-target="{reply_target_id}" onclick="cyrusJumpToMessage(event,this)">↪ پاسخ به: {reply_source}</button>' if reply_source else "")
@@ -2181,7 +2221,7 @@ def chat(conversation_id):
 
         message_rows += f"""
         <div id="message-{msg_id}" class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" data-conversation-id="{conversation_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
-          {reply_preview}{forwarded_label}{pinned_label}
+          {sender_label_html}{reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           {reaction_badges_html}
           <small>{stamp}{edited_label} {read_status_html}</small>
