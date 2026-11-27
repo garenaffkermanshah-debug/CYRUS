@@ -65,6 +65,10 @@ def cyrus_refresh_auth_session():
 
     refresh_token = session.get("refresh_token")
     if not refresh_token:
+        # A session without a refresh credential cannot be renewed safely.
+        for key in ("access_token", "refresh_token", "token_expires_at", "user_id", "last_seen_ping_at"):
+            session.pop(key, None)
+        session.permanent = False
         return
 
     try:
@@ -80,7 +84,13 @@ def cyrus_refresh_auth_session():
             session["refresh_token"] = data.get("refresh_token") or refresh_token
             session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
             session.permanent = True
+        elif response.status_code in (400, 401):
+            # Supabase rejects revoked/expired refresh tokens with an auth error.
+            for key in ("access_token", "refresh_token", "token_expires_at", "user_id", "last_seen_ping_at"):
+                session.pop(key, None)
+            session.permanent = False
         else:
+            # Keep the session during temporary backend failures and retry shortly.
             session["token_expires_at"] = time.time() + 60
     except Exception:
         session["token_expires_at"] = time.time() + 60
