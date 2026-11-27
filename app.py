@@ -1155,6 +1155,9 @@ def public_user_profile(user_id):
         uuid.UUID(user_id)
     except ValueError:
         return "شناسه کاربر نامعتبر است", 400
+    own_id = str(session.get("user_id") or "")
+    if user_id == own_id:
+        return redirect("/settings")
     headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"]}
     try:
         r = requests.get(URL + "/rest/v1/cyrus_profiles",
@@ -1165,60 +1168,174 @@ def public_user_profile(user_id):
         p = r.json()[0]
     except Exception:
         return page('<div class="container card"><h3>ارتباط با سرور برقرار نشد</h3></div>'), 502
-    name = html.escape(str(p.get("display_name") or p.get("username") or "کاربر"))
-    username = html.escape(str(p.get("username") or ""))
-    bio = html.escape(str(p.get("bio") or ""))
+
+    name = str(p.get("display_name") or p.get("username") or "کاربر")
+    username = str(p.get("username") or "")
+    bio = str(p.get("bio") or "")
     avatar = str(p.get("avatar_url") or "")
-    avatar_html = ('<img src="' + html.escape(avatar, quote=True) + '" alt="عکس پروفایل" style="width:110px;height:110px;border-radius:50%;object-fit:cover;border:2px solid #3297df">') if avatar else '<div class="avatar" style="width:110px;height:110px;margin:auto;font-size:42px">𓅃</div>'
-    own_id = str(session.get("user_id") or "")
+    safe_id = html.escape(user_id, quote=True)
+    avatar_html = ('<img src="' + html.escape(avatar, quote=True) + '" alt="">') if avatar else '<div class="profile-user-symbol">𓅃</div>'
+
     blocked_by_me = False
-    if user_id != own_id:
-        try:
-            block_check = requests.get(
-                URL + "/rest/v1/cyrus_user_blocks",
-                params={"select":"blocker_id", "blocker_id":"eq."+own_id,
-                        "blocked_id":"eq."+user_id, "limit":"1"},
-                headers=headers, timeout=15
-            )
-            blocked_by_me = bool(block_check.ok and block_check.json())
-        except Exception:
-            blocked_by_me = False
+    is_contact = False
+    contact_name = ""
+    saved_profile = False
+    try:
+        block_check = requests.get(URL + "/rest/v1/cyrus_user_blocks",
+            params={"select":"blocker_id","blocker_id":"eq."+own_id,"blocked_id":"eq."+user_id,"limit":"1"},
+            headers=headers, timeout=15)
+        blocked_by_me = bool(block_check.ok and block_check.json())
+        contact_check = requests.get(URL + "/rest/v1/cyrus_contacts",
+            params={"select":"contact_name","owner_id":"eq."+own_id,"contact_user_id":"eq."+user_id,"limit":"1"},
+            headers=headers, timeout=15)
+        if contact_check.ok and contact_check.json():
+            is_contact = True
+            contact_name = str(contact_check.json()[0].get("contact_name") or "")
+        saved_check = requests.get(URL + "/rest/v1/cyrus_saved_profiles",
+            params={"select":"id","owner_id":"eq."+own_id,"saved_user_id":"eq."+user_id,"limit":"1"},
+            headers=headers, timeout=15)
+        saved_profile = bool(saved_check.ok and saved_check.json())
+    except Exception:
+        pass
+
+    display_name = contact_name or name
     block_label = "رفع مسدودیت" if blocked_by_me else "مسدود کردن کاربر"
-    block_form = (
-        f'<form method="post" action="/user/{html.escape(user_id, quote=True)}/block" '
-        'onsubmit="return confirm(\'وضعیت مسدودسازی این کاربر تغییر کند؟\')">'
-        f'<button type="submit" style="background:#24384b;color:#e6c36d">{block_label}</button></form>'
-        if user_id != own_id else ""
+    contact_action = (
+        '<button type="button" onclick="document.getElementById(\\'cyrusEditContact\\').open=true">ویرایش مخاطب</button>'
+        if is_contact else
+        f'<form method="post" action="/user/{safe_id}/contact"><button type="submit">افزودن مخاطب</button></form>'
     )
-    blocked_notice = '<p class="error">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
-    send_form_style = 'style="display:none"' if blocked_by_me else ""
+    saved_label = "حذف پروفایل ذخیره‌شده" if saved_profile else "ذخیره پروفایل"
+    blocked_notice = '<p class="profile-blocked-note">این کاربر را مسدود کرده‌اید؛ امکان ارسال پیام نیست.</p>' if blocked_by_me else ""
+    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="/start-chat/{safe_id}">ارسال پیام</a>'
+
     content = f"""<main class="container cyrus-user-profile">
       <style>
-        .cyrus-user-profile{{padding:14px}}
-        .user-profile-hero{{text-align:center;padding:25px 16px 18px;background:#111e2b;border:1px solid #263b50;border-radius:18px}}
-        .user-profile-hero img,.user-profile-hero .avatar{{width:108px;height:108px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px}}
-        .user-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px}}
-        .user-profile-username{{color:#78b8e6;font-size:13px;direction:ltr}}
-        .user-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:13px 0;white-space:pre-wrap}}
-        .user-profile-actions{{margin-top:12px}}
-        .user-profile-actions button{{background:#20384d;color:#eaf3fa}}
-        .user-profile-actions .block-button{{background:#40262c;color:#f0c6c9}}
+        .cyrus-user-profile{{padding:12px 12px 88px;max-width:560px}}
+        .user-profile-card{{position:relative;background:#111e2b;border:1px solid #263b50;border-radius:16px;padding:15px 16px 17px;overflow:visible}}
+        .user-profile-top{{display:flex;align-items:center;justify-content:space-between;min-height:58px;direction:rtl}}
+        .user-profile-photo{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:2px solid #2d8ecb;background:#172a3a;display:grid;place-items:center}}
+        .user-profile-photo img{{width:100%;height:100%;object-fit:cover}}
+        .profile-user-symbol{{font-size:28px;color:#d8b46a}}
+        .profile-more{{position:absolute;left:12px;top:12px;z-index:15}}
+        .profile-more summary{{list-style:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:25px;cursor:pointer}}
+        .profile-more summary::-webkit-details-marker{{display:none}}
+        .profile-more-menu{{position:absolute;left:0;top:39px;width:205px;padding:5px;background:#223344;border:1px solid #3a5267;border-radius:12px;box-shadow:0 8px 28px #0008;z-index:20}}
+        .profile-more-menu form{{margin:0}}
+        .profile-more-menu button,.profile-more-menu a{{display:block;width:100%;margin:0;padding:12px 13px;border:0;border-radius:8px;background:transparent;color:#e8eff5;text-align:right;font-size:13px;text-decoration:none}}
+        .profile-more-menu button:active,.profile-more-menu a:active{{background:#344b5e}}
+        .profile-more-menu .danger{{color:#f1aeb4}}
+        .user-profile-name{{margin:13px 0 3px;text-align:right;color:#f0f4f7;font-size:20px;font-weight:500}}
+        .user-profile-username{{text-align:right;color:#78b8e6;font-size:13px;direction:ltr;unicode-bidi:plaintext}}
+        .user-profile-bio{{text-align:right;color:#c3cfda;font-size:14px;line-height:1.9;margin:11px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
+        .profile-primary-action{{display:block;text-align:center;margin:12px 0 0;padding:13px;border-radius:12px;background:#248bd0;color:#fff;text-decoration:none;font-size:15px}}
+        .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
+        .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
+        .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
+        .profile-contact-edit summary::-webkit-details-marker{{display:none}}
+        .profile-contact-edit form{{padding:12px 14px;border-top:1px solid #263b50}}
+        .profile-contact-edit input{{width:100%;box-sizing:border-box;padding:12px;background:#0a1521;color:#fff;border:1px solid #2a4054;border-radius:9px}}
+        .profile-contact-edit button{{margin-top:10px;width:100%;padding:12px;background:#248bd0;color:white;border:0;border-radius:9px}}
       </style>
-      <section class="user-profile-hero">
-        {avatar_html}
-        <h2>{name}</h2>
-        <div class="user-profile-username">@{username}</div>
-        <p class="user-profile-bio">{bio or "بیوگرافی اضافه نشده است"}</p>
+      <section class="user-profile-card">
+        <div class="user-profile-top">
+          <div class="user-profile-photo">{avatar_html}</div>
+          <details class="profile-more">
+            <summary aria-label="گزینه‌های بیشتر">⋮</summary>
+            <div class="profile-more-menu">
+              {contact_action}
+              <form method="post" action="/user/{safe_id}/save-profile"><button type="submit">{saved_label}</button></form>
+              <form method="post" action="/user/{safe_id}/block" onsubmit="return confirm('وضعیت مسدودسازی این کاربر تغییر کند؟')"><button class="danger" type="submit">{block_label}</button></form>
+            </div>
+          </details>
+        </div>
+        <h2 class="user-profile-name">{html.escape(display_name)}</h2>
+        <div class="user-profile-username">@{html.escape(username)}</div>
+        <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
       </section>
-      <div class="user-profile-actions">
-        {block_form.replace('<button type="submit"', '<button class="block-button" type="submit"') if block_form else ""}
-        {blocked_notice}
-        <form method="post" action="/message-to/{html.escape(user_id, quote=True)}" {send_form_style}>
-          <button type="submit">ارسال پیام</button>
-        </form>
-      </div>
-    </main>"""
+      {send_link}
+      {blocked_notice}
+      {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
+    </main>
+    <script>
+    document.addEventListener('click',function(e){{if(!e.target.closest('.profile-more'))document.querySelectorAll('.profile-more[open]').forEach(x=>x.open=false);}});
+    </script>"""
     return page(content)
+
+
+@app.route("/user/<user_id>/contact", methods=["POST"])
+def add_user_contact(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id = str(session.get("user_id") or "")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است", 400
+    if user_id == own_id:
+        return redirect("/settings")
+    name = request.form.get("contact_name", "").strip()[:60] or None
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json","Prefer":"resolution=merge-duplicates,return=minimal"}
+    try:
+        result = requests.post(URL+"/rest/v1/cyrus_contacts",
+            params={"on_conflict":"owner_id,contact_user_id"},
+            json={"owner_id":own_id,"contact_user_id":user_id,"contact_name":name},
+            headers=headers,timeout=20)
+        if not result.ok:
+            return page('<div class="container card"><p>افزودن مخاطب انجام نشد</p><a href="/user/'+user_id+'">بازگشت</a></div>'),400
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'),502
+    return redirect("/user/"+user_id)
+
+
+@app.route("/user/<user_id>/contact/edit", methods=["POST"])
+def edit_user_contact(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id = str(session.get("user_id") or "")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است",400
+    contact_name = request.form.get("contact_name","").strip()[:60] or None
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json","Prefer":"return=minimal"}
+    try:
+        changed = requests.patch(URL+"/rest/v1/cyrus_contacts",
+            params={"owner_id":"eq."+own_id,"contact_user_id":"eq."+user_id},
+            json={"contact_name":contact_name},headers=headers,timeout=20)
+        if not changed.ok:
+            return page('<div class="container card"><p>ویرایش مخاطب انجام نشد</p><a href="/user/'+user_id+'">بازگشت</a></div>'),400
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'),502
+    return redirect("/user/"+user_id)
+
+
+@app.route("/user/<user_id>/save-profile", methods=["POST"])
+def toggle_saved_profile(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id = str(session.get("user_id") or "")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است",400
+    if user_id == own_id:
+        return redirect("/settings")
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json","Prefer":"return=minimal"}
+    params = {"owner_id":"eq."+own_id,"saved_user_id":"eq."+user_id}
+    try:
+        existing = requests.get(URL+"/rest/v1/cyrus_saved_profiles",params={**params,"select":"id","limit":"1"},headers=headers,timeout=15)
+        if not existing.ok:
+            return page('<div class="container card"><p>بررسی پروفایل ذخیره‌شده ناموفق بود</p><a href="/user/'+user_id+'">بازگشت</a></div>'),400
+        if existing.json():
+            changed = requests.delete(URL+"/rest/v1/cyrus_saved_profiles",params=params,headers=headers,timeout=15)
+        else:
+            changed = requests.post(URL+"/rest/v1/cyrus_saved_profiles",json={"owner_id":own_id,"saved_user_id":user_id},headers=headers,timeout=15)
+        if not changed.ok:
+            return page('<div class="container card"><p>ذخیره پروفایل انجام نشد</p><a href="/user/'+user_id+'">بازگشت</a></div>'),400
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'),502
+    return redirect("/user/"+user_id)
 
 
 @app.route("/user/<user_id>/block", methods=["POST"])
