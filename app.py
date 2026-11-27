@@ -2040,13 +2040,13 @@ def privacy_security():
         .cps-account p{margin:6px 0 0;font-size:12px;line-height:1.7;color:#9eafbd}
         .cps-section{padding:18px 16px 6px}
         .cps-title{color:#6ab5ee;font-size:14px;margin:0 0 10px;font-weight:500}
-        .cps-row{min-height:58px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #263440;padding:9px 0;cursor:pointer}
+        .cps-row{min-height:62px;display:flex;align-items:center;gap:11px;border-bottom:1px solid #263440;padding:11px 0;cursor:pointer;box-sizing:border-box}
         .cps-row:last-child{border-bottom:0}
-        .cps-icon{width:27px;flex:0 0 27px;text-align:center;font-size:21px;color:#8abde5}
-        .cps-main{flex:1;min-width:0}
-        .cps-name{font-size:14px;color:#eaf0f5}
-        .cps-value{font-size:12px;color:#8fa5b7;margin-top:4px;line-height:1.5}
-        .cps-chevron{font-size:23px;color:#71899b}
+        .cps-icon{width:25px;flex:0 0 25px;text-align:center;font-size:20px;color:#8abde5}
+        .cps-main{flex:1;min-width:0;display:block;overflow:hidden}
+        .cps-name{display:block;font-size:13px;line-height:1.55;color:#eaf0f5;overflow-wrap:anywhere}
+        .cps-value{display:block;font-size:12px;color:#8fa5b7;margin-top:5px;line-height:1.65;overflow-wrap:anywhere}
+        .cps-chevron{font-size:22px;line-height:1;flex:0 0 16px;text-align:center;color:#71899b}
         .cps-switch{appearance:none;width:38px;height:22px;flex:0 0 38px;border-radius:14px;background:#52616e;position:relative;margin:0;cursor:pointer}
         .cps-switch:before{content:"";position:absolute;width:18px;height:18px;top:2px;right:2px;border-radius:50%;background:#eaf0f5;transition:transform .16s}
         .cps-switch:checked{background:#58a9e6}
@@ -2071,11 +2071,11 @@ def privacy_security():
       <section class="cps-section">
         <h2 class="cps-title">حریم خصوصی</h2>
         <div class="cps-row" data-pref="phone" data-title="شماره تلفن" data-desc="نمایش شماره تلفن در CYRUS در حال حاضر قابلیت حساب تلفنی ندارد؛ این انتخاب صرفاً برای ذخیره ترجیح توست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">♙</span><span class="cps-main"><span class="cps-name">شماره تلفن</span><span class="cps-value" data-value>مخاطبان من</span></span><span class="cps-chevron">›</span></div>
-        <div class="cps-row" data-pref="lastseen" data-title="آخرین بازدید و آنلاین بودن" data-desc="نمایش وضعیت حضور در رابط فعلی هنوز به این گزینه متصل نیست؛ این مقدار ترجیح ذخیره‌شده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">◷</span><span class="cps-main"><span class="cps-name">آخرین بازدید و آنلاین بودن</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="lastseen" data-title="آخرین بازدید و آنلاین بودن" data-desc="نمایش وضعیت حضور در رابط فعلی هنوز به این گزینه متصل نیست؛ این مقدار ترجیح ذخیره‌شده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">◷</span><span class="cps-main"><span class="cps-name">آخرین بازدید</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
         <div class="cps-row" data-pref="photo" data-title="تصویر پروفایل" data-desc="این انتخاب فعلاً ذخیره می‌شود؛ دسترسی تصاویر پروفایل در سرور هنوز بر اساس آن محدود نشده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">▣</span><span class="cps-main"><span class="cps-name">تصویر پروفایل</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
         <div class="cps-row" data-pref="calls" data-title="تماس‌ها" data-desc="قابلیت تماس صوتی و تصویری هنوز در CYRUS فعال نیست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">☎</span><span class="cps-main"><span class="cps-name">تماس‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
         <div class="cps-row" data-pref="groups" data-title="گروه‌ها و کانال‌ها" data-desc="دعوت‌پذیری گروه‌ها و کانال‌ها هنوز به این ترجیح متصل نشده است." data-options="همه|مخاطبان من"><span class="cps-icon">♧</span><span class="cps-main"><span class="cps-name">گروه‌ها و کانال‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
-        <div class="cps-row" data-pref="forward" data-title="پیام‌های فورواردشده" data-desc="کنترل نمایش پیوند به حساب در پیام‌های فورواردشده در نسخه فعلی هنوز پشتیبانی نمی‌شود." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">➦</span><span class="cps-main"><span class="cps-name">پیام‌های فورواردشده</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" data-pref="forward" data-title="پیام‌های فورواردشده" data-desc="کنترل نمایش پیوند به حساب در پیام‌های فورواردشده در نسخه فعلی هنوز پشتیبانی نمی‌شود." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">➦</span><span class="cps-main"><span class="cps-name">پیام‌های فورواردی</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
       </section>
       <section class="cps-section">
         <h2 class="cps-title">امنیت</h2>
@@ -3721,24 +3721,44 @@ async function cyrusToggleVoiceRecord(b){
             pass
     content += """
     <style id="cyrus-chat-prefs-style">
-      .message .message-body{font-size:var(--cyrus-message-size,14px)!important}
-      .message{border-radius:var(--cyrus-message-radius,16px)!important}
-      .container:has(.cyrus-chat-header){background:var(--cyrus-chat-wallpaper,linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9)))!important}
       .cyrus-chat-prefs-no-animation *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
     </style>
     <script>
     (function(){
-      try{
-        const p=JSON.parse(localStorage.getItem('cyrus-chat-preferences-v1')||'{}');
-        const root=document.documentElement;
-        root.style.setProperty('--cyrus-message-size',(Math.max(12,Math.min(22,Number(p.size)||16)))+'px');
-        root.style.setProperty('--cyrus-message-radius',p.bubble===false?'5px':'16px');
-        const walls={default:'linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9))',blue:'linear-gradient(160deg,#0b2540,#174b72,#081b31)',green:'linear-gradient(160deg,#102c28,#286454,#0b1d22)',purple:'linear-gradient(160deg,#251a3b,#514078,#151426)',gold:'linear-gradient(160deg,#302417,#70512b,#171a20)'};
-        if(walls[p.wall])root.style.setProperty('--cyrus-chat-wallpaper',walls[p.wall]);
-        if(p.animations===false)document.documentElement.classList.add('cyrus-chat-prefs-no-animation');
-        if(p.enter===true){const box=document.querySelector('.send-box input[name="content"]'),form=box&&box.closest('form');if(box&&form)box.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();form.requestSubmit();}});}
-        if(p.video===true)document.querySelectorAll('.message video').forEach(v=>{v.autoplay=true;v.play().catch(()=>{});});
-      }catch(e){}
+      function applyCyrusChatPreferences(){
+        let p={};
+        try{p=JSON.parse(localStorage.getItem('cyrus-chat-preferences-v1')||'{}')||{};}catch(_e){}
+        const size=Math.max(12,Math.min(22,Number(p.size)||16));
+        const radius=p.bubble===false?'5px':'16px';
+        document.querySelectorAll('.message .message-body').forEach(el=>el.style.setProperty('font-size',size+'px','important'));
+        document.querySelectorAll('.message').forEach(el=>el.style.setProperty('border-radius',radius,'important'));
+        const walls={
+          default:'linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9))',
+          blue:'linear-gradient(160deg,#0b2540,#174b72,#081b31)',
+          green:'linear-gradient(160deg,#102c28,#286454,#0b1d22)',
+          purple:'linear-gradient(160deg,#251a3b,#514078,#151426)',
+          gold:'linear-gradient(160deg,#302417,#70512b,#171a20)'
+        };
+        const chat=document.querySelector('.container:has(.cyrus-chat-header)');
+        if(chat&&walls[p.wall])chat.style.setProperty('background',walls[p.wall],'important');
+        document.documentElement.classList.toggle('cyrus-chat-prefs-no-animation',p.animations===false);
+        const input=document.querySelector('.send-box input[name="content"]');
+        if(input&&!input.dataset.cyrusEnterPrefBound){
+          input.dataset.cyrusEnterPrefBound='1';
+          input.addEventListener('keydown',function(e){
+            let current={};try{current=JSON.parse(localStorage.getItem('cyrus-chat-preferences-v1')||'{}')||{};}catch(_e){}
+            if(current.enter===true&&e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+              e.preventDefault();const form=input.closest('form');if(form)form.requestSubmit();
+            }
+          });
+        }
+        document.querySelectorAll('.message video').forEach(v=>{
+          if(p.video===true){v.autoplay=true;v.play().catch(()=>{});}
+          else{v.autoplay=false;v.pause();}
+        });
+      }
+      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyCyrusChatPreferences,{once:true});
+      else applyCyrusChatPreferences();
     })();
     </script>
     """
@@ -6135,7 +6155,6 @@ def chat_settings():
       </section>
       <section class="tgcs-section">
         <h2 class="tgcs-title">رسانه</h2>
-        <div class="tgcs-row"><span class="tgcs-label">پخش خودکار GIF</span><label class="tgcs-switch"><input id="tgcs-gif" type="checkbox" aria-label="پخش خودکار GIF"><i></i></label></div>
         <div class="tgcs-row"><span class="tgcs-label">پخش خودکار ویدیو</span><label class="tgcs-switch"><input id="tgcs-video" type="checkbox" aria-label="پخش خودکار ویدیو"><i></i></label></div>
         <div class="tgcs-row"><span class="tgcs-label">انیمیشن‌ها</span><label class="tgcs-switch"><input id="tgcs-animations" type="checkbox" checked aria-label="انیمیشن‌ها"><i></i></label></div>
       </section>
@@ -6144,9 +6163,9 @@ def chat_settings():
     <script>
     (function(){
       const key='cyrus-chat-preferences-v1';
-      const defaults={size:16,bubble:true,enter:false,gif:false,video:false,animations:true,wall:'default'};
+      const defaults={size:16,bubble:true,enter:false,video:false,animations:true,wall:'default'};
       let prefs={...defaults};try{prefs={...prefs,...JSON.parse(localStorage.getItem(key)||'{}')}}catch(e){}
-      const ids={size:'tgcs-size',bubble:'tgcs-bubble',enter:'tgcs-enter',gif:'tgcs-gif',video:'tgcs-video',animations:'tgcs-animations'};
+      const ids={size:'tgcs-size',bubble:'tgcs-bubble',enter:'tgcs-enter',video:'tgcs-video',animations:'tgcs-animations'};
       Object.keys(ids).forEach(k=>{const el=document.getElementById(ids[k]);if(!el)return;if(el.type==='checkbox')el.checked=!!prefs[k];else el.value=String(prefs[k]);});
       function show(){document.getElementById('tgcs-size-value').textContent=prefs.size;document.getElementById('tgcs-bubble-value').textContent=prefs.bubble?'گرد':'زاویه‌دار';document.querySelectorAll('.tgcs-wall').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.wall===prefs.wall)));}
       function save(){try{localStorage.setItem(key,JSON.stringify(prefs));}catch(e){}show();document.getElementById('tgcs-status').textContent='ذخیره شد';}
