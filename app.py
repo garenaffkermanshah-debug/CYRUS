@@ -3696,9 +3696,18 @@ def serve_chat_media(conversation_id, owner_id, object_name):
             signed_url=URL+signed_url
         elif signed_url.startswith("/object/"):
             signed_url=URL+"/storage/v1"+signed_url
-        elif not signed_url.startswith("http"):
+        elif not signed_url.startswith(("https://","http://")):
             return "لینک فایل نامعتبر است",502
-        return redirect(signed_url,code=302)
+        # لینک امضاشده فقط باید از همان میزبان Supabase صادر شده باشد؛
+        # پاسخ غیرمنتظره نباید مرورگر را به میزبان دیگری هدایت کند.
+        signed_parts=urlsplit(signed_url)
+        storage_parts=urlsplit(URL)
+        if (not signed_parts.hostname or
+                signed_parts.hostname.lower()!=str(storage_parts.hostname or "").lower() or
+                signed_parts.scheme not in ("https","http") or
+                (storage_parts.scheme=="https" and signed_parts.scheme!="https")):
+            return "میزبان لینک امن فایل معتبر نیست",502
+        return Response("",status=302,headers={"Location":signed_url,"Cache-Control":"private, no-store","Referrer-Policy":"no-referrer","X-Content-Type-Options":"nosniff"})
     except Exception:
         return "ارتباط با سرور ذخیره‌سازی برقرار نشد",502
 
