@@ -18,6 +18,27 @@ class CyrusSecurityTests(unittest.TestCase):
         cyrus.app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
         self.client = cyrus.app.test_client()
 
+    def test_new_supabase_secret_key_is_not_sent_as_bearer_jwt(self):
+        previous = cyrus.ADMIN_KEY
+        cyrus.ADMIN_KEY = "sb_secret_test_only"
+        try:
+            headers = cyrus.cyrus_security_headers()
+            self.assertEqual(headers["apikey"], "sb_secret_test_only")
+            self.assertNotIn("Authorization", headers)
+            self.assertEqual(headers["Content-Type"], "application/json")
+        finally:
+            cyrus.ADMIN_KEY = previous
+
+    def test_legacy_service_role_key_keeps_bearer_compatibility(self):
+        previous = cyrus.ADMIN_KEY
+        cyrus.ADMIN_KEY = "legacy-service-role-jwt"
+        try:
+            headers = cyrus.cyrus_security_headers()
+            self.assertEqual(headers["apikey"], "legacy-service-role-jwt")
+            self.assertEqual(headers["Authorization"], "Bearer legacy-service-role-jwt")
+        finally:
+            cyrus.ADMIN_KEY = previous
+
     def test_liveness_probe_is_public_and_non_cacheable(self):
         response = self.client.get("/healthz")
         self.assertEqual(response.status_code, 200)
