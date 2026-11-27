@@ -1214,7 +1214,10 @@ def verify_email():
                     if not error:
                         return redirect(url_for("home"))
                 else:
-                    error = "کد نادرست یا منقضی شده است؛ دوباره بررسی کنید."
+                    if str(data.get("error_code") or "") == "otp_expired":
+                        error = "کد نادرست، منقضی یا قبلاً مصرف شده است؛ فقط آخرین کد ایمیل را وارد کنید. مدت اعتبار OTP ایمیل در Supabase باید ۶۰۰ ثانیه باشد."
+                    else:
+                        error = "کد نادرست است؛ مطمئن شوید کد را برای همین ایمیل و از آخرین پیام CYRUS وارد می‌کنید."
 
     content = f"""
     <main class="container"><div class="card">
