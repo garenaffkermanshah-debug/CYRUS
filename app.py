@@ -2364,6 +2364,19 @@ def manage_room(conversation_id):
         if not owner and my_role not in ("owner", "admin"):
             return "فقط مالک یا مدیر اجازه مدیریت دارد", 403
 
+        join_requests = []
+        if room_type == "channel":
+            try:
+                jr = requests.post(
+                    URL + "/rest/v1/rpc/cyrus_manage_list_join_requests",
+                    json={"p_conversation_id": conversation_id},
+                    headers=headers, timeout=15
+                )
+                if jr.ok and isinstance(jr.json(), list):
+                    join_requests = jr.json()
+            except Exception:
+                join_requests = []
+
         if request.method == "POST":
             action = request.form.get("action", "")
             data = {"p_conversation_id": conversation_id}
@@ -2417,6 +2430,16 @@ def manage_room(conversation_id):
 
             elif action == "rotate_invite":
                 rpc = "cyrus_manage_rotate_invite"
+
+            elif action in ("approve_request", "decline_request"):
+                uid = request.form.get("user_id", "")
+                try:
+                    uuid.UUID(uid)
+                except ValueError:
+                    return "شناسه درخواست نامعتبر است", 400
+                rpc = "cyrus_manage_review_join_request"
+                data["p_user_id"] = uid
+                data["p_approve"] = action == "approve_request"
 
             elif action == "add":
                 username = request.form.get("username", "").strip()
@@ -2554,6 +2577,21 @@ def manage_room(conversation_id):
         if not rows:
             rows = '<p class="muted">هنوز عضوی وجود ندارد</p>'
 
+        join_request_rows = ""
+        for jr in join_requests:
+            req_uid = html.escape(str(jr.get("user_id") or ""), quote=True)
+            req_name = html.escape(str(jr.get("display_name") or jr.get("username") or "کاربر"))
+            req_username = html.escape(str(jr.get("username") or ""))
+            join_request_rows += (
+                '<div class="card"><p>' + req_name + ' (@' + req_username + ')</p>'
+                '<form method="post"><input type="hidden" name="action" value="approve_request">'
+                '<input type="hidden" name="user_id" value="' + req_uid + '"><button>تأیید عضویت</button></form>'
+                '<form method="post"><input type="hidden" name="action" value="decline_request">'
+                '<input type="hidden" name="user_id" value="' + req_uid + '"><button>رد درخواست</button></form></div>'
+            )
+        if not join_request_rows:
+            join_request_rows = '<p class="muted">درخواست عضویت جدیدی نیست</p>'
+
         content = f"""
         <div class="container">
           <section class="welcome">
@@ -2600,6 +2638,8 @@ def manage_room(conversation_id):
               <button>افزودن عضو</button>
             </form>
           </div>
+
+          {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if room_type == "channel" and join_requests else ''}
 
           <h3>اعضا ({len(members)})</h3>
           {rows}
