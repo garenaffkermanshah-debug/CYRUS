@@ -2047,7 +2047,7 @@ def chat(conversation_id):
                 if created_for_receipt and cyrus_read_time(row.get("last_read_at"))
                 and cyrus_read_time(row.get("last_read_at")) >= created_for_receipt
             )
-            if room_type == "private":
+            if str(room_data_for_history.get("type") or "") == "private":
                 read_status_html = '<span class="message-read-status" title="'+("خوانده‌شده" if readers else "ارسال‌شده")+'">'+("✓✓" if readers else "✓")+'</span>'
             elif readers:
                 read_status_html = '<span class="message-read-status" title="تعداد اعضای خواننده">✓✓ '+str(readers)+'</span>'
