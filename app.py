@@ -112,7 +112,7 @@ def cyrus_get_account_security(user_id):
         return None, "missing_admin_key"
     try:
         r = requests.get(URL + "/rest/v1/cyrus_account_security",
-            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until","user_id":"eq."+str(user_id),"limit":"1"},
+            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until,pending_password_hash,pending_expires_at","user_id":"eq."+str(user_id),"limit":"1"},
             headers=cyrus_security_headers(), timeout=12)
         if not r.ok:
             return None, "security_lookup_failed"
@@ -141,8 +141,8 @@ def cyrus_upload_room_avatar(room_id, file_obj, access_token):
     if mime not in extensions:
         return None, "فقط تصویر JPG، PNG یا WebP مجاز است"
     data = file_obj.read(5 * 1024 * 1024 + 1)
-    valid = ((mime == "image/jpeg" and data.startswith(b"\\xff\\xd8\\xff")) or
-             (mime == "image/png" and data.startswith(b"\\x89PNG\\r\\n\\x1a\\n")) or
+    valid = ((mime == "image/jpeg" and data.startswith(b"\xff\xd8\xff")) or
+             (mime == "image/png" and data.startswith(b"\x89PNG\r\n\x1a\n")) or
              (mime == "image/webp" and len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"))
     if not data or len(data) > 5*1024*1024 or not valid:
         return None, "تصویر نامعتبر است یا حجم آن بیشتر از ۵ مگابایت است"
@@ -1132,6 +1132,7 @@ def verify_email():
                     session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
                     session.permanent = True
                     session["user_id"] = data["user"]["id"]
+                    session["cyrus_login_email"] = email
                     if flow == "register" and username:
                         profile_created = False
                         try:
