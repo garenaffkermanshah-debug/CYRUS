@@ -2618,9 +2618,12 @@ def conversation_profile(conversation_id):
     content="""<main class="container cyrus-room-profile">
 <style>
 .cyrus-room-profile{padding:0 0 28px;background:#0d1722;min-height:calc(100dvh - 76px);color:#eaf1f6}
-.rp-top{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#172331;border-bottom:1px solid #263442}
-.rp-back,.rp-gear{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;background:#203243;font-size:24px}
+.rp-top{height:58px;display:flex;align-items:center;gap:10px;padding:0 14px;background:#172331;border-bottom:1px solid #263442;position:relative;z-index:5}
+.rp-back,.rp-gear,.rp-menu-button{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;background:#203243;font-size:24px;text-decoration:none;border:0}
 .rp-title{flex:1;text-align:right;font-size:16px;font-weight:600}.rp-gear{color:#e5bd69;font-size:21px}.rp-gear-space{width:38px}
+.rp-menu-wrap{position:relative}.rp-menu-button{font:24px Arial;cursor:pointer}.rp-menu{position:absolute;top:44px;left:0;min-width:190px;padding:6px;background:#142536;border:1px solid #34516a;border-radius:13px;box-shadow:0 12px 35px #0009;z-index:20}.rp-menu[hidden]{display:none}.rp-menu button,.rp-menu a{display:block;width:100%;padding:11px 12px;border:0;border-radius:8px;background:transparent;color:#eaf2f8;text-align:right;text-decoration:none;font:13px Tahoma;white-space:nowrap}
+.rp-official-cover{height:164px;margin:-20px -16px 18px;background:linear-gradient(180deg,#07111a22,#07111acc),url('/static/cyrus-tomb.jpg') center 43%/cover no-repeat;border-bottom:1px solid #38536b;position:relative}
+.rp-main h2{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .rp-hero{padding:20px 16px 18px;background:#111e2b;border-bottom:1px solid #263442}
 .rp-head{display:flex;align-items:center;gap:14px}.rp-head img,.rp-avatar-fallback{width:76px;height:76px;flex:0 0 76px;border-radius:50%;object-fit:cover;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:32px;color:#d8b46a}
 .rp-main{flex:1;min-width:0;text-align:right}.rp-main h2{margin:0;text-align:right;color:#eef4f8;font-size:20px;overflow-wrap:anywhere}.rp-kind{font-size:12px;color:#8ca8be;margin-top:6px}
@@ -2632,11 +2635,11 @@ def conversation_profile(conversation_id):
 .rp-member-name{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}.rp-member-name b{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rp-member-name small{font-size:11px;color:#8ea5b9;direction:ltr;text-align:right}.rp-role{font-size:11px;color:#7eb8e2;white-space:nowrap}
 .rp-actions{padding:8px 14px 13px 69px;display:flex;flex-wrap:wrap;gap:7px}.rp-actions a,.rp-actions button{display:inline-block;width:auto;margin:0;padding:8px 11px;border:1px solid #2d455b;border-radius:9px;background:#20384d;color:#8dc9f5;text-decoration:none;font-size:12px}.rp-actions form{margin:0}.rp-actions .rp-danger{color:#f1aeb4}.rp-empty{padding:20px;text-align:center;color:#8fa5b8;font-size:13px}
 </style>
-<header class="rp-top"><a class="rp-back" href="/chat/__ID__" aria-label="بازگشت">‹</a><span class="rp-title">اطلاعات __KIND__</span>__GEAR__</header>
-<section class="rp-hero"><div class="rp-head">__AVATAR__<div class="rp-main"><h2>__TITLE__</h2><div class="rp-kind">__KIND__ · __COUNT__ عضو</div></div></div><div class="rp-link-label">لینک کانال / دعوت</div>__LINK__<p class="rp-bio">__DESC__</p></section>
+<header class="rp-top"><a class="rp-back" href="/chat/__ID__" aria-label="بازگشت">‹</a><span class="rp-title">اطلاعات __KIND__</span>__GEAR____MENU__</header>
+<section class="rp-hero">__COVER__<div class="rp-head">__AVATAR__<div class="rp-main"><h2>__TITLE__</h2><div class="rp-kind">__KIND__ · __COUNT__ عضو</div></div></div><div class="rp-link-label">لینک کانال / دعوت</div>__LINK__<p class="rp-bio">__DESC__</p></section>
 <div class="rp-members-title"><span>اعضا</span><span>__COUNT__</span></div><input class="rp-search" id="rp-search" placeholder="جستجوی اعضا"><section id="rp-list">__ROWS__</section></main>
 <script>(function(){const i=document.getElementById("rp-search"),r=[...document.querySelectorAll(".rp-member")];i.addEventListener("input",()=>{const q=i.value.trim().toLocaleLowerCase();r.forEach(x=>x.style.display=x.textContent.toLocaleLowerCase().includes(q)?"":"none");});})();</script>"""
-    for k,v in {"__ID__":html.escape(conversation_id,quote=True),"__KIND__":kind,"__GEAR__":gear,"__AVATAR__":avatar_html,"__TITLE__":title,"__COUNT__":str(len(members)),"__LINK__":invite_html,"__DESC__":desc or "توضیحی اضافه نشده است","__ROWS__":rows}.items():
+    for k,v in {"__ID__":html.escape(conversation_id,quote=True),"__KIND__":kind,"__GEAR__":gear,"__MENU__":profile_menu,"__COVER__":'<div class="rp-official-cover" role="img" aria-label="تصویر پس‌زمینه کانال رسمی"></div>' if is_official_profile else "","__AVATAR__":avatar_html,"__TITLE__":title_html,"__COUNT__":str(len(members)),"__LINK__":invite_html,"__DESC__":desc or "توضیحی اضافه نشده است","__ROWS__":rows}.items():
         content=content.replace(k,v)
     return page(content)
 
