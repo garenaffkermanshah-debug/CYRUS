@@ -3786,9 +3786,9 @@ def cyrus_media_signature_valid(mime, data):
     if not data:
         return False
     if mime == "image/jpeg":
-        return data.startswith(b"\\xff\\xd8\\xff")
+        return data.startswith(b"\xff\xd8\xff")
     if mime == "image/png":
-        return data.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
     if mime == "image/webp":
         return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
     if mime == "image/gif":
@@ -3796,7 +3796,7 @@ def cyrus_media_signature_valid(mime, data):
     if mime == "video/mp4" or mime == "audio/mp4":
         return len(data) >= 12 and data[4:8] == b"ftyp"
     if mime == "video/webm" or mime == "audio/webm":
-        return data.startswith(b"\\x1a\\x45\\xdf\\xa3")
+        return data.startswith(b"\x1a\x45\xdf\xa3")
     if mime == "audio/ogg":
         return data.startswith(b"OggS")
     if mime == "audio/mpeg":
@@ -3805,7 +3805,7 @@ def cyrus_media_signature_valid(mime, data):
         return data.startswith(b"%PDF-")
     if mime == "text/plain":
         try:
-            return b"\\x00" not in data and data.decode("utf-8") is not None
+            return b"\x00" not in data and data.decode("utf-8") is not None
         except UnicodeDecodeError:
             return False
     if mime in ("application/zip",
@@ -3822,7 +3822,6 @@ def cyrus_media_signature_valid(mime, data):
         except (zipfile.BadZipFile, OSError):
             return False
     return False
-
 
 @app.route("/chat/<conversation_id>/upload", methods=["POST"])
 def upload_chat_media(conversation_id):
