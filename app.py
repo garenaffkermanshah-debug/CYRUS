@@ -1888,8 +1888,9 @@ def chat(conversation_id):
         .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}
         .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
         .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
-        .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;display:grid;grid-template-columns:repeat(6,40px);gap:4px;padding:8px;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20}}
-        .composer-emoji-panel button{{width:40px;height:40px;margin:0;padding:0;background:transparent;border:0;border-radius:8px;font-size:24px}}
+        .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20;display:none}}
+        .composer-emoji-panel emoji-picker{{display:block;width:100%;height:100%;--background:#203243;--border-color:#3a5268;--input-border-color:#435b70;--input-font-color:#edf4fa;--button-hover-background:#334b60}}
+        .send-box .composer-send:disabled{{opacity:.55;cursor:wait}}
         @media(max-width:520px){{.container:has(.cyrus-chat-header){{padding-inline:8px}}.message{{max-width:88%}}.messages-area{{gap:7px}}}}
         .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
         .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
@@ -1936,20 +1937,72 @@ def chat(conversation_id):
       function cyrusToggleEmoji(event) {{
         event.preventDefault();event.stopPropagation();
         const panel=document.getElementById("cyrusEmojiPanel");
-        if(panel)panel.style.display=panel.style.display==="none"?"grid":"none";
+        if(panel)panel.style.display=panel.style.display==="none"?"block":"none";
       }}
-      function cyrusInsertEmoji(emoji) {{
+      function cyrusInsertEmoji(emoji,closePanel=true) {{
         const input=document.querySelector('.send-box input[name="content"]');
         const panel=document.getElementById("cyrusEmojiPanel");
         if(!input)return;
-        const start=input.selectionStart||input.value.length;
-        const end=input.selectionEnd||start;
+        const start=input.selectionStart===null?input.value.length:input.selectionStart;
+        const end=input.selectionEnd===null?start:input.selectionEnd;
         input.value=input.value.slice(0,start)+emoji+input.value.slice(end);
         input.focus();input.setSelectionRange(start+emoji.length,start+emoji.length);
-        if(panel)panel.style.display="none";
+        input.dispatchEvent(new Event("input",{bubbles:true}));
+        if(panel&&closePanel)panel.style.display="none";
       }}
       document.addEventListener('DOMContentLoaded',function(){{
         window.scrollTo(0,document.body.scrollHeight);
+        const picker=document.getElementById("cyrusFullEmojiPicker");
+        if(picker)picker.addEventListener("emoji-click",function(event){{
+          const value=event.detail&&event.detail.unicode;
+          if(value)cyrusInsertEmoji(value,false);
+        }});
+        const form=document.querySelector(".send-box");
+        if(form){{
+          const input=form.querySelector('input[name="content"]');
+          const nonceInput=form.querySelector('input[name="client_nonce"]');
+          const sendButton=form.querySelector(".composer-send");
+          const draftKey="cyrus-chat-draft-"+form.action.split("/").filter(Boolean).slice(-2, -1)[0];
+          const makeNonce=()=>window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
+          try{{
+            const saved=JSON.parse(localStorage.getItem(draftKey)||"null");
+            if(saved&&typeof saved.text==="string"&&saved.text){{
+              input.value=saved.text;
+              nonceInput.value=saved.nonce||makeNonce();
+            }}
+          }}catch(e){{}}
+          if(!nonceInput.value)nonceInput.value=makeNonce();
+          input.addEventListener("input",function(){{
+            try{{localStorage.setItem(draftKey,JSON.stringify({{text:input.value,nonce:nonceInput.value||makeNonce()}}));}}catch(e){{}}
+          }});
+          form.addEventListener("submit",async function(event){{
+            if(form.dataset.sending==="1"){{event.preventDefault();return;}}
+            const text=input.value.trim();
+            if(!text)return;
+            event.preventDefault();
+            const nonce=nonceInput.value||makeNonce();
+            nonceInput.value=nonce;
+            try{{localStorage.setItem(draftKey,JSON.stringify({{text:text,nonce:nonce}}));}}catch(e){{}}
+            form.dataset.sending="1";
+            if(sendButton)sendButton.disabled=true;
+            input.value="";
+            const payload=new FormData(form);
+            payload.set("content",text);
+            payload.set("client_nonce",nonce);
+            try{{
+              const response=await fetch(form.action,{{method:"POST",body:payload,credentials:"same-origin",redirect:"follow"}});
+              if(!response.ok)throw new Error("send failed");
+              try{{localStorage.removeItem(draftKey);}}catch(e){{}}
+              nonceInput.value=makeNonce();
+              window.location.href=response.url||form.action;
+            }}catch(e){{
+              if(!input.value)input.value=text;
+              form.dataset.sending="";
+              if(sendButton)sendButton.disabled=false;
+              input.focus();
+            }}
+          }});
+        }}
       }});
       function cyrusOpenMessageMenu(event,message) {{
         if(event.target.closest('.message-context')) return;
