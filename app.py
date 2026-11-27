@@ -2245,7 +2245,9 @@ def manage_account_two_factor():
         code,data=auth_request("/auth/v1/otp",{"email":email,"create_user":False})
         if code not in (200,201,202):
             return page('<main class="container card"><p>ارسال کد تأیید فعال‌سازی انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
-        session["cyrus_2fa_setup_hash"]=generate_password_hash(password,method="scrypt")
+        pending_hash=generate_password_hash(password,method="scrypt")
+        if not cyrus_save_account_security(uid,{"pending_password_hash":pending_hash,"pending_expires_at":(datetime.now(timezone.utc)+timedelta(minutes=10)).isoformat()}):
+            return page('<main class="container card"><p>ذخیره موقت تنظیمات امنیتی انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
         session["cyrus_2fa_setup_email"]=email
         session["cyrus_2fa_setup_started"]=time.time()
         return redirect("/privacy-security/2fa/verify")
@@ -2264,10 +2266,20 @@ def verify_two_factor_setup():
     if not session.get("access_token"):
         return redirect("/login")
     email=str(session.get("cyrus_2fa_setup_email") or "")
-    password_hash=str(session.get("cyrus_2fa_setup_hash") or "")
     started=float(session.get("cyrus_2fa_setup_started",0) or 0)
-    if not email or not password_hash or time.time()-started>600:
-        for k in ("cyrus_2fa_setup_email","cyrus_2fa_setup_hash","cyrus_2fa_setup_started"): session.pop(k,None)
+    record, lookup_error=cyrus_get_account_security(session.get("user_id"))
+    password_hash=str((record or {}).get("pending_password_hash") or "")
+    pending_expiry=str((record or {}).get("pending_expires_at") or "")
+    expired=time.time()-started>600
+    if pending_expiry:
+        try:
+            expiry_dt=datetime.fromisoformat(pending_expiry.replace("Z","+00:00"))
+            if expiry_dt.tzinfo is None: expiry_dt=expiry_dt.replace(tzinfo=timezone.utc)
+            expired=expired or expiry_dt<=datetime.now(timezone.utc)
+        except ValueError:
+            expired=True
+    if not email or not password_hash or lookup_error or expired:
+        session.pop("cyrus_2fa_setup_email",None);session.pop("cyrus_2fa_setup_started",None)
         return redirect("/privacy-security")
     error=""
     if request.method=="POST":
@@ -2278,9 +2290,9 @@ def verify_two_factor_setup():
             code,data=auth_request("/auth/v1/verify",{"type":"email","email":email,"token":token})
             verified_user=data.get("user") if isinstance(data,dict) else None
             if code==200 and verified_user and str(verified_user.get("id"))==str(session.get("user_id")):
-                saved=cyrus_save_account_security(session.get("user_id"),{"two_factor_enabled":True,"password_hash":password_hash,"failed_attempts":0,"locked_until":None})
+                saved=cyrus_save_account_security(session.get("user_id"),{"two_factor_enabled":True,"password_hash":password_hash,"pending_password_hash":None,"pending_expires_at":None,"failed_attempts":0,"locked_until":None})
                 if saved:
-                    for k in ("cyrus_2fa_setup_email","cyrus_2fa_setup_hash","cyrus_2fa_setup_started"): session.pop(k,None)
+                    for k in ("cyrus_2fa_setup_email","cyrus_2fa_setup_started"): session.pop(k,None)
                     return redirect("/privacy-security")
                 error="ذخیره تنظیمات امنیتی انجام نشد؛ دوباره تلاش کنید."
             else:
