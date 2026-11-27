@@ -179,6 +179,24 @@ class CyrusSecurityTests(unittest.TestCase):
             self.assertEqual(state.get("cyrus_pending_email"), "pilot@example.com")
             self.assertEqual(state.get("cyrus_pending_flow"), "login")
 
+    def test_expired_otp_error_explains_last_code_and_validity(self):
+        from unittest.mock import patch
+
+        with self.client.session_transaction() as state:
+            state.update(
+                cyrus_pending_email="pilot@example.com",
+                cyrus_pending_flow="login",
+                csrf_token="test-csrf-token",
+            )
+        with patch.object(cyrus, "auth_request", return_value=(403, {"error_code": "otp_expired"})):
+            response = self.client.post(
+                "/verify-email",
+                data={"csrf_token": "test-csrf-token", "token": "123456"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("۶۰۰ ثانیه", response.get_data(as_text=True))
+        self.assertIn("آخرین کد ایمیل", response.get_data(as_text=True))
+
     def test_pwa_manifest_points_to_existing_app_icon(self):
         manifest_response = self.client.get("/manifest.webmanifest")
         self.assertEqual(manifest_response.status_code, 200)
