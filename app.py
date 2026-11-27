@@ -2263,9 +2263,25 @@ def manage_account_two_factor():
         return redirect("/privacy-security/2fa/verify")
     if action=="disable":
         password=str(request.form.get("current_password") or "")
-        if not record or not record.get("two_factor_enabled") or not record.get("password_hash") or not check_password_hash(str(record["password_hash"]),password):
+        if not record or not record.get("two_factor_enabled") or not record.get("password_hash"):
+            return redirect("/privacy-security")
+        locked_until=str(record.get("locked_until") or "")
+        if locked_until:
+            try:
+                locked_dt=datetime.fromisoformat(locked_until.replace("Z","+00:00"))
+                if locked_dt.tzinfo is None: locked_dt=locked_dt.replace(tzinfo=timezone.utc)
+                if locked_dt>datetime.now(timezone.utc):
+                    return page('<main class="container card"><p>برای تلاش دوباره کمی صبر کنید؛ تأیید دومرحله‌ای همچنان فعال است.</p><a href="/privacy-security">بازگشت</a></main>'),429
+            except ValueError:
+                pass
+        if not check_password_hash(str(record["password_hash"]),password):
+            attempts=int(record.get("failed_attempts") or 0)+1
+            payload={"failed_attempts":attempts}
+            if attempts>=5:
+                payload={"failed_attempts":0,"locked_until":(datetime.now(timezone.utc)+timedelta(minutes=15)).isoformat()}
+            cyrus_save_account_security(uid,payload)
             return page('<main class="container card"><p>گذرواژه دومرحله‌ای نادرست است؛ تأیید دومرحله‌ای همچنان فعال ماند.</p><a href="/privacy-security">بازگشت</a></main>'),400
-        if not cyrus_save_account_security(uid,{"two_factor_enabled":False,"password_hash":None,"failed_attempts":0,"locked_until":None}):
+        if not cyrus_save_account_security(uid,{"two_factor_enabled":False,"password_hash":None,"failed_attempts":0,"locked_until":None,"pending_password_hash":None,"pending_expires_at":None}):
             return page('<main class="container card"><p>خاموش‌کردن تأیید دومرحله‌ای انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
         return redirect("/privacy-security")
     return "درخواست نامعتبر است",400
