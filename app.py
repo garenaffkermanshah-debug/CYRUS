@@ -104,6 +104,42 @@ KEY = os.getenv("SUPABASE_KEY", "")
 # Server-only Supabase Auth admin key; never expose this to clients.
 ADMIN_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
+
+def cyrus_official_channel_id():
+    """Return the single server-designated official channel, never client-controlled."""
+    if not ADMIN_KEY or not URL:
+        return ""
+    try:
+        response = requests.get(
+            URL + "/rest/v1/cyrus_official_channels",
+            params={"select":"channel_id", "singleton":"eq.true", "limit":"1"},
+            headers=cyrus_security_headers(), timeout=12
+        )
+        if response.ok and response.json():
+            return str(response.json()[0].get("channel_id") or "")
+    except Exception:
+        pass
+    return ""
+
+
+def cyrus_ensure_official_membership(user_id):
+    """Auto-follow the official channel for every authenticated account entering home."""
+    channel_id = cyrus_official_channel_id()
+    user_id = str(user_id or "")
+    if not channel_id or not user_id or not ADMIN_KEY:
+        return False
+    try:
+        response = requests.post(
+            URL + "/rest/v1/cyrus_members",
+            params={"on_conflict":"conversation_id,user_id"},
+            json={"conversation_id":channel_id, "user_id":user_id, "role":"member"},
+            headers={**cyrus_security_headers(), "Prefer":"resolution=ignore-duplicates,return=minimal"},
+            timeout=12
+        )
+        return response.ok or response.status_code == 409
+    except Exception:
+        return False
+
 def cyrus_security_headers():
     return {"apikey": ADMIN_KEY, "Authorization": "Bearer " + ADMIN_KEY, "Content-Type": "application/json"}
 
@@ -601,6 +637,10 @@ def home():
     if not session.get("access_token"):
         return redirect(url_for("login"))
 
+    official_channel_id = cyrus_official_channel_id()
+    if official_channel_id:
+        cyrus_ensure_official_membership(session.get("user_id"))
+
     categories = {
         "all": ("همه", "هنوز گفتگویی ندارید", "گفتگوها، گروه‌ها و کانال‌های شما اینجا نمایش داده می‌شوند"),
         "private": ("خصوصی", "هنوز گفتگوی خصوصی ندارید", "گفتگوهای دونفره شما اینجا نمایش داده می‌شوند"),
@@ -869,6 +909,8 @@ def home():
             except Exception:
                 pass
 
+        official_badge = '<span class="cyrus-verified-badge" title="کانال رسمی تأییدشده" aria-label="تأییدشده">✓</span>' if room_id == official_channel_id else ""
+        room_title_html = html.escape(str(room_title)) + official_badge
         rows += f"""
         <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-unread="{unread}" data-title="{html.escape(str(room_title), quote=True)}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
              role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
@@ -877,7 +919,7 @@ def home():
              style="cursor:pointer">
           {avatar_html}
           <div class="chat-info">
-            <div class="chat-name">{html.escape(str(room_title))}</div>
+            <div class="chat-name">{room_title_html}</div>
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
           {unread_badge}
@@ -908,6 +950,7 @@ def home():
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
         .cyrus-chat-row .avatar{{font-weight:bold;color:#fff;cursor:pointer}}
         .cyrus-chat-row:focus-visible{{outline:2px solid #3297df;outline-offset:-2px}}
+        .cyrus-verified-badge{{display:inline-grid;place-items:center;width:16px;height:16px;margin-right:6px;border-radius:50%;background:#229ee6;color:#fff;font:700 11px Arial;vertical-align:middle;box-shadow:0 0 0 1px #0c1b29}}
         .cyrus-chat-row .chat-info{{cursor:pointer}}
       </style>
       <div class="tabs">{tabs}<a class="tab" href="/home?view=archive">آرشیو</a></div>
@@ -3034,6 +3077,7 @@ def chat(conversation_id):
 
     room_data = room.json()[0]
     room_type = str(room_data.get("type") or "")
+    is_official_channel = room_type == "channel" and conversation_id == cyrus_official_channel_id()
     room_title_text = str(room_data.get("title") or "گفتگو")
     room_avatar_source = str(room_data.get("avatar_url") or "")
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
@@ -3136,7 +3180,7 @@ def chat(conversation_id):
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
             + room_manage_menu
             + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
-            + ('' if is_room_owner else '<form method="post" action="/rooms/' + html.escape(conversation_id,quote=True) + '/leave" onsubmit="return confirm(\'از این مجموعه خارج می‌شوید؟\')"><button type="submit">ترک ' + ("گروه" if room_type=="group" else "کانال") + '</button></form>')
+            + ('' if (is_room_owner or is_official_channel) else '<form method="post" action="/rooms/' + html.escape(conversation_id,quote=True) + '/leave" onsubmit="return confirm(\'از این مجموعه خارج می‌شوید؟\')"><button type="submit">ترک ' + ("گروه" if room_type=="group" else "کانال") + '</button></form>')
             + '</div></div>'
         )
     else:
@@ -3150,10 +3194,11 @@ def chat(conversation_id):
         )
     room_header = f"""
     <section class="room-header cyrus-chat-header">
+      <style>.cyrus-verified-badge{{display:inline-grid;place-items:center;width:17px;height:17px;margin-right:7px;border-radius:50%;background:#229ee6;color:#fff;font:700 11px Arial;vertical-align:middle}}</style>
       <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
-        <h2>{room_title}</h2>
+        <h2>{room_title}{'<span class="cyrus-verified-badge" title="کانال رسمی تأییدشده" aria-label="تأییدشده">✓</span>' if is_official_channel else ''}</h2>
         <span class="room-type">{room_last_seen if room_type == 'private' else room_subtitle}</span>
       </a>
       {room_more_html}
@@ -3184,10 +3229,8 @@ def chat(conversation_id):
 
     channel_can_post = True
     if room_type == "channel":
-        channel_can_post = (
-            str(room_data.get("created_by") or "") == str(current_user)
-        )
-        if not channel_can_post:
+        channel_can_post = (str(room_data.get("created_by") or "") == str(current_user))
+        if not is_official_channel and not channel_can_post:
             member_check = requests.get(
                 URL + "/rest/v1/cyrus_members",
                 params={
@@ -4233,6 +4276,9 @@ def upload_chat_media(conversation_id):
         if not room_response.ok or not room_response.json():
             return "گفتگو پیدا نشد",404
         room=room_response.json()[0]
+        official_channel_id=cyrus_official_channel_id()
+        if conversation_id==official_channel_id and str(room.get("created_by") or "")!=current_user:
+            return "در کانال رسمی امپراتوری پارس فقط مالک کانال اجازه انتشار فایل دارد.",403
         member_response=requests.get(URL+"/rest/v1/cyrus_members",
             params={"select":"role,last_message_at","conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user,"limit":"1"},
             headers=headers,timeout=20)
@@ -4399,6 +4445,9 @@ def send_message(conversation_id):
             return "گفتگو پیدا نشد یا دسترسی ندارید", 403
 
         room = room_response.json()[0]
+        official_channel_id = cyrus_official_channel_id()
+        if conversation_id == official_channel_id and str(room.get("created_by") or "") != current_user:
+            return "در کانال رسمی امپراتوری پارس فقط مالک کانال اجازه انتشار پیام دارد.", 403
 
         message_metadata = {}
         reply_to_id = str(request.form.get("reply_to_id") or "").strip()
@@ -5809,6 +5858,8 @@ def leave_room_from_chat(conversation_id):
         uuid.UUID(conversation_id)
     except ValueError:
         return "شناسه مجموعه نامعتبر است", 400
+    if conversation_id == cyrus_official_channel_id():
+        return page('<div class="container card"><h3>کانال رسمی امپراتوری پارس</h3><p>عضویت در این کانال دائمی است و امکان ترک آن وجود ندارد.</p><a href="/chat/'+html.escape(conversation_id,quote=True)+'">بازگشت به کانال</a></div>'), 403
     headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json"}
     try:
         result = requests.post(URL+"/rest/v1/rpc/cyrus_manage_leave_room",
