@@ -1,7 +1,1 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="512" android:viewportHeight="512">
-    <path android:fillColor="#0D1722" android:pathData="M0,0h512v512h-512z"/>
-    <path android:strokeColor="#D8B45F" android:strokeWidth="10" android:fillColor="#00000000" android:pathData="M256,66a190,190 0,1 0,0.1 0"/>
-    <path android:fillColor="#D8B45F" android:pathData="M150,120h210v48h-210zM180,180h150v35h-150zM215,230h80v140h-80zM135,400h242v24h-242z"/>
-    <path android:fillColor="#0D1722" android:pathData="M210,258h92v88h-92z"/>
-    <path android:fillColor="#D8B45F" android:pathData="M230,278h52v48h-52z"/>
-</vector>
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android" android:src="@drawable/cyrus_icon_image" android:gravity="fill" />
