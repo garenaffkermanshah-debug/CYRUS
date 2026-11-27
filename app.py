@@ -407,7 +407,7 @@ def page(content):
         session["csrf_token"] = csrf_token
     csrf_input = '<input type="hidden" name="csrf_token" value="' + html.escape(csrf_token, quote=True) + '">'
     content = re.sub(
-        r'(<form\\b(?=[^>]*\\bmethod\\s*=\\s*["\\']?post\\b)[^>]*>)',
+        r"""(<form\b(?=[^>]*\bmethod\s*=\s*["']?post\b)[^>]*>)""",
         lambda match: match.group(1) + csrf_input,
         str(content),
         flags=re.IGNORECASE
