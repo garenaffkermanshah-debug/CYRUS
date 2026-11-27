@@ -31,6 +31,7 @@ docker run --rm -p 8080:8080 \
   -e PORT=8080 \
   -e SUPABASE_URL="https://YOUR-PROJECT.supabase.co" \
   -e SUPABASE_KEY="YOUR_SUPABASE_ANON_OR_PUBLISHABLE_KEY" \
+  -e SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVER_ONLY_SERVICE_ROLE_KEY" \
   -e SECRET_KEY="GENERATE_A_LONG_RANDOM_SECRET" \
   -e COOKIE_SECURE=1 \
   cyrus-messenger
@@ -40,13 +41,14 @@ docker run --rm -p 8080:8080 \
 
 ## متغیرهای ضروری
 - `SUPABASE_URL`: نشانی پروژه Supabase.
-- `SUPABASE_KEY`: کلید عمومی anon یا publishable پروژه؛ هرگز service-role key را در برنامه وب قرار ندهید.
+- `SUPABASE_KEY`: کلید عمومی anon یا publishable پروژه.
+- `SUPABASE_SERVICE_ROLE_KEY`: کلید service_role فقط برای سمت سرور؛ هرگز در HTML، JavaScript مرورگر یا مخزن قرار ندهید.
 - `SECRET_KEY`: یک راز تصادفی طولانی و ثابت. آن را در هر بار استقرار تغییر ندهید، وگرنه نشست‌های کاربران باطل می‌شوند.
 - `COOKIE_SECURE=1`: کوکی نشست فقط روی HTTPS ارسال شود. برای استقرار عمومی HTTPS الزامی است.
 
 ## بررسی سلامت سرویس
 - `GET /healthz`: زنده بودن پردازه وب را گزارش می‌کند.
-- `GET /readyz`: وجود تنظیمات Supabase و دسترسی به Auth API را بررسی می‌کند؛ در صورت آماده نبودن پاسخ HTTP 503 می‌دهد.
+- `GET /readyz`: وجود سه متغیر Supabase و دسترسی به Auth API را بررسی می‌کند؛ در صورت آماده نبودن پاسخ HTTP 503 می‌دهد.
 
 در تنظیمات پلتفرم، مسیر readiness را روی `/readyz` قرار دهید. مسیر liveness می‌تواند `/healthz` باشد.
 
