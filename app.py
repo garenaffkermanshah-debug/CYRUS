@@ -833,10 +833,6 @@ def home():
       </style>
       <div class="tabs">{tabs}<a class="tab" href="/home?view=archive">آرشیو</a></div>
 
-      <div class="cyrus-list-tools">
-        <input id="cyrus-list-search" type="search" placeholder="جستجو در گفتگوها…" aria-label="جستجو در گفتگوها">
-
-      </div>
       <div class="chat-list" id="cyrus-main-chat-list">{rows}</div>
       <script>
       const CYRUS_ARCHIVE_KEY = 'cyrus_archived_chats_v1';
@@ -2018,7 +2014,6 @@ def privacy_security():
       <section class="cps-account"><strong>حریم خصوصی حساب CYRUS</strong><p>تنظیم کن چه کسانی بتوانند اطلاعات و راه‌های ارتباطی تو را ببینند. گزینه‌های این صفحه در همین مرورگر ذخیره می‌شوند.</p></section>
       <section class="cps-section">
         <h2 class="cps-title">حریم خصوصی</h2>
-        <div class="cps-row" data-pref="phone" data-title="شماره تلفن" data-desc="نمایش شماره تلفن در CYRUS در حال حاضر قابلیت حساب تلفنی ندارد؛ این انتخاب صرفاً برای ذخیره ترجیح توست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">♙</span><span class="cps-main"><span class="cps-name">شماره تلفن</span><span class="cps-value" data-value>مخاطبان من</span></span><span class="cps-chevron">›</span></div>
         <div class="cps-row" data-pref="lastseen" data-title="آخرین بازدید و آنلاین بودن" data-desc="نمایش وضعیت حضور در رابط فعلی هنوز به این گزینه متصل نیست؛ این مقدار ترجیح ذخیره‌شده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">◷</span><span class="cps-main"><span class="cps-name">آخرین بازدید</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
         <div class="cps-row" data-pref="photo" data-title="تصویر پروفایل" data-desc="این انتخاب فعلاً ذخیره می‌شود؛ دسترسی تصاویر پروفایل در سرور هنوز بر اساس آن محدود نشده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">▣</span><span class="cps-main"><span class="cps-name">تصویر پروفایل</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
         <div class="cps-row" data-pref="calls" data-title="تماس‌ها" data-desc="قابلیت تماس صوتی و تصویری هنوز در CYRUS فعال نیست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">☎</span><span class="cps-main"><span class="cps-name">تماس‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
