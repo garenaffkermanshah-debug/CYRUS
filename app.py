@@ -1253,6 +1253,55 @@ def contacts():
     except Exception:
         error = "ارتباط با سرور برقرار نشد"
 
+    # Enrich the directory with current avatar and presence data in one batched request.
+    directory_profiles = {}
+    directory_ids = []
+    for item in users if isinstance(users, list) else []:
+        if isinstance(item, dict) and item.get("id"):
+            try:
+                directory_ids.append(str(uuid.UUID(str(item.get("id")))))
+            except (ValueError, TypeError):
+                pass
+    directory_ids = list(dict.fromkeys(directory_ids))[:100]
+    if directory_ids:
+        try:
+            profile_response = requests.get(
+                URL + "/rest/v1/cyrus_profiles",
+                params={
+                    "select": "id,avatar_url,last_seen_at",
+                    "id": "in.(" + ",".join(directory_ids) + ")"
+                },
+                headers=headers,
+                timeout=15
+            )
+            if profile_response.ok:
+                directory_profiles = {
+                    str(row.get("id") or ""): row
+                    for row in profile_response.json()
+                    if isinstance(row, dict)
+                }
+        except Exception:
+            directory_profiles = {}
+
+    def directory_presence(profile):
+        seen = str((profile or {}).get("last_seen_at") or "").strip()
+        if not seen:
+            return "آخرین بازدید نامشخص", False
+        try:
+            seen_dt = datetime.fromisoformat(seen.replace("Z", "+00:00"))
+            if seen_dt.tzinfo is None:
+                seen_dt = seen_dt.replace(tzinfo=timezone.utc)
+            age = max(0, (datetime.now(timezone.utc) - seen_dt.astimezone(timezone.utc)).total_seconds())
+            if age <= 300:
+                return "آنلاین", True
+            if age < 86400:
+                return "آخرین بازدید امروز", False
+            if age < 7 * 86400:
+                return "آخرین بازدید این هفته", False
+            return "مدتی پیش", False
+        except (TypeError, ValueError, OverflowError):
+            return "آخرین بازدید نامشخص", False
+
     rows = ""
     for user in users:
         name = str(user.get("display_name") or user.get("username") or "کاربر")
@@ -1269,15 +1318,30 @@ def contacts():
             continue
 
         safe_id = html.escape(user_id, quote=True)
+        profile = directory_profiles.get(user_id, {})
+        avatar_url = str(profile.get("avatar_url") or "")
+        presence_text, is_online = directory_presence(profile)
+        avatar_html = (
+            '<img src="' + html.escape(avatar_url, quote=True) + '" alt="" loading="lazy" '
+            'style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+            if avatar_url else "𓅃"
+        )
+        presence_color = "#79d6a4" if is_online else "#91a6b9"
+        chat_href = "/start-chat/" + safe_id
 
         rows += f"""
         <div class="chat-row">
-          <div class="avatar">𓅃</div>
+          <div class="avatar" style="position:relative;overflow:hidden">{avatar_html}
+            <span aria-label="{html.escape(presence_text, quote=True)}" title="{html.escape(presence_text, quote=True)}"
+              style="position:absolute;right:0;bottom:0;width:11px;height:11px;border-radius:50%;background:{presence_color};border:2px solid #101c29"></span>
+          </div>
           <div class="chat-info">
             <div class="chat-name">{html.escape(name)}</div>
             <div class="chat-preview">@{html.escape(username)} · {html.escape(bio)}</div>
+            <small style="color:{presence_color}">{html.escape(presence_text)}</small>
           </div>
-          <a class="action" style="margin:0;padding:10px 14px;text-align:center" href="/user/{safe_id}">نمایش پروفایل</a>
+          <a class="action" style="margin:0;padding:10px 12px;text-align:center" href="{chat_href}" aria-label="ارسال پیام به {html.escape(name, quote=True)}">پیام</a>
+          <a class="action" style="margin:0;padding:10px 12px;text-align:center" href="/user/{safe_id}">پروفایل</a>
         </div>"""
 
     if not rows and not error:
