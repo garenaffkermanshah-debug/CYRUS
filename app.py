@@ -7,7 +7,7 @@ from flask import Flask, request, session, redirect, url_for, render_template, r
 
 load_dotenv()
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 6 * 1024 * 1024
+app.config["MAX_CONTENT_LENGTH"] = 21 * 1024 * 1024  # allow 20 MiB media plus multipart overhead
 # CYRUS_PERSISTENT_SESSION_FIX
 _session_key = os.getenv("SECRET_KEY")
 if not _session_key:
