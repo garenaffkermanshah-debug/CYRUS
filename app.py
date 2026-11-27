@@ -88,6 +88,31 @@ def cyrus_refresh_auth_session():
 URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
 
+@app.route("/healthz", methods=["GET"])
+def cyrus_liveness():
+    """Container/platform liveness probe; does not expose configuration or secrets."""
+    return Response('{"status":"alive","service":"CYRUS"}',mimetype="application/json",
+                    headers={"Cache-Control":"no-store"})
+
+
+@app.route("/readyz", methods=["GET"])
+def cyrus_readiness():
+    """Readiness probe checks required configuration and Supabase Auth reachability."""
+    if not URL or not KEY:
+        return Response('{"status":"not_ready","reason":"configuration"}',status=503,
+                        mimetype="application/json",headers={"Cache-Control":"no-store"})
+    try:
+        check=requests.get(URL+"/auth/v1/settings",
+            headers={"apikey":KEY,"Accept":"application/json"},timeout=5)
+        if not check.ok:
+            return Response('{"status":"not_ready","reason":"backend"}',status=503,
+                            mimetype="application/json",headers={"Cache-Control":"no-store"})
+    except requests.RequestException:
+        return Response('{"status":"not_ready","reason":"backend"}',status=503,
+                        mimetype="application/json",headers={"Cache-Control":"no-store"})
+    return Response('{"status":"ready","service":"CYRUS"}',mimetype="application/json",
+                    headers={"Cache-Control":"no-store"})
+
 @app.before_request
 def cyrus_update_last_seen():
     if not session.get("access_token") or not session.get("user_id"):
