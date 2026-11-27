@@ -2577,7 +2577,7 @@ def chat(conversation_id):
         cyrusSelectionBar=document.createElement('div');
         cyrusSelectionBar.className='cyrus-selection-bar';
         cyrusSelectionBar.setAttribute('role','toolbar');
-        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-select-all>انتخاب همه</button><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-clear>لغو</button>';
+        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-select-all>انتخاب همه</button><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-delete>حذف پیام‌های من</button><button type="button" data-clear>لغو</button>';
         cyrusSelectionBar.style.cssText='position:fixed;z-index:50;bottom:calc(84px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#102033;border:1px solid #42617a;border-radius:18px;box-shadow:0 8px 30px #0008;color:#eaf3fa';
         cyrusSelectionBar.querySelector('[data-copy]').addEventListener('click',async()=>{{
           const texts=cyrusSelectedMessageTexts();
@@ -2587,6 +2587,17 @@ def chat(conversation_id):
           document.querySelectorAll('.message[data-message-id]').forEach(message=>cyrusSelectedMessages.add(message.dataset.messageId));
           cyrusUpdateMessageSelection();
           cyrusToast('همه پیام‌های بارگذاری‌شده انتخاب شدند');
+        }});
+        cyrusSelectionBar.querySelector('[data-delete]').addEventListener('click',()=>{{
+          const ids=[...cyrusSelectedMessages];
+          if(!ids.length||!confirm('پیام‌های انتخاب‌شده‌ای که متعلق به شما هستند حذف شوند؟ پیام‌های دیگران حذف نمی‌شوند.'))return;
+          const first=document.querySelector('.message[data-message-id]');
+          const conversationId=first&&first.dataset.conversationId;
+          if(!conversationId)return cyrusToast('شناسه گفتگو در دسترس نیست');
+          const form=document.createElement('form');form.method='post';form.action='/chat/'+encodeURIComponent(conversationId)+'/delete-selected';
+          const room=document.createElement('input');room.type='hidden';room.name='conversation_id';room.value=conversationId;form.appendChild(room);
+          ids.forEach(id=>{{const field=document.createElement('input');field.type='hidden';field.name='message_ids';field.value=id;form.appendChild(field);}});
+          document.body.appendChild(form);form.submit();
         }});
         cyrusSelectionBar.querySelector('[data-clear]').addEventListener('click',cyrusClearMessageSelection);
         document.body.appendChild(cyrusSelectionBar);
@@ -3038,6 +3049,53 @@ def send_message(conversation_id):
 
     return redirect(url_for("chat", conversation_id=conversation_id))
 
+
+
+@app.route("/chat/<conversation_id>/delete-selected", methods=["POST"])
+def delete_selected_messages(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+    posted_room = str(request.form.get("conversation_id") or "")
+    if posted_room != conversation_id:
+        return "گفتگوی انتخاب‌شده معتبر نیست", 400
+    message_ids = list(dict.fromkeys(str(value or "").strip() for value in request.form.getlist("message_ids")))
+    if not message_ids or len(message_ids) > 100:
+        return "تعداد پیام‌های انتخاب‌شده معتبر نیست", 400
+    valid_ids=[]
+    for message_id in message_ids:
+        try:
+            uuid.UUID(message_id)
+            valid_ids.append(message_id)
+        except ValueError:
+            continue
+    if not valid_ids:
+        return "شناسه پیام معتبر نیست", 400
+    uid=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session.get("access_token",""),"Prefer":"return=representation"}
+    try:
+        membership=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,"user_id":"eq."+uid,"limit":"1"},
+            headers=headers,timeout=15)
+        if not membership.ok or not membership.json():
+            return "عضو این گفتگو نیستید",403
+        deleted=0
+        for message_id in valid_ids:
+            response=requests.delete(URL+"/rest/v1/cyrus_messages",
+                params={"id":"eq."+message_id,"conversation_id":"eq."+conversation_id,"sender_id":"eq."+uid},
+                headers=headers,timeout=15)
+            if not response.ok:
+                return page('<div class="container card"><p>حذف گروهی کامل نشد؛ دوباره گفتگو را بررسی کنید.</p><a href="/chat/'+html.escape(conversation_id,quote=True)+'">بازگشت</a></div>'),400
+            try:
+                deleted+=len(response.json())
+            except Exception:
+                pass
+        return redirect(url_for("chat",conversation_id=conversation_id,deleted=deleted))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/chat/message/<message_id>/pin", methods=["POST"])
