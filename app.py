@@ -1191,14 +1191,24 @@ def login():
             elif not existing.get("email_confirmed_at"):
                 error = "ایمیل این حساب هنوز تأیید نشده؛ از بخش ثبت‌نام کد تأیید دریافت کنید."
             else:
-                code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": False})
-                if code in (200, 201, 202):
+                security, security_error = cyrus_get_account_security(existing.get("id"))
+                if security_error:
+                    error = "بررسی تنظیمات امنیتی حساب انجام نشد؛ دوباره تلاش کنید."
+                elif security and security.get("two_factor_enabled"):
                     session.clear()
-                    session["cyrus_pending_email"] = email
-                    session["cyrus_pending_flow"] = "login"
-                    session["cyrus_otp_sent_at"] = time.time()
-                    return redirect(url_for("verify_email"))
-                error = "ارسال کد ورود انجام نشد؛ دوباره تلاش کنید."
+                    session["cyrus_2fa_email"] = email
+                    session["cyrus_2fa_user_id"] = str(existing.get("id"))
+                    session["cyrus_2fa_started_at"] = time.time()
+                    return redirect(url_for("login_second_factor"))
+                else:
+                    code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": False})
+                    if code in (200, 201, 202):
+                        session.clear()
+                        session["cyrus_pending_email"] = email
+                        session["cyrus_pending_flow"] = "login"
+                        session["cyrus_otp_sent_at"] = time.time()
+                        return redirect(url_for("verify_email"))
+                    error = "ارسال کد ورود انجام نشد؛ دوباره تلاش کنید."
 
     content = f"""
     <main class="container"><div class="card">
@@ -1212,6 +1222,60 @@ def login():
       <p class="muted"><a class="form-link" href="/register">ساخت حساب جدید</a></p>
     </div></main>
     """
+    return page(content)
+
+
+@app.route("/login/second-factor", methods=["GET","POST"])
+def login_second_factor():
+    email=str(session.get("cyrus_2fa_email") or "")
+    user_id=str(session.get("cyrus_2fa_user_id") or "")
+    started=float(session.get("cyrus_2fa_started_at",0) or 0)
+    if not email or not user_id or time.time()-started > 600:
+        session.pop("cyrus_2fa_email",None);session.pop("cyrus_2fa_user_id",None);session.pop("cyrus_2fa_started_at",None)
+        return redirect("/login")
+    error=""
+    if request.method=="POST":
+        record, lookup_error=cyrus_get_account_security(user_id)
+        if lookup_error or not record or not record.get("two_factor_enabled") or not record.get("password_hash"):
+            error="تنظیمات امنیتی حساب در دسترس نیست؛ دوباره وارد شوید."
+        else:
+            locked_until=str(record.get("locked_until") or "")
+            if locked_until:
+                try:
+                    locked_dt=datetime.fromisoformat(locked_until.replace("Z","+00:00"))
+                    if locked_dt.tzinfo is None: locked_dt=locked_dt.replace(tzinfo=timezone.utc)
+                    if locked_dt > datetime.now(timezone.utc):
+                        error="به‌دلیل تلاش‌های ناموفق، ورود موقتاً قفل شده است."
+                except ValueError:
+                    pass
+            password=str(request.form.get("second_password") or "")
+            if not error and check_password_hash(str(record["password_hash"]),password):
+                if not cyrus_save_account_security(user_id,{"failed_attempts":0,"locked_until":None}):
+                    error="ثبت وضعیت امنیتی انجام نشد؛ دوباره تلاش کنید."
+                else:
+                    code,data=auth_request("/auth/v1/otp",{"email":email,"create_user":False})
+                    if code in (200,201,202):
+                        session.pop("cyrus_2fa_email",None);session.pop("cyrus_2fa_user_id",None);session.pop("cyrus_2fa_started_at",None)
+                        session["cyrus_pending_email"]=email
+                        session["cyrus_pending_flow"]="login"
+                        session["cyrus_otp_sent_at"]=time.time()
+                        return redirect(url_for("verify_email"))
+                    error="ارسال کد ایمیل انجام نشد؛ دوباره تلاش کنید."
+            elif not error:
+                attempts=int(record.get("failed_attempts") or 0)+1
+                payload={"failed_attempts":attempts}
+                if attempts>=5:
+                    payload.update({"failed_attempts":0,"locked_until":(datetime.now(timezone.utc)+timedelta(minutes=15)).isoformat()})
+                cyrus_save_account_security(user_id,payload)
+                error="گذرواژه دومرحله‌ای نادرست است."
+    content=f"""
+    <main class="container"><div class="card">
+      <h2>گذرواژه دومرحله‌ای</h2>
+      <p class="muted">این حساب تأیید دومرحله‌ای را فعال کرده است. پس از تأیید گذرواژه، کد ورود به ایمیل ارسال می‌شود.</p>
+      <p class="muted" dir="ltr">{html.escape(email)}</p><p class="error">{html.escape(error)}</p>
+      <form method="post"><input type="password" name="second_password" minlength="10" maxlength="128" placeholder="گذرواژه دومرحله‌ای" autocomplete="current-password" required><button>تأیید و ارسال کد ایمیل</button></form>
+      <p class="muted"><a class="form-link" href="/login">بازگشت</a></p>
+    </div></main>"""
     return page(content)
 
 
