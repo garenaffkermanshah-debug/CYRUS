@@ -1880,7 +1880,7 @@ def chat(conversation_id):
                         room_blocked_by_me = bool(own_block.ok and own_block.json())
                         room_blocked_by_other = not room_blocked_by_me
                         room_last_seen = "این گفتگو مسدود است"
-                    room_profile_href = "/user/" + other_id + "?from_chat=1"
+                    room_profile_href = "/user/" + other_id + "?from_chat=" + conversation_id
         except Exception:
             pass
     room_title = html.escape(room_title_text)
