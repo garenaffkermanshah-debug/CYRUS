@@ -216,7 +216,7 @@ BASE = """
 <style>
 *{box-sizing:border-box}
 :root{--gold:#e2b85f;--blue:#278bdc;--panel:rgba(9,15,25,.88);--muted:#b0b2b7}
-body{margin:0;min-height:100vh;background:linear-gradient(rgba(3,7,15,.30),rgba(3,7,15,.48)),url('/static/cyrus-iran-panorama.jpg') center center/cover fixed;color:#f5eddd;font-family:Tahoma,Arial}
+body{margin:0;min-height:100vh;background:linear-gradient(rgba(3,7,15,.30),rgba(3,7,15,.48)),url('/static/cyrus-tomb.jpg') center center/cover fixed;color:#f5eddd;font-family:Tahoma,Arial}
 body:before{content:"";position:fixed;inset:0;background:rgba(3,7,15,.48);z-index:-1}
 a{text-decoration:none;color:inherit}
 .top{height:88px;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;background:rgba(5,10,20,.82);border-bottom:1px solid #987039;backdrop-filter:blur(8px)}
