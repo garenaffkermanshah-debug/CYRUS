@@ -2206,6 +2206,7 @@ def chat(conversation_id):
         .context-actions form{{display:flex;flex-direction:column;gap:5px;margin:0}}
         .context-actions select{{width:calc(100% - 24px);margin:6px 12px;max-width:none;background:#0b1422;color:#fff;border:1px solid #526a7d;border-radius:7px;padding:9px}}
         .context-actions form>button{{justify-content:flex-start}}
+        .cyrus-inchat-search{{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#142231;border-bottom:1px solid #2b4054;position:sticky;top:0;z-index:35}}.cyrus-inchat-search input{{min-width:0;flex:1;background:#0a1521;color:#fff;border:1px solid #334b61;border-radius:10px;padding:9px;font-size:13px}}.cyrus-inchat-search button{{border:0;border-radius:8px;background:#24394b;color:#e5eef6;padding:7px 10px}}.cyrus-search-count{{font-size:11px;color:#a9bdce;white-space:nowrap}}.message.cyrus-search-hit{{outline:2px solid #caa65d;outline-offset:2px}}.message.cyrus-search-current{{outline:3px solid #42a5f5;outline-offset:3px}}.cyrus-scroll-latest{{position:fixed;right:16px;bottom:94px;z-index:30;width:42px;height:42px;border:1px solid #3b5368;border-radius:50%;background:#172a3b;color:#eaf4fc;font-size:22px;box-shadow:0 5px 18px #0006}}.cyrus-scroll-latest[hidden]{{display:none}}.cyrus-compose-counter{{position:absolute;left:54px;bottom:7px;color:#9db0c2;font-size:10px;pointer-events:none}}.cyrus-compose-counter[hidden]{{display:none}}
         .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
         .forwarded-label,.pinned-label{{color:#d8b46a}}
         .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
@@ -2344,6 +2345,40 @@ def chat(conversation_id):
           if(!badges.children.length)badges.remove();message.classList.remove('context-open');
         }}catch(e){{alert('ثبت واکنش انجام نشد؛ دوباره تلاش کنید.');}}
       }}
+      (function(){{ 
+        const msgs=[...document.querySelectorAll('.message')],input=document.querySelector('.send-box input[name="content"]'),form=input&&input.form,chatId="{conversation_id}";
+        let searchBox=null,searchInput=null,matches=[],matchAt=0;
+        function ensureSearch(){{
+          if(searchBox)return;
+          searchBox=document.createElement('div');searchBox.className='cyrus-inchat-search';
+          searchBox.innerHTML='<input type="search" placeholder="جستجو در پیام‌های این گفتگو" aria-label="جستجو در گفتگو"><span class="cyrus-search-count">۰/۰</span><button type="button" data-dir="-1" aria-label="نتیجهٔ قبلی">↑</button><button type="button" data-dir="1" aria-label="نتیجهٔ بعدی">↓</button><button type="button" data-close aria-label="بستن جستجو">×</button>';
+          const header=document.querySelector('.room-header');if(header)header.after(searchBox);
+          searchInput=searchBox.querySelector('input');
+          searchInput.addEventListener('input',runSearch);
+          searchBox.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>moveMatch(Number(b.dataset.dir))));
+          searchBox.querySelector('[data-close]').addEventListener('click',closeSearch);
+        }}
+        function runSearch(){{
+          const q=(searchInput.value||'').trim().toLocaleLowerCase();matches=[];
+          msgs.forEach(m=>{{m.classList.remove('cyrus-search-hit','cyrus-search-current');if(q&&m.textContent.toLocaleLowerCase().includes(q))matches.push(m);}});
+          matchAt=0;updateSearch();if(matches.length)showMatch(0);
+        }}
+        function updateSearch(){{const n=searchBox.querySelector('.cyrus-search-count');if(n)n.textContent=(matches.length?matchAt+1:0)+'/'+matches.length;}}
+        function showMatch(i){{if(!matches.length)return;matchAt=(i+matches.length)%matches.length;matches.forEach((m,j)=>m.classList.toggle('cyrus-search-current',j===matchAt));matches.forEach(m=>m.classList.add('cyrus-search-hit'));matches[matchAt].scrollIntoView({{behavior:'smooth',block:'center'}});updateSearch();}}
+        function moveMatch(d){{if(matches.length)showMatch(matchAt+d);}}
+        function closeSearch(){{if(searchBox)searchBox.remove();searchBox=null;searchInput=null;msgs.forEach(m=>m.classList.remove('cyrus-search-hit','cyrus-search-current'));}}
+        window.cyrusSearchInChat=function(){{ensureSearch();searchBox.hidden=false;searchInput.focus();}};
+        document.addEventListener('keydown',e=>{{if(e.key==='Escape'&&searchBox)closeSearch();if(searchBox&&document.activeElement===searchInput&&e.key==='Enter'){{e.preventDefault();moveMatch(e.shiftKey?-1:1);}}}});
+        const down=document.createElement('button');down.type='button';down.className='cyrus-scroll-latest';down.textContent='↓';down.title='رفتن به آخر گفتگو';down.setAttribute('aria-label','آخرین پیام‌ها');document.body.appendChild(down);
+        function checkDown(){{down.hidden=window.scrollY+window.innerHeight>document.documentElement.scrollHeight-260;}}
+        down.addEventListener('click',()=>window.scrollTo({{top:document.documentElement.scrollHeight,behavior:'smooth'}}));window.addEventListener('scroll',checkDown,{{passive:true}});checkDown();
+        if(input){{const key='cyrus-draft-'+chatId;try{{const saved=localStorage.getItem(key);if(saved&&!input.value)input.value=saved;}}catch(e){{}}
+          let counter=document.createElement('small');counter.className='cyrus-compose-counter';input.parentElement.appendChild(counter);
+          function count(){{counter.textContent=input.value.length+'/4000';counter.hidden=input.value.length<3500;}}
+          input.addEventListener('input',()=>{{try{{localStorage.setItem(key,input.value);}}catch(e){{}}count();}});count();
+          if(form){{form.addEventListener('submit',()=>{{try{{localStorage.removeItem(key);}}catch(e){{}}}});input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){{e.preventDefault();form.requestSubmit();}}}});}}
+        }}
+      }})();
       function cyrusReply(button) {{
         document.getElementById("cyrusReplyId").value=button.dataset.id||"";
         document.getElementById("cyrusReplyText").textContent="پاسخ به: "+(button.dataset.content||"").slice(0,120);
