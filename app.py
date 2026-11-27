@@ -848,7 +848,7 @@ def search():
             room_response = requests.get(
                 URL + "/rest/v1/cyrus_conversations",
                 params={
-                    "select": "id,title,type,created_by",
+                    "select": "id,title,type,created_by,is_public",
                     "type": "in.(group,channel)",
                     "title": "ilike.*" + query + "*",
                     "order": "created_at.desc",
@@ -915,6 +915,8 @@ def search():
     room_rows = ""
     for room in rooms:
         rid = str(room.get("id") or "")
+        if not room.get("is_public", False) and rid not in joined_ids:
+            continue
         title = str(room.get("title") or "بدون نام")
         room_type = str(room.get("type") or "")
         room_kind = "channels" if room_type == "channel" else "groups"
@@ -2623,8 +2625,9 @@ def public_channels():
         response = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,title,created_by,created_at",
+                "select": "id,title,created_by,created_at,is_public",
                 "type": "eq.channel",
+                "is_public": "eq.true",
                 "order": "created_at.desc",
                 "limit": "200"
             },
