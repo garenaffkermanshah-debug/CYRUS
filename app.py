@@ -1868,7 +1868,7 @@ def search_chat_messages(conversation_id):
         return app.response_class('{"error":"invalid_conversation"}', status=400, mimetype="application/json")
 
     query = str(request.args.get("q") or "").strip()
-    query = re.sub(r"[^\\w\\s@.-]", " ", query, flags=re.UNICODE)
+    query = re.sub(r"[^\w\s@.-]", " ", query, flags=re.UNICODE)
     query = " ".join(query.split())[:80]
     if len(query) < 2:
         return app.response_class('{"results":[]}', mimetype="application/json")
