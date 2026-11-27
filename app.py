@@ -1808,6 +1808,99 @@ def toggle_user_block(user_id):
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 502
 
 
+@app.route("/blocked-users")
+def blocked_users():
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    rows_html=""
+    error=""
+    try:
+        blocked=requests.get(URL+"/rest/v1/cyrus_user_blocks",
+            params={"select":"blocked_id,created_at","blocker_id":"eq."+own_id,
+                    "order":"created_at.desc","limit":"500"},
+            headers=headers,timeout=20)
+        if not blocked.ok:
+            raise RuntimeError("blocked list unavailable")
+        rows=blocked.json()
+        ids=list(dict.fromkeys(str(row.get("blocked_id") or "") for row in rows if row.get("blocked_id")))
+        profiles={}
+        if ids:
+            result=requests.get(URL+"/rest/v1/cyrus_profiles",
+                params={"select":"id,username,display_name,avatar_url","id":"in.("+",".join(ids)+")"},
+                headers=headers,timeout=20)
+            if not result.ok:
+                raise RuntimeError("blocked profiles unavailable")
+            profiles={str(item.get("id") or ""):item for item in result.json() if isinstance(item,dict)}
+        for row in rows:
+            uid=str(row.get("blocked_id") or "")
+            try:
+                safe_id=str(uuid.UUID(uid))
+            except ValueError:
+                continue
+            profile=profiles.get(safe_id,{})
+            name=html.escape(str(profile.get("display_name") or profile.get("username") or "کاربر"))
+            username=html.escape(str(profile.get("username") or ""))
+            avatar=str(profile.get("avatar_url") or "")
+            avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="">' if avatar else '<span>♙</span>')
+            rows_html+=(
+                '<article class="blocked-user-row"><a class="blocked-user-identity" href="/user/'+safe_id+'">'
+                '<span class="blocked-user-avatar">'+avatar_html+'</span><span><b>'+name+'</b>'
+                +('<small>@'+username+'</small>' if username else '')+'</span></a>'
+                '<form method="post" action="/blocked-users/'+safe_id+'/remove" onsubmit="return confirm(\'این کاربر از فهرست مسدودها خارج شود؟\')">'
+                '<button type="submit">رفع مسدودیت</button></form></article>'
+            )
+    except Exception:
+        error="فهرست کاربران مسدودشده دریافت نشد؛ اتصال یا دسترسی پایگاه داده را بررسی کنید."
+    if not rows_html and not error:
+        rows_html='<div class="blocked-empty"><span>𓊹</span><h3>فهرست مسدودی خالی است</h3><p>کاربرانی که مسدود می‌کنید اینجا نمایش داده می‌شوند.</p></div>'
+    content=f"""
+    <main class="container blocked-users-page">
+      <style>
+        .blocked-users-page{{max-width:560px;margin:12px auto;padding:14px 12px 90px;color:#edf3f8}}
+        .blocked-users-head{{display:flex;align-items:center;gap:12px;margin-bottom:14px}}
+        .blocked-users-head a{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:#172b3d;color:#e8eef5;text-decoration:none;font-size:22px}}
+        .blocked-users-head h2{{font-size:18px;font-weight:500;margin:0;color:#e5bd69}}
+        .blocked-user-row{{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:11px;margin:7px 0;background:#101f2e;border:1px solid #293f53;border-radius:14px}}
+        .blocked-user-identity{{display:flex;align-items:center;gap:10px;min-width:0;color:#edf3f8;text-decoration:none}}
+        .blocked-user-identity b,.blocked-user-identity small{{display:block;overflow-wrap:anywhere}}
+        .blocked-user-identity small{{direction:ltr;text-align:right;color:#8fb7d5;font-size:11px;margin-top:3px}}
+        .blocked-user-avatar{{width:42px;height:42px;flex:0 0 42px;border-radius:50%;overflow:hidden;background:#1b3043;color:#d8b45f;display:grid;place-items:center;font-size:21px}}
+        .blocked-user-avatar img{{width:100%;height:100%;object-fit:cover}}
+        .blocked-user-row form{{margin:0;flex:0 0 auto}}
+        .blocked-user-row button{{margin:0;padding:9px 11px;border-radius:10px;background:#24394b;border:1px solid #49647b;color:#e9d49c;font:inherit;font-size:11px}}
+        .blocked-empty{{text-align:center;padding:55px 18px;color:#9eb1c1;background:#101f2e;border:1px solid #293f53;border-radius:16px}}
+        .blocked-empty span{{font-size:42px;color:#d8b45f}}.blocked-empty h3{{color:#e5bd69;font-size:16px;font-weight:500}}
+        .blocked-users-error{{padding:14px;color:#ffaaa0;text-align:center}}
+      </style>
+      <header class="blocked-users-head"><a href="/settings" aria-label="بازگشت">‹</a><h2>کاربران مسدودشده</h2></header>
+      {('<p class="blocked-users-error">'+html.escape(error)+'</p>') if error else rows_html}
+    </main>"""
+    return page(content)
+
+
+@app.route("/blocked-users/<user_id>/remove", methods=["POST"])
+def remove_blocked_user(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        user_id=str(uuid.UUID(user_id))
+    except ValueError:
+        return "شناسه کاربر نامعتبر است",400
+    own_id=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Prefer":"return=minimal"}
+    try:
+        result=requests.delete(URL+"/rest/v1/cyrus_user_blocks",
+            params={"blocker_id":"eq."+own_id,"blocked_id":"eq."+user_id},
+            headers=headers,timeout=20)
+        if not result.ok:
+            return page('<main class="container card"><p>رفع مسدودیت انجام نشد.</p><a href="/blocked-users">بازگشت</a></main>'),400
+        return redirect("/blocked-users?updated=1")
+    except Exception:
+        return page('<main class="container card"><p>ارتباط با سرور برقرار نشد.</p><a href="/blocked-users">بازگشت</a></main>'),502
+
+
 @app.route("/message-to/<user_id>", methods=["POST"])
 def message_to_user(user_id):
     if not session.get("access_token"):
@@ -5506,6 +5599,7 @@ def settings():
         <section class="setting-buttons">
           <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
+          <a class="s-button" href="/blocked-users"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0M4 4l16 16"/></svg></span><span class="button-title">کاربران مسدودشده و حریم خصوصی</span><span>‹</span></a>
           <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
           <a class="s-button" href="https://t.me/CyrusSupport_Aria" target="_blank" rel="noopener noreferrer"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M21.5 3.5 18 20.2a1.5 1.5 0 0 1-2.4.8l-4.7-3.5-2.3 2.2a1 1 0 0 1-1.7-.6l-.8-5.2L2.4 11a1.4 1.4 0 0 1 .1-2.6L20 2.8a1.2 1.2 0 0 1 1.5.7Z"/><path d="m6.2 13.7 11.2-8.1-6.5 11.9"/></svg></span><span class="button-title">پشتیبانی رسمی سرزمین‌های پارس</span><span>‹</span></a>
           <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
