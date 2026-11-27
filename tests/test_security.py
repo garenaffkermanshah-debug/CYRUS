@@ -30,6 +30,29 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertEqual(response.json["status"], "not_ready")
         self.assertNotIn("SUPABASE_KEY", response.get_data(as_text=True))
 
+    def test_login_page_issues_csrf_token_and_accepts_valid_form(self):
+        page = self.client.get("/login")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("csrf_token", page.get_data(as_text=True))
+        with self.client.session_transaction() as state:
+            token = state.get("csrf_token")
+        self.assertTrue(token)
+        response = self.client.post(
+            "/login",
+            data={"csrf_token": token, "email": "pilot@example.com"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "/login/password")
+
+    def test_pwa_manifest_points_to_existing_app_icon(self):
+        manifest_response = self.client.get("/manifest.webmanifest")
+        self.assertEqual(manifest_response.status_code, 200)
+        manifest = manifest_response.get_json()
+        self.assertEqual(manifest["start_url"], "/home")
+        icon_response = self.client.get(manifest["icons"][0]["src"])
+        self.assertEqual(icon_response.status_code, 200)
+        self.assertEqual(icon_response.mimetype, "image/svg+xml")
+
     def test_achaemenid_background_asset_is_available(self):
         response = self.client.get("/static/cyrus-tomb.jpg")
         self.assertEqual(response.status_code, 200)
