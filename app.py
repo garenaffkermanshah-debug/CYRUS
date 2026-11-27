@@ -660,9 +660,9 @@ def home():
                 pass
 
         rows += f"""
-        <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
+        <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-unread="{unread}" data-title="{html.escape(str(room_title), quote=True)}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
              role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
-             onclick="if(!event.target.closest('.cyrus-remove-chat'))window.location.href='/chat/{room_id}'"
+             onclick="if(!event.target.closest('.cyrus-remove-chat,.cyrus-archive-chat,.cyrus-pin-chat,.cyrus-mute-chat'))window.location.href='/chat/{room_id}'"
              onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();window.location.href='/chat/{room_id}'}}"
              style="cursor:pointer">
           {avatar_html}
@@ -672,6 +672,8 @@ def home():
           </div>
           {unread_badge}
           <button type="button" class="cyrus-archive-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusArchiveToggle(this)">آرشیو</button>
+          <button type="button" class="cyrus-pin-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusTogglePinned(this)" aria-label="سنجاق گفتگو">سنجاق</button>
+          <button type="button" class="cyrus-mute-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusToggleMuted(this)" aria-label="بی‌صدا کردن گفتگو">بی‌صدا</button>
           <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
             <button type="submit">حذف گفتگو</button>
           </form>
@@ -698,6 +700,12 @@ def home():
       </style>
       <div class="tabs">{tabs}<a class="tab" href="/home?view=archive">آرشیو</a></div>
 
+      <div class="cyrus-list-tools">
+        <input id="cyrus-list-search" type="search" placeholder="جستجو در گفتگوها…" aria-label="جستجو در گفتگوها">
+        <button type="button" id="cyrus-unread-filter" aria-pressed="false">فقط خوانده‌نشده‌ها</button>
+        <select id="cyrus-list-sort" aria-label="ترتیب گفتگوها"><option value="recent">جدیدترین</option><option value="oldest">قدیمی‌ترین</option><option value="pinned">سنجاق‌شده‌ها</option></select>
+        <button type="button" id="cyrus-clear-list-filters">پاک‌کردن فیلترها</button>
+      </div>
       <div class="chat-list" id="cyrus-main-chat-list">{rows}</div>
       <script>
       const CYRUS_ARCHIVE_KEY = 'cyrus_archived_chats_v1';
@@ -728,11 +736,54 @@ def home():
         localStorage.setItem(CYRUS_ARCHIVE_KEY,JSON.stringify(ids));
         cyrusApplyArchiveView();
       }}
-      cyrusApplyArchiveView();
+      const CYRUS_PIN_KEY='cyrus_pinned_chats_v1',CYRUS_MUTE_KEY='cyrus_muted_chats_v1';
+      function cyrusReadSet(key){{try{{const v=JSON.parse(localStorage.getItem(key)||'[]');return new Set(Array.isArray(v)?v.map(String):[]);}}catch(_e){{return new Set();}}}}
+      function cyrusWriteSet(key,set){{localStorage.setItem(key,JSON.stringify(Array.from(set)));}}
+      function cyrusTogglePinned(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_PIN_KEY);set.has(id)?set.delete(id):set.add(id);cyrusWriteSet(CYRUS_PIN_KEY,set);cyrusApplyListTools();}}
+      function cyrusToggleMuted(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_MUTE_KEY);set.has(id)?set.delete(id):set.add(id);cyrusWriteSet(CYRUS_MUTE_KEY,set);cyrusApplyListTools();}}
+      function cyrusApplyListTools(){{
+        const rows=Array.from(document.querySelectorAll('.cyrus-chat-row'));
+        const pins=cyrusReadSet(CYRUS_PIN_KEY),mutes=cyrusReadSet(CYRUS_MUTE_KEY);
+        const term=(document.getElementById('cyrus-list-search')?.value||'').trim().toLowerCase();
+        const onlyUnread=document.getElementById('cyrus-unread-filter')?.getAttribute('aria-pressed')==='true';
+        const sort=document.getElementById('cyrus-list-sort')?.value||'recent';
+        const archiveView=new URLSearchParams(location.search).get('view')==='archive';
+        rows.forEach(row=>{{
+          const id=row.dataset.roomId,archived=cyrusArchivedIds().includes(id),unread=Number(row.dataset.unread||0)>0;
+          const pinned=pins.has(id),muted=mutes.has(id);
+          row.classList.toggle('cyrus-is-pinned',pinned);row.classList.toggle('cyrus-is-muted',muted);row.classList.toggle('cyrus-is-unread',unread);
+          const pb=row.querySelector('.cyrus-pin-chat'),mb=row.querySelector('.cyrus-mute-chat');
+          if(pb)pb.textContent=pinned?'برداشتن سنجاق':'سنجاق';
+          if(mb)mb.textContent=muted?'فعال‌کردن صدا':'بی‌صدا';
+          const match=(row.dataset.search||'').includes(term);
+          row.style.display=((archiveView===archived)&&match&&(!onlyUnread||unread)&&(sort!=='pinned'||pinned))?'':'none';
+        }});
+        const list=document.getElementById('cyrus-main-chat-list');
+        if(list){{const visible=rows.filter(r=>r.style.display!=='none');visible.sort((a,b)=>{{
+          if(sort==='pinned')return (pins.has(b.dataset.roomId)?1:0)-(pins.has(a.dataset.roomId)?1:0);
+          if(sort==='oldest')return rows.indexOf(a)-rows.indexOf(b);
+          return (pins.has(b.dataset.roomId)?1:0)-(pins.has(a.dataset.roomId)?1:0)||rows.indexOf(a)-rows.indexOf(b);
+        }}).forEach(r=>list.appendChild(r));}}
+        const empty=list&&list.querySelector('.cyrus-archive-empty');
+        if(list&&!rows.some(r=>r.style.display!=='none')){{let e=empty;if(!e){{e=document.createElement('div');e.className='empty cyrus-archive-empty';list.appendChild(e);}}e.textContent=archiveView?'گفتگوی آرشیوشده‌ای ندارید':'گفتگویی مطابق فیلترها پیدا نشد';e.style.display='block';}}
+        else if(empty)empty.style.display='none';
+      }}
+      document.getElementById('cyrus-list-search')?.addEventListener('input',cyrusApplyListTools);
+      document.getElementById('cyrus-unread-filter')?.addEventListener('click',function(){{const on=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',String(on));this.textContent=on?'نمایش همه گفتگوها':'فقط خوانده‌نشده‌ها';cyrusApplyListTools();}});
+      document.getElementById('cyrus-list-sort')?.addEventListener('change',cyrusApplyListTools);
+      document.getElementById('cyrus-clear-list-filters')?.addEventListener('click',function(){{const q=document.getElementById('cyrus-list-search');if(q)q.value='';const f=document.getElementById('cyrus-unread-filter');if(f){{f.setAttribute('aria-pressed','false');f.textContent='فقط خوانده‌نشده‌ها';}}const sort=document.getElementById('cyrus-list-sort');if(sort)sort.value='recent';cyrusApplyListTools();}});
+      cyrusApplyArchiveView();cyrusApplyListTools();
       </script>
       <style>
         .cyrus-chat-row{{position:relative;touch-action:pan-y;min-height:64px;padding:8px 12px;background:transparent;border:0;border-bottom:1px solid #24313d;border-radius:0;box-shadow:none;gap:10px}} .cyrus-chat-row .avatar{{width:42px;height:42px;min-width:42px;flex:0 0 42px;font-size:18px}} .cyrus-chat-row .chat-info{{min-width:0;flex:1;padding:0 2px}} .cyrus-chat-row .chat-name{{font-size:14px;font-weight:600;color:#e8edf3;line-height:1.5}} .cyrus-chat-row .chat-preview{{font-size:12px;color:#94a5b4;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}} .cyrus-chat-row .unread-badge{{min-width:18px;height:18px;padding:0 5px;font-size:10px;display:flex;align-items:center;justify-content:center;border-radius:10px}} .cyrus-chat-row .cyrus-remove-chat button{{font-size:11px;padding:5px 8px}}
         .cyrus-archive-chat{{width:auto;flex:0 0 auto;margin:0;padding:7px 9px;border:1px solid #34516a;border-radius:9px;background:#12263a;color:#b8d8ef;font-size:11px}}
+        .cyrus-list-tools{{display:flex;gap:6px;align-items:center;padding:9px 12px;flex-wrap:wrap}}
+        .cyrus-list-tools input{{flex:1 1 100%;min-width:0;margin:0;padding:10px 12px;background:#0b1826;border:1px solid #29445c;border-radius:10px;color:#fff;font:12px Tahoma}}
+        .cyrus-list-tools button,.cyrus-list-tools select{{width:auto;flex:1 1 auto;margin:0;padding:8px 9px;background:#102337;border:1px solid #29445c;border-radius:9px;color:#b9d4e8;font:11px Tahoma}}
+        .cyrus-pin-chat,.cyrus-mute-chat{{width:auto;flex:0 0 auto;margin:0;padding:7px 8px;background:#102337;border:1px solid #29445c;border-radius:9px;color:#b9d4e8;font:10px Tahoma}}
+        .cyrus-chat-row.cyrus-is-pinned .chat-name:before{{content:'📌 ';font-size:10px}}
+        .cyrus-chat-row.cyrus-is-muted .chat-preview:after{{content:'  · بی‌صدا';color:#6e91aa;font-size:10px}}
+        .cyrus-chat-row.cyrus-is-unread{{background:rgba(31,93,139,.13)}}
         .cyrus-remove-chat{{display:none;margin:0}}
         .cyrus-remove-chat button{{width:auto;margin:0;padding:7px 10px;font-size:12px;background:#48252a;border:1px solid #a34a55;color:#ffd9dd}}
         .cyrus-chat-row.remove-open .cyrus-remove-chat{{display:block}}
