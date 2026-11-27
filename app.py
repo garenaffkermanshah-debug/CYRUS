@@ -470,16 +470,17 @@ def page(content):
         </header>"""
     if session.get("access_token") and not is_chat:
         items = [
-            ("/home", '<path d="M3 10.8 12 3l9 7.8"/><path d="M5.5 9.5V21h13V9.5M9.5 21v-6h5v6"/>', "بارگاه"),
-            ("/contacts", '<path d="M16 21v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V21"/><circle cx="9.5" cy="7" r="4"/><path d="M17 3.5a4 4 0 0 1 0 7.5M21 21v-1.5a4 4 0 0 0-3-3.87"/>', "خویشان"),
-            ("/search", '<circle cx="10.8" cy="10.8" r="7.2"/><path d="m16.2 16.2 5 5"/>', "کاوش"),
-            ("/settings", '<path d="M12 2.8v2.1m0 14.2v2.1M4.9 4.9l1.5 1.5m11.2 11.2 1.5 1.5M2.8 12h2.1m14.2 0h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/><circle cx="12" cy="12" r="5.2"/>', "تنظیمات")
+            ("/home", "𓆃", "بارگاه"),
+            ("/contacts", "𓅃", "خویشان"),
+            ("/search", "⌕", "کاوش"),
+            ("/profile", "♙", "نگاره"),
+            ("/settings", "𓊹", "فرمان")
         ]
         links = ""
         for href, icon, label in items:
             active = "current" if current == href or (href == "/home" and current == "/") else ""
-            links += f'<a class="{active}" href="{href}" aria-label="{label}"><svg class="nav-svg" viewBox="0 0 24 24" aria-hidden="true">{icon}</svg><span>{label}</span></a>'
-        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a span{{font-size:10px;line-height:1.3}}.bottom .nav-svg{{width:25px;height:25px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .18s}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-svg{{color:#e5bd69;transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
+            links += f'<a class="{active}" href="{href}" aria-label="{label}"><span class="nav-icon" aria-hidden="true">{icon}</span><span>{label}</span></a>'
+        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a span{{font-size:10px;line-height:1.3}}.bottom a .nav-icon{{font-size:23px;line-height:1.1;font-family:serif}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
     return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
