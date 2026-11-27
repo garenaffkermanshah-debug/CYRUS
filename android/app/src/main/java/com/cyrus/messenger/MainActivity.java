@@ -12,9 +12,13 @@ import android.webkit.WebSettings;
 import android.webkit.WebResourceRequest;
 import android.content.Intent;
 import android.net.Uri;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient.FileChooserParams;
 
 public class MainActivity extends Activity {
     private WebView webView;
+    private ValueCallback<Uri[]> fileChooserCallback;
+    private static final int FILE_CHOOSER_REQUEST = 4312;
     private static final String HOME = "https://cyrus.ethiodeploy.app/";
 
     @Override
@@ -40,7 +44,22 @@ public class MainActivity extends Activity {
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
 
-        webView.setWebChromeClient(new WebChromeClient());
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
+                if (fileChooserCallback != null) fileChooserCallback.onReceiveValue(null);
+                fileChooserCallback = callback;
+                Intent chooser = params.createIntent();
+                try {
+                    startActivityForResult(chooser, FILE_CHOOSER_REQUEST);
+                } catch (Exception e) {
+                    fileChooserCallback = null;
+                    callback.onReceiveValue(null);
+                    return false;
+                }
+                return true;
+            }
+        });
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -67,6 +86,16 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_CHOOSER_REQUEST && fileChooserCallback != null) {
+            Uri[] selected = FileChooserParams.parseResult(resultCode, data);
+            fileChooserCallback.onReceiveValue(selected);
+            fileChooserCallback = null;
+        }
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle outState) {
         if (webView != null) webView.saveState(outState);
         super.onSaveInstanceState(outState);
@@ -80,6 +109,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (fileChooserCallback != null) { fileChooserCallback.onReceiveValue(null); fileChooserCallback = null; }
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();
