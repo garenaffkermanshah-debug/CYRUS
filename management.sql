@@ -387,3 +387,50 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.cyrus_manage_transfer_ownership(uuid,uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.cyrus_manage_transfer_ownership(uuid,uuid) TO authenticated;
+
+
+-- Complete join-request lifecycle for both groups and channels.
+CREATE OR REPLACE FUNCTION public.cyrus_manage_review_join_request(p_conversation_id uuid,p_user_id uuid,p_approve boolean)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=public,pg_temp
+AS $$
+DECLARE v_type text;
+BEGIN
+  IF public.cyrus_room_actor_role(p_conversation_id) NOT IN ('owner','admin') THEN
+    RAISE EXCEPTION 'فقط مالک یا مدیر می‌تواند درخواست عضویت را بررسی کند';
+  END IF;
+  SELECT type INTO v_type FROM public.cyrus_conversations WHERE id=p_conversation_id;
+  IF v_type NOT IN ('group','channel') THEN RAISE EXCEPTION 'مجموعه پیدا نشد'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.cyrus_join_requests WHERE conversation_id=p_conversation_id AND user_id=p_user_id) THEN
+    RAISE EXCEPTION 'درخواست عضویت پیدا نشد';
+  END IF;
+  IF p_approve THEN
+    INSERT INTO public.cyrus_members(conversation_id,user_id,role)
+    VALUES(p_conversation_id,p_user_id,'member') ON CONFLICT DO NOTHING;
+  END IF;
+  DELETE FROM public.cyrus_join_requests WHERE conversation_id=p_conversation_id AND user_id=p_user_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.cyrus_manage_review_join_request(uuid,uuid,boolean) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_review_join_request(uuid,uuid,boolean) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.cyrus_invite_cancel_request(p_invite_code text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=public,pg_temp
+AS $$
+DECLARE v_room_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'ورود لازم است'; END IF;
+  SELECT id INTO v_room_id FROM public.cyrus_conversations
+  WHERE invite_code=trim(p_invite_code) AND type IN ('group','channel');
+  IF v_room_id IS NULL THEN RAISE EXCEPTION 'لینک دعوت نامعتبر یا لغو شده است'; END IF;
+  DELETE FROM public.cyrus_join_requests
+  WHERE conversation_id=v_room_id AND user_id=auth.uid();
+END;
+$$;
+REVOKE ALL ON FUNCTION public.cyrus_invite_cancel_request(text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_invite_cancel_request(text) TO authenticated;
