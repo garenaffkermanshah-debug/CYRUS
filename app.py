@@ -698,7 +698,7 @@ def home():
             rooms = requests.get(
                 URL + "/rest/v1/cyrus_conversations",
                 params={
-                    "select": "id,title,type,created_at",
+                    "select": "id,title,type,created_at,avatar_url",
                     "id": "in.(" + ",".join(room_ids) + ")",
                     "order": "created_at.desc"
                 },
@@ -799,7 +799,10 @@ def home():
         ]
         color_seed = sum((i + 1) * ord(ch) for i, ch in enumerate(room_id))
         avatar_color = avatar_color_list[color_seed % len(avatar_color_list)]
+        room_avatar = str(room.get("avatar_url") or "")
         avatar_html = (
+            '<img class="avatar" src="' + html.escape(room_avatar, quote=True) + '" alt="">'
+            if room_avatar else
             f'<div class="avatar" style="background:{avatar_color};border-color:{avatar_color}">{icon}</div>'
         )
 
@@ -5029,8 +5032,9 @@ def cyrus_channel_member_picker(title, room_type="channel", error=""):
     .channel-member-picker .channel-contact small{{direction:ltr;text-align:right;color:#8ea5b9;font-size:11px}}
     .channel-member-picker .picker-list{{max-height:55vh;overflow:auto}}</style>
     <h2>انتخاب اعضای {kind}</h2><p class="muted">{safe_title} · در آغاز حداکثر ۱۰۰ مخاطب</p><p class="error">{html.escape(error)}</p>
-    <form method="post" action="/rooms/create" id="channel-members-form">
+    <form method="post" action="/rooms/create" id="channel-members-form" enctype="multipart/form-data">
     <input type="hidden" name="title" value="{safe_title}"><input type="hidden" name="type" value="{safe_type}"><input type="hidden" name="action" value="{create_action}">
+    <label class="channel-contact" style="display:block"><span>تصویر گروه یا کانال (اختیاری)</span><input type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp"></label>
     <div class="picker-list">{rows}</div><p class="muted" id="channel-member-count">۰ نفر انتخاب شده‌اند</p><button type="submit">ساخت {kind} و افزودن اعضا</button></form>
     <script>(function(){{const f=document.getElementById('channel-members-form'),b=[...f.querySelectorAll('input[name="member_ids"]')],l=document.getElementById('channel-member-count');function u(){{const n=b.filter(x=>x.checked).length;l.textContent=n+' نفر انتخاب شده‌اند';b.forEach(x=>x.disabled=!x.checked&&n>=100)}}b.forEach(x=>x.addEventListener('change',u));f.addEventListener('submit',e=>{{if(b.filter(x=>x.checked).length>100){{e.preventDefault();alert('حداکثر ۱۰۰ مخاطب را انتخاب کن')}}}});u()}})();</script></main>"""
     return page(content)
@@ -5097,6 +5101,11 @@ def create_room():
         if isinstance(result,list) and result: result=result[0]
         if isinstance(result,dict): result=result.get("create_cyrus_room") or result.get("id")
         room_id=str(uuid.UUID(str(result)))
+        avatar_url, avatar_error = cyrus_upload_room_avatar(room_id, request.files.get("avatar_file"), session["access_token"])
+        if avatar_error:
+            return page('<div class="container card"><p>' + html.escape(avatar_error) + '</p><a href="/rooms/' + room_id + '/manage">ادامه مدیریت مجموعه</a></div>'), 400
+        if avatar_url and not cyrus_set_room_avatar(room_id, avatar_url, session["access_token"]):
+            return page('<div class="container card"><p>مجموعه ساخته شد، اما ثبت تصویر انجام نشد.</p><a href="/rooms/' + room_id + '/manage">تلاش دوباره از مدیریت</a></div>'), 502
         failed=[]
         for member_id in dict.fromkeys(member_ids):
             added=requests.post(URL+"/rest/v1/rpc/cyrus_manage_add_member",json={"p_conversation_id":room_id,"p_user_id":member_id},headers=headers,timeout=15)
@@ -5259,7 +5268,12 @@ def manage_room(conversation_id):
             if action == "save_settings":
                 title = request.form.get("title", "").strip()
                 description = request.form.get("description", "").strip()
-                avatar_url = request.form.get("avatar_url", "").strip()
+                avatar_url = str(room.get("avatar_url") or "")
+                uploaded_avatar, avatar_error = cyrus_upload_room_avatar(conversation_id, request.files.get("avatar_file"), session["access_token"])
+                if avatar_error:
+                    return page('<div class="container card"><p>' + html.escape(avatar_error) + '</p><a href="' + request.url + '">بازگشت</a></div>'), 400
+                if uploaded_avatar:
+                    avatar_url = uploaded_avatar
                 reactions = request.form.get("reactions_enabled") == "on"
                 is_public = request.form.get("is_public") == "on"
                 join_approval = request.form.get("join_approval") == "on"
@@ -5552,7 +5566,7 @@ def manage_room(conversation_id):
             .tg-room-settings hr{{display:none}}
           </style>
           <header class="tg-manage-topbar"><a href="/conversation/{conversation_id}/profile" aria-label="بازگشت به اطلاعات مجموعه">➜</a><span>مدیریت {kind}</span></header>
-          <form class="tg-room-settings" method="post">
+          <form class="tg-room-settings" method="post" enctype="multipart/form-data">
             <input type="hidden" name="action" value="save_settings">
             <div class="tg-section">
               <div class="tg-section-title">اطلاعات {kind}</div>
@@ -5562,8 +5576,9 @@ def manage_room(conversation_id):
               <label class="tg-field">توضیحات
                 <textarea name="description" maxlength="500" rows="3">{description}</textarea>
               </label>
-              <label class="tg-field">آدرس تصویر
-                <input name="avatar_url" maxlength="500" value="{avatar_url}" placeholder="https://..." dir="ltr">
+              <label class="tg-field">تصویر گروه یا کانال
+                <input type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp">
+                <small>برای تغییر تصویر، از گالری انتخاب کن؛ حداکثر ۵ مگابایت.</small>
               </label>
               <label class="tg-switch-row"><span>فعال بودن واکنش‌ها</span><span class="tg-switch"><input type="checkbox" name="reactions_enabled" {reactions_checked}><i></i></span></label>
             </div>
