@@ -96,13 +96,13 @@ CREATE TABLE IF NOT EXISTS public.cyrus_contacts (
 );
 ALTER TABLE public.cyrus_contacts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS cyrus_contacts_read_own ON public.cyrus_contacts;
-CREATE POLICY cyrus_contacts_read_own ON public.cyrus_contacts FOR SELECT TO authenticated USING (owner_id = auth.uid());
+CREATE POLICY cyrus_contacts_read_own ON public.cyrus_contacts FOR SELECT TO authenticated USING (owner_id = (SELECT auth.uid()));
 DROP POLICY IF EXISTS cyrus_contacts_insert_own ON public.cyrus_contacts;
-CREATE POLICY cyrus_contacts_insert_own ON public.cyrus_contacts FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
+CREATE POLICY cyrus_contacts_insert_own ON public.cyrus_contacts FOR INSERT TO authenticated WITH CHECK (owner_id = (SELECT auth.uid()));
 DROP POLICY IF EXISTS cyrus_contacts_update_own ON public.cyrus_contacts;
-CREATE POLICY cyrus_contacts_update_own ON public.cyrus_contacts FOR UPDATE TO authenticated USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
+CREATE POLICY cyrus_contacts_update_own ON public.cyrus_contacts FOR UPDATE TO authenticated USING (owner_id = (SELECT auth.uid())) WITH CHECK (owner_id = (SELECT auth.uid()));
 DROP POLICY IF EXISTS cyrus_contacts_delete_own ON public.cyrus_contacts;
-CREATE POLICY cyrus_contacts_delete_own ON public.cyrus_contacts FOR DELETE TO authenticated USING (owner_id = auth.uid());
+CREATE POLICY cyrus_contacts_delete_own ON public.cyrus_contacts FOR DELETE TO authenticated USING (owner_id = (SELECT auth.uid()));
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.cyrus_contacts TO authenticated;
 
 CREATE TABLE IF NOT EXISTS public.cyrus_saved_profiles (
@@ -115,11 +115,11 @@ CREATE TABLE IF NOT EXISTS public.cyrus_saved_profiles (
 );
 ALTER TABLE public.cyrus_saved_profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS cyrus_saved_profiles_read_own ON public.cyrus_saved_profiles;
-CREATE POLICY cyrus_saved_profiles_read_own ON public.cyrus_saved_profiles FOR SELECT TO authenticated USING (owner_id = auth.uid());
+CREATE POLICY cyrus_saved_profiles_read_own ON public.cyrus_saved_profiles FOR SELECT TO authenticated USING (owner_id = (SELECT auth.uid()));
 DROP POLICY IF EXISTS cyrus_saved_profiles_insert_own ON public.cyrus_saved_profiles;
-CREATE POLICY cyrus_saved_profiles_insert_own ON public.cyrus_saved_profiles FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
+CREATE POLICY cyrus_saved_profiles_insert_own ON public.cyrus_saved_profiles FOR INSERT TO authenticated WITH CHECK (owner_id = (SELECT auth.uid()));
 DROP POLICY IF EXISTS cyrus_saved_profiles_delete_own ON public.cyrus_saved_profiles;
-CREATE POLICY cyrus_saved_profiles_delete_own ON public.cyrus_saved_profiles FOR DELETE TO authenticated USING (owner_id = auth.uid());
+CREATE POLICY cyrus_saved_profiles_delete_own ON public.cyrus_saved_profiles FOR DELETE TO authenticated USING (owner_id = (SELECT auth.uid()));
 GRANT SELECT, INSERT, DELETE ON public.cyrus_saved_profiles TO authenticated;
 
 -- Idempotency key prevents duplicate message rows when the client retries after a connection timeout.
@@ -339,17 +339,17 @@ alter table public.cyrus_message_reactions enable row level security;
 grant select,insert,delete on public.cyrus_message_reactions to authenticated;
 drop policy if exists cyrus_reactions_read_member on public.cyrus_message_reactions;
 create policy cyrus_reactions_read_member on public.cyrus_message_reactions for select to authenticated using (
-  exists (select 1 from public.cyrus_members m where m.conversation_id=cyrus_message_reactions.conversation_id and m.user_id=auth.uid())
+  exists (select 1 from public.cyrus_members m where m.conversation_id=cyrus_message_reactions.conversation_id and m.user_id=(SELECT auth.uid()))
   or exists (select 1 from public.cyrus_conversations c where c.id=cyrus_message_reactions.conversation_id and c.type='channel' and c.is_public=true)
 );
 drop policy if exists cyrus_reactions_insert_self_member on public.cyrus_message_reactions;
 create policy cyrus_reactions_insert_self_member on public.cyrus_message_reactions for insert to authenticated with check (
-  user_id=auth.uid()
+  user_id=(SELECT auth.uid())
   and exists (select 1 from public.cyrus_messages msg where msg.id=cyrus_message_reactions.message_id and msg.conversation_id=cyrus_message_reactions.conversation_id)
-  and exists (select 1 from public.cyrus_members m where m.conversation_id=cyrus_message_reactions.conversation_id and m.user_id=auth.uid())
+  and exists (select 1 from public.cyrus_members m where m.conversation_id=cyrus_message_reactions.conversation_id and m.user_id=(SELECT auth.uid()))
 );
 drop policy if exists cyrus_reactions_delete_self on public.cyrus_message_reactions;
-create policy cyrus_reactions_delete_self on public.cyrus_message_reactions for delete to authenticated using (user_id=auth.uid());
+create policy cyrus_reactions_delete_self on public.cyrus_message_reactions for delete to authenticated using (user_id=(SELECT auth.uid()));
 
 
 -- Secure owner transfer for groups and channels.
@@ -578,3 +578,32 @@ USING (
           )
     )
 );
+
+
+-- Keep the authenticated ownership checks init-plan optimized.
+ALTER TABLE public.cyrus_conversations ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cyrus_rooms_create ON public.cyrus_conversations;
+CREATE POLICY cyrus_rooms_create ON public.cyrus_conversations
+  FOR INSERT TO authenticated WITH CHECK (created_by = (SELECT auth.uid()));
+
+ALTER TABLE public.cyrus_members ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cyrus_members_delete_own_membership ON public.cyrus_members;
+CREATE POLICY cyrus_members_delete_own_membership ON public.cyrus_members
+  FOR DELETE TO authenticated USING (user_id = (SELECT auth.uid()));
+DROP POLICY IF EXISTS cyrus_members_update_own_read_state ON public.cyrus_members;
+CREATE POLICY cyrus_members_update_own_read_state ON public.cyrus_members
+  FOR UPDATE TO authenticated USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
+
+
+-- Foreign-key covering indexes identified by Supabase performance advisors.
+CREATE INDEX IF NOT EXISTS idx_cyrus_channel_views_user_id ON public.cyrus_channel_views(user_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_contacts_contact_user_id ON public.cyrus_contacts(contact_user_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_conversations_created_by ON public.cyrus_conversations(created_by);
+CREATE INDEX IF NOT EXISTS idx_cyrus_join_requests_user_id ON public.cyrus_join_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_message_reactions_user_id ON public.cyrus_message_reactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_messages_sender_id ON public.cyrus_messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_official_channels_channel_id ON public.cyrus_official_channels(channel_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_saved_messages_user_id ON public.cyrus_saved_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_saved_profiles_saved_user_id ON public.cyrus_saved_profiles(saved_user_id);
+CREATE INDEX IF NOT EXISTS idx_cyrus_user_links_contact_user_id ON public.cyrus_user_links(contact_user_id);
