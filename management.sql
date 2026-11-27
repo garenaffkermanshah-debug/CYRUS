@@ -207,3 +207,33 @@ REVOKE ALL ON FUNCTION public.cyrus_invite_preview(text) FROM PUBLIC,anon;
 REVOKE ALL ON FUNCTION public.cyrus_invite_join(text) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.cyrus_invite_preview(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.cyrus_invite_join(text) TO authenticated;
+
+
+-- CYRUS secure server-side message posting permissions (2026-11-27).
+-- Remove permissive legacy INSERT policies: PostgreSQL combines policies with OR.
+DROP POLICY IF EXISTS cyrus_messages_send ON public.cyrus_messages;
+DROP POLICY IF EXISTS cyrus_channel_post_insert_guard ON public.cyrus_messages;
+CREATE POLICY cyrus_messages_send_secure
+ON public.cyrus_messages
+FOR INSERT TO authenticated
+WITH CHECK (
+  sender_id = (SELECT auth.uid())
+  AND EXISTS (
+    SELECT 1 FROM public.cyrus_conversations c
+    WHERE c.id = cyrus_messages.conversation_id
+      AND (
+        (c.type = 'private'
+          AND EXISTS (SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=c.id AND m.user_id=(SELECT auth.uid()))
+          AND NOT EXISTS (SELECT 1 FROM public.cyrus_members other_m WHERE other_m.conversation_id=c.id AND other_m.user_id<>(SELECT auth.uid()) AND public.cyrus_is_blocked_pair(other_m.user_id))
+        )
+        OR
+        (c.type = 'group'
+          AND EXISTS (SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=c.id AND m.user_id=(SELECT auth.uid())
+            AND (m.role IN ('owner','admin') OR coalesce((c.member_permissions->>'send_messages')::boolean,true))
+          )
+        )
+        OR
+        (c.type = 'channel' AND (c.created_by=(SELECT auth.uid()) OR EXISTS (SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=c.id AND m.user_id=(SELECT auth.uid()) AND m.role='admin'))
+      )
+  )
+);
