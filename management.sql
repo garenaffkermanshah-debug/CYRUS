@@ -350,3 +350,40 @@ create policy cyrus_reactions_insert_self_member on public.cyrus_message_reactio
 );
 drop policy if exists cyrus_reactions_delete_self on public.cyrus_message_reactions;
 create policy cyrus_reactions_delete_self on public.cyrus_message_reactions for delete to authenticated using (user_id=auth.uid());
+
+
+-- Secure owner transfer for groups and channels.
+CREATE OR REPLACE FUNCTION public.cyrus_manage_transfer_ownership(p_conversation_id uuid,p_user_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path=public,pg_temp
+AS $$
+DECLARE
+  v_actor uuid := auth.uid();
+  v_owner uuid;
+  v_type text;
+BEGIN
+  IF v_actor IS NULL THEN RAISE EXCEPTION 'ورود لازم است'; END IF;
+  IF p_user_id IS NULL OR p_user_id = v_actor THEN RAISE EXCEPTION 'عضو مقصد نامعتبر است'; END IF;
+  SELECT created_by,type INTO v_owner,v_type
+  FROM public.cyrus_conversations
+  WHERE id=p_conversation_id
+  FOR UPDATE;
+  IF v_owner IS NULL OR v_type NOT IN ('group','channel') THEN RAISE EXCEPTION 'گروه یا کانال پیدا نشد'; END IF;
+  IF v_owner <> v_actor THEN RAISE EXCEPTION 'فقط مالک فعلی می‌تواند مالکیت را منتقل کند'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.cyrus_members
+    WHERE conversation_id=p_conversation_id AND user_id=p_user_id
+  ) THEN RAISE EXCEPTION 'مالک جدید باید ابتدا عضو مجموعه باشد'; END IF;
+  INSERT INTO public.cyrus_members(conversation_id,user_id,role)
+  VALUES(p_conversation_id,v_actor,'admin')
+  ON CONFLICT(conversation_id,user_id) DO UPDATE SET role='admin';
+  UPDATE public.cyrus_members SET role='owner'
+  WHERE conversation_id=p_conversation_id AND user_id=p_user_id;
+  UPDATE public.cyrus_conversations SET created_by=p_user_id
+  WHERE id=p_conversation_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.cyrus_manage_transfer_ownership(uuid,uuid) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_manage_transfer_ownership(uuid,uuid) TO authenticated;
