@@ -1035,7 +1035,7 @@ def verify_email():
                     error = "حساب تأییدشده‌ای با این ایمیل پیدا نشد؛ از بخش ثبت‌نام اقدام کنید."
                 elif flow == "register" and existing and existing.get("email_confirmed_at"):
                     session.clear()
-                    error = "این ایمیل قبلاً تأیید شده است؛ برای ورود از بخش ورود کد بگیرید."
+                    return redirect(url_for("login"))
                 else:
                     code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": flow == "register"})
                     if code in (200, 201, 202):
