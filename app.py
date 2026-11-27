@@ -2243,7 +2243,7 @@ def chat(conversation_id):
 
     send_box = (
         f'<form class="media-picker-form" id="cyrusMediaUpload" method="post" enctype="multipart/form-data" action="/chat/{conversation_id}/upload">'
-        '<input type="file" id="cyrusMediaInput" name="media" accept="image/*,video/mp4,video/webm,audio/*,.pdf,.txt,.zip,.docx,.xlsx" hidden>'
+        '<input type="file" id="cyrusMediaInput" name="media" multiple accept="image/*,video/mp4,video/webm,audio/*,.pdf,.txt,.zip,.docx,.xlsx" hidden>'
         '<button type="submit" id="cyrusMediaSubmit" hidden>ارسال</button></form>'
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
         '<div id="cyrusReplyBar" class="cyrus-reply-composer" style="display:none"><span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
@@ -2260,7 +2260,7 @@ def chat(conversation_id):
         '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
         '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled>➤</button></form>'
         '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
-        'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
+        'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.multiple=true;i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
         'function cyrusShareLocation(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;if(!navigator.geolocation){alert("موقعیت مکانی پشتیبانی نمی‌شود");return;}navigator.geolocation.getCurrentPosition(p=>{const i=document.querySelector(".send-box input[name=content]");i.value="موقعیت مکانی: https://maps.google.com/?q="+p.coords.latitude+","+p.coords.longitude;i.focus();},()=>alert("اجازهٔ مکان را به مرورگر بدهید"),{timeout:12000});}function cyrusShareContact(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;const n=prompt("نام مخاطب");if(!n)return;const p=prompt("شماره تماس");if(!p)return;const i=document.querySelector(".send-box input[name=content]");i.value="مخاطب: "+n+" | شماره: "+p;i.focus();}'
         'let cyrusRecorder=null,cyrusVoiceChunks=[];async function cyrusToggleVoiceRecord(b){if(cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusRecorder.stop();b.textContent="🎙";b.classList.remove("recording");return;}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});cyrusVoiceChunks=[];cyrusRecorder=new MediaRecorder(stream);cyrusRecorder.ondataavailable=e=>{if(e.data&&e.data.size)cyrusVoiceChunks.push(e.data)};cyrusRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(cyrusVoiceChunks,{type:cyrusRecorder.mimeType||"audio/webm"});if(!blob.size){alert("ضبط صدا خالی بود");return;}const form=new FormData();form.append("media",blob,"voice.webm");b.disabled=true;b.textContent="…";try{const res=await fetch(document.getElementById("cyrusMediaUpload").action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok)location.reload();else alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}catch(err){alert("ارتباط برای ارسال صدا برقرار نشد");}finally{b.disabled=false;b.textContent="🎙";}};cyrusRecorder.start();b.textContent="■";b.classList.add("recording");}catch(err){alert("برای ضبط صدا، اجازهٔ میکروفون را به مرورگر بدهید");}}'
         'document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});'
@@ -2879,10 +2879,11 @@ def upload_chat_media(conversation_id):
         uuid.UUID(conversation_id)
     except ValueError:
         return "شناسه گفتگو نامعتبر است", 400
-    file = request.files.get("media")
-    if not file or not file.filename:
+    files = [item for item in request.files.getlist("media") if item and item.filename]
+    if not files:
         return "فایلی انتخاب نشده است", 400
-    mime = (file.mimetype or "").lower().split(";")[0].strip()
+    if len(files) > 10:
+        return "در هر نوبت حداکثر ۱۰ فایل می‌توانید ارسال کنید", 413
     kind_by_mime = {
         "image/jpeg":"photo","image/png":"photo","image/webp":"photo","image/gif":"photo",
         "video/mp4":"video","video/webm":"video",
@@ -2891,11 +2892,6 @@ def upload_chat_media(conversation_id):
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document":"document",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"document"
     }
-    if mime not in kind_by_mime:
-        return "نوع فایل پشتیبانی نمی‌شود", 415
-    data = file.read(20 * 1024 * 1024 + 1)
-    if not data or len(data) > 20 * 1024 * 1024:
-        return "حجم فایل باید حداکثر ۲۰ مگابایت باشد", 413
     current_user = str(session.get("user_id") or "")
     headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
                "Content-Type":"application/json","Prefer":"return=minimal"}
@@ -2909,7 +2905,9 @@ def upload_chat_media(conversation_id):
         member_response=requests.get(URL+"/rest/v1/cyrus_members",
             params={"select":"role","conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user,"limit":"1"},
             headers=headers,timeout=20)
-        member_rows=member_response.json() if member_response.ok else []
+        if not member_response.ok:
+            return "بررسی عضویت ناموفق بود",503
+        member_rows=member_response.json()
         is_owner=str(room.get("created_by") or "")==current_user
         role=str(member_rows[0].get("role") or "") if member_rows else ""
         if not is_owner and not member_rows:
@@ -2934,26 +2932,47 @@ def upload_chat_media(conversation_id):
                         return "بررسی مسدودسازی ناموفق بود",503
                     if blocked:
                         return "این گفتگو مسدود است",403
-        filename=Path(file.filename).name[:180]
-        safe_name=re.sub(r"[^A-Za-z0-9._-]","_",filename) or "file"
-        ext=safe_name.rsplit(".",1)[-1].lower() if "." in safe_name else ""
-        allowed_ext={"jpeg":"jpg","png":"png","webp":"webp","gif":"gif","mp4":"mp4","webm":"webm","mpeg":"mp3","mp3":"mp3","ogg":"ogg","pdf":"pdf","txt":"txt","zip":"zip","docx":"docx","xlsx":"xlsx"}
-        ext=allowed_ext.get(ext, {"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif","video/mp4":"mp4","video/webm":"webm","audio/mpeg":"mp3","audio/mp4":"m4a","audio/ogg":"ogg","audio/webm":"webm","application/pdf":"pdf","text/plain":"txt","application/zip":"zip"}.get(mime,"bin"))
-        object_path=conversation_id+"/"+current_user+"/"+str(uuid.uuid4())+"."+ext
-        uploaded=requests.post(URL+"/storage/v1/object/cyrus-chat-files/"+object_path,data=data,
-            headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"false"},timeout=60)
-        if not uploaded.ok:
-            return page('<div class="container card"><h3>بارگذاری فایل انجام نشد</h3><p>'+html.escape(uploaded.text[:350])+'</p></div>'),502
-        public_url=request.host_url.rstrip("/")+"/chat/media/"+object_path
-        caption=str(request.form.get("caption") or "").strip()[:500]
-        message_type=kind_by_mime[mime]
-        message_response=requests.post(URL+"/rest/v1/cyrus_messages",
-            json={"conversation_id":conversation_id,"sender_id":current_user,"content":caption or filename,
-                  "message_type":message_type,"attachment_url":public_url,
-                  "metadata":{"file_name":filename,"mime_type":mime,"file_size":len(data)}},
-            headers=headers,timeout=30)
-        if not message_response.ok:
-            return page('<div class="container card"><h3>فایل بارگذاری شد اما پیام ثبت نشد</h3><p>'+html.escape(message_response.text[:350])+'</p></div>'),403
+
+        sent_count=0
+        failures=[]
+        for file in files:
+            mime=(file.mimetype or "").lower().split(";")[0].strip()
+            if mime not in kind_by_mime:
+                failures.append((file.filename,"نوع فایل پشتیبانی نمی‌شود"))
+                continue
+            data=file.read(20*1024*1024+1)
+            if not data or len(data)>20*1024*1024:
+                failures.append((file.filename,"حجم فایل باید حداکثر ۲۰ مگابایت باشد"))
+                continue
+            filename=Path(file.filename).name[:180]
+            safe_name=re.sub(r"[^A-Za-z0-9._-]","_",filename) or "file"
+            ext=safe_name.rsplit(".",1)[-1].lower() if "." in safe_name else ""
+            ext_map={"jpeg":"jpg","png":"png","webp":"webp","gif":"gif","mp4":"mp4","webm":"webm","mpeg":"mp3","mp3":"mp3","ogg":"ogg","pdf":"pdf","txt":"txt","zip":"zip","docx":"docx","xlsx":"xlsx"}
+            mime_ext={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif","video/mp4":"mp4","video/webm":"webm","audio/mpeg":"mp3","audio/mp4":"m4a","audio/ogg":"ogg","audio/webm":"webm","application/pdf":"pdf","text/plain":"txt","application/zip":"zip","application/vnd.openxmlformats-officedocument.wordprocessingml.document":"docx","application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":"xlsx"}
+            ext=ext_map.get(ext,mime_ext.get(mime,"bin"))
+            object_path=conversation_id+"/"+current_user+"/"+str(uuid.uuid4())+"."+ext
+            uploaded=requests.post(URL+"/storage/v1/object/cyrus-chat-files/"+object_path,data=data,
+                headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":mime,"x-upsert":"false"},timeout=60)
+            if not uploaded.ok:
+                failures.append((filename,"بارگذاری در فضای ذخیره‌سازی ناموفق بود"))
+                continue
+            public_url=request.host_url.rstrip("/")+"/chat/media/"+object_path
+            message_response=requests.post(URL+"/rest/v1/cyrus_messages",
+                json={"conversation_id":conversation_id,"sender_id":current_user,"content":filename,
+                      "message_type":kind_by_mime[mime],"attachment_url":public_url,
+                      "metadata":{"file_name":filename,"mime_type":mime,"file_size":len(data)}},
+                headers=headers,timeout=30)
+            if not message_response.ok:
+                requests.delete(URL+"/storage/v1/object/cyrus-chat-files/"+object_path,
+                    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"]},timeout=20)
+                failures.append((filename,"ثبت پیام ناموفق بود"))
+                continue
+            sent_count+=1
+        if sent_count==0:
+            detail="؛ ".join(html.escape(name)+": "+html.escape(reason) for name,reason in failures[:3])
+            return page('<div class="container card"><h3>ارسال فایل انجام نشد</h3><p>'+detail+'</p><a href="/chat/'+conversation_id+'">بازگشت به گفتگو</a></div>'),400
+        if failures:
+            flash(str(sent_count)+" فایل ارسال شد؛ "+str(len(failures))+" فایل ارسال نشد.")
         return redirect(url_for("chat",conversation_id=conversation_id))
     except Exception:
         return "ارتباط با سرور برقرار نشد",502
