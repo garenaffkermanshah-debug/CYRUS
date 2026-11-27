@@ -3683,6 +3683,25 @@ def serve_chat_media(conversation_id, owner_id, object_name):
                  (room_data.get("type")=="channel" and room_data.get("is_public") is True))
         if not allowed:
             return "برای دریافت این فایل به عضویت گفتگو نیاز دارید",403
+        # در گفتگوی خصوصی، مسدودسازی باید دریافت رسانه را هم مانند ارسال پیام متوقف کند.
+        if room_data.get("type")=="private":
+            if not member.ok or not member.json():
+                return "عضویت در گفتگوی خصوصی تأیید نشد",403
+            members_check=requests.get(URL+"/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+conversation_id},
+                headers=headers,timeout=15)
+            if not members_check.ok:
+                return "بررسی امنیت گفتگوی خصوصی ناموفق بود",503
+            other_ids=[str(row.get("user_id") or "") for row in members_check.json()
+                       if str(row.get("user_id") or "")!=current_user]
+            if not other_ids:
+                return "عضو دیگر گفتگو پیدا نشد",403
+            for other_id in other_ids:
+                block_status=cyrus_block_status(other_id,headers)
+                if block_status is None:
+                    return "بررسی مسدودسازی ناموفق بود؛ دریافت فایل متوقف شد",503
+                if block_status:
+                    return "این گفتگوی خصوصی مسدود است؛ دریافت فایل امکان‌پذیر نیست",403
         object_path=conversation_id+"/"+owner_id+"/"+object_name
         signed=requests.post(URL+"/storage/v1/object/sign/cyrus-chat-files/"+object_path,
             json={"expiresIn":3600},headers=headers,timeout=20)
