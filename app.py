@@ -3745,6 +3745,69 @@ def create_room():
     except Exception: return cyrus_channel_member_picker(title,room_type,"ارتباط با سرور برقرار نشد یا پاسخ نامعتبر بود"),502
 
 
+@app.route("/rooms/<conversation_id>/add-member", methods=["POST"])
+def add_room_member(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه نامعتبر است", 400
+
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Content-Type": "application/json"
+    }
+    username = request.form.get("username", "").strip().lstrip("@")
+    if not username or len(username) > 40:
+        return "نام کاربری نامعتبر است", 400
+    try:
+        room_response = requests.get(
+            URL + "/rest/v1/cyrus_conversations",
+            params={"select":"id,type,created_by,member_permissions","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers, timeout=20
+        )
+        if not room_response.ok or not room_response.json():
+            return "گروه یا کانال پیدا نشد", 404
+        room = room_response.json()[0]
+        if room.get("type") not in ("group", "channel"):
+            return "این گفتگو گروه یا کانال نیست", 400
+        current = str(session.get("user_id") or "")
+        member_response = requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"role","conversation_id":"eq."+conversation_id,"user_id":"eq."+current,"limit":"1"},
+            headers=headers, timeout=20
+        )
+        member_rows = member_response.json() if member_response.ok else []
+        role = str(member_rows[0].get("role") or "") if member_rows else ""
+        owner = str(room.get("created_by") or "") == current
+        permissions = room.get("member_permissions") if isinstance(room.get("member_permissions"),dict) else {}
+        can_add = owner or role in ("owner","admin") or (room.get("type") == "group" and bool(permissions.get("add_members",False)))
+        if not can_add:
+            return "اجازه افزودن عضو ندارید", 403
+        profile_response = requests.get(
+            URL + "/rest/v1/cyrus_profiles",
+            params={"select":"id","username":"eq."+username,"limit":"1"},
+            headers=headers, timeout=20
+        )
+        if not profile_response.ok or not profile_response.json():
+            return "نام کاربری پیدا نشد", 404
+        target_id = str(profile_response.json()[0].get("id") or "")
+        if not target_id or target_id == current:
+            return "افزودن خودتان امکان‌پذیر نیست", 400
+        result = requests.post(
+            URL + "/rest/v1/rpc/cyrus_manage_add_member",
+            json={"p_conversation_id":conversation_id,"p_user_id":target_id},
+            headers=headers, timeout=20
+        )
+        if not result.ok:
+            return page('<div class="container card"><h3>افزودن عضو انجام نشد</h3><p>'+html.escape(result.text[:350])+'</p><a href="/rooms/'+html.escape(conversation_id,quote=True)+'/manage">بازگشت</a></div>'), 400
+        return redirect(url_for("manage_room",conversation_id=conversation_id))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
+
+
 @app.route("/rooms/<conversation_id>/manage", methods=["GET", "POST"])
 def manage_room(conversation_id):
     if not session.get("access_token"):
@@ -4169,8 +4232,7 @@ def manage_room(conversation_id):
 
           <div class="card">
             <h3>افزودن عضو</h3>
-            <form method="post">
-              <input type="hidden" name="action" value="add">
+            <form method="post" action="/rooms/{conversation_id}/add-member">
               <input name="username" placeholder="نام کاربری عضو" required>
               <button>افزودن عضو</button>
             </form>
