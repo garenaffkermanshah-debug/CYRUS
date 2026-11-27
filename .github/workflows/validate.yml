@@ -1,0 +1,33 @@
+name: CYRUS validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  python-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile application
+        run: python -m py_compile app.py
+      - name: Check required routes exist
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source = Path("app.py").read_text(encoding="utf-8")
+          required = [
+              'def chat(conversation_id):',
+              'def send_message(conversation_id):',
+              'def upload_chat_media(conversation_id):',
+              'def toggle_message_pin(message_id):',
+              'def manage_room(conversation_id):',
+          ]
+          missing = [route for route in required if route not in source]
+          if missing:
+              raise SystemExit("Missing required CYRUS route(s): " + ", ".join(missing))
+          print("Required routes found.")
+          PY
