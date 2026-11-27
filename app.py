@@ -146,8 +146,10 @@ def cyrus_protect_state_changes():
 def cyrus_validate_form_csrf():
     if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
         return
-    # درخواست‌های فرم مرورگر باید توکن نشست معتبر داشته باشند.
-    if request.form:
+    # همهٔ ارسال‌های فرم مرورگر، حتی فرم خالی، باید توکن معتبر داشته باشند.
+    content_type = str(request.mimetype or "").lower()
+    is_browser_form = content_type in ("application/x-www-form-urlencoded", "multipart/form-data")
+    if is_browser_form:
         expected = str(session.get("csrf_token") or "")
         supplied = str(request.form.get("csrf_token") or "")
         if not expected or not supplied or not secrets.compare_digest(expected, supplied):
