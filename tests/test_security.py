@@ -167,7 +167,7 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertEqual(manifest["start_url"], "/home")
         icon_response = self.client.get(manifest["icons"][0]["src"])
         self.assertEqual(icon_response.status_code, 200)
-        self.assertEqual(icon_response.mimetype, "image/svg+xml")
+        self.assertEqual(icon_response.mimetype, "image/webp")
 
     def test_service_worker_cache_assets_exist_and_scope_is_root(self):
         response = self.client.get("/service-worker.js")
@@ -175,8 +175,9 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertIn("no-cache", response.headers.get("Cache-Control", ""))
         self.assertEqual(response.headers.get("Service-Worker-Allowed"), "/")
         worker = response.get_data(as_text=True)
-        self.assertIn("const CACHE='cyrus-static-v1'", worker)
+        self.assertIn("const CACHE='cyrus-static-v2'", worker)
         for asset in (
+            "/static/cyrus-app-icon.webp",
             "/static/cyrus-app-icon.svg",
             "/static/cyrus-cylinder.jpg",
             "/static/cyrus-tomb.jpg",
