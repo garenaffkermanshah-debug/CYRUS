@@ -2638,7 +2638,14 @@ def conversation_profile(conversation_id):
 <header class="rp-top"><a class="rp-back" href="/chat/__ID__" aria-label="بازگشت">‹</a><span class="rp-title">اطلاعات __KIND__</span>__GEAR____MENU__</header>
 <section class="rp-hero">__COVER__<div class="rp-head">__AVATAR__<div class="rp-main"><h2>__TITLE__</h2><div class="rp-kind">__KIND__ · __COUNT__ عضو</div></div></div><div class="rp-link-label">لینک کانال / دعوت</div>__LINK__<p class="rp-bio">__DESC__</p></section>
 <div class="rp-members-title"><span>اعضا</span><span>__COUNT__</span></div><input class="rp-search" id="rp-search" placeholder="جستجوی اعضا"><section id="rp-list">__ROWS__</section></main>
-<script>(function(){const i=document.getElementById("rp-search"),r=[...document.querySelectorAll(".rp-member")];i.addEventListener("input",()=>{const q=i.value.trim().toLocaleLowerCase();r.forEach(x=>x.style.display=x.textContent.toLocaleLowerCase().includes(q)?"":"none");});})();</script>"""
+<script>(function(){const i=document.getElementById("rp-search"),r=[...document.querySelectorAll(".rp-member")];i.addEventListener("input",()=>{const q=i.value.trim().toLocaleLowerCase();r.forEach(x=>x.style.display=x.textContent.toLocaleLowerCase().includes(q)?"":"none");});})();</script>
+<script>
+window.cyrusOfficialProfileMenu=function(e){e.stopPropagation();const m=document.getElementById("rp-official-menu");if(m)m.hidden=!m.hidden;};
+window.cyrusOfficialCopy=function(){const a=document.querySelector(".rp-link"),u=a?a.href:"";if(!u)return;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).catch(()=>prompt("لینک کانال",u));else prompt("لینک کانال",u);};
+window.cyrusOfficialShare=function(){const a=document.querySelector(".rp-link"),u=a?a.href:"";if(!u)return;if(navigator.share)navigator.share({title:"امپراتوری پارس",text:"کانال رسمی امپراتوری پارس در CYRUS",url:u}).catch(()=>{});else window.cyrusOfficialCopy();};
+document.addEventListener("click",e=>{const m=document.getElementById("rp-official-menu");if(m&&!e.target.closest(".rp-menu-wrap"))m.hidden=true;});
+document.addEventListener("keydown",e=>{const m=document.getElementById("rp-official-menu");if(e.key==="Escape"&&m)m.hidden=true;});
+</script>"""
     for k,v in {"__ID__":html.escape(conversation_id,quote=True),"__KIND__":kind,"__GEAR__":gear,"__MENU__":profile_menu,"__COVER__":'<div class="rp-official-cover" role="img" aria-label="تصویر پس‌زمینه کانال رسمی"></div>' if is_official_profile else "","__AVATAR__":avatar_html,"__TITLE__":title_html,"__COUNT__":str(len(members)),"__LINK__":invite_html,"__DESC__":desc or "توضیحی اضافه نشده است","__ROWS__":rows}.items():
         content=content.replace(k,v)
     return page(content)
