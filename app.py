@@ -830,14 +830,20 @@ def welcome():
 def register():
     error = ""
     if request.method == "POST":
-        email = request.form.get("email","").strip()
+        email = str(request.form.get("email") or "").strip().lower()
         password = request.form.get("password","")
         password_confirm = request.form.get("password_confirm","")
-        username = request.form.get("username","").strip()
+        username = str(request.form.get("username") or "").strip().lower()
         if not email or not password or not password_confirm or not username:
             error = "همه بخش‌ها را تکمیل کنید"
+        elif len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+            error = "نشانی ایمیل معتبر وارد کنید"
+        elif not (3 <= len(username) <= 24 and all(ch.isalnum() or ch in "_-" for ch in username)):
+            error = "نام کاربری باید ۳ تا ۲۴ نویسه و شامل حروف انگلیسی، عدد، خط تیره یا زیرخط باشد"
+        elif len(password) < 8 or len(password) > 128:
+            error = "گذرواژه باید بین ۸ تا ۱۲۸ نویسه باشد"
         elif password != password_confirm:
-            error = "رمزهای عبور با یکدیگر مطابقت ندارند"
+            error = "گذرواژه‌ها با یکدیگر مطابقت ندارند"
         else:
             code, data = auth_request("/auth/v1/signup", {"email":email,"password":password})
             if code in (200,201) and data.get("access_token"):
@@ -986,10 +992,11 @@ def reset_password():
 def login():
     error = ""
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
-        if not email:
-            error = "ایمیل را وارد کنید"
+        email = str(request.form.get("email") or "").strip().lower()
+        if not email or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+            error = "نشانی ایمیل معتبر وارد کنید"
         else:
+            session.clear()
             session["cyrus_login_email"] = email
             return redirect(url_for("login_password"))
 
@@ -1003,6 +1010,7 @@ def login():
         <button>ادامه</button>
       </form>
       <p class="muted"><a class="form-link" href="/register">ساخت حساب جدید</a></p>
+      <p class="muted"><a class="form-link" href="/forgot-password">بازیابی گذرواژه فراموش‌شده</a></p>
     </div></main>
     """
     return page(content)
