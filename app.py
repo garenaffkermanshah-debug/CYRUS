@@ -3177,11 +3177,10 @@ def join_public_channel(conversation_id):
         return "ارتباط با سرور برقرار نشد", 502
 
 
-@app.route("/invite/<invite_code>", methods=["GET"])
+@app.route("/invite/<invite_code>", methods=["GET", "POST"])
 def join_by_invite(invite_code):
     if not session.get("access_token"):
         return redirect("/login")
-
     if not invite_code or len(invite_code) > 100:
         return "لینک دعوت نامعتبر است", 400
 
@@ -3191,35 +3190,91 @@ def join_by_invite(invite_code):
         "Content-Type": "application/json"
     }
 
+    if request.method == "GET":
+        try:
+            preview_response = requests.post(
+                URL + "/rest/v1/rpc/cyrus_invite_preview",
+                json={"p_invite_code": invite_code},
+                headers=headers,
+                timeout=20
+            )
+            if not preview_response.ok:
+                return page('<div class="container card"><p>لینک دعوت نامعتبر یا لغو شده است.</p><a href="/home">بازگشت</a></div>'), 404
+            preview = preview_response.json()
+            if isinstance(preview, list) and preview:
+                preview = preview[0]
+            if not isinstance(preview, dict):
+                return page('<div class="container card"><p>پیش‌نمایش دعوت دریافت نشد.</p></div>'), 502
+            room_id = str(uuid.UUID(str(preview.get("id") or "")))
+            if preview.get("already_member"):
+                return redirect(url_for("chat", conversation_id=room_id))
+
+            kind = "گروه" if preview.get("type") == "group" else "کانال"
+            title = html.escape(str(preview.get("title") or kind))
+            description = html.escape(str(preview.get("description") or ""))
+            avatar_url = str(preview.get("avatar_url") or "")
+            avatar_html = ('<img src="' + html.escape(avatar_url, quote=True) + '" alt="">') if avatar_url else '<div class="invite-avatar-symbol">𓊹</div>'
+            try:
+                member_count = int(preview.get("member_count") or 0)
+            except (TypeError, ValueError):
+                member_count = 0
+            pending = bool(preview.get("request_pending")) or request.args.get("request_sent") == "1"
+            join_approval = bool(preview.get("join_approval"))
+            notice = '<div class="invite-pending">درخواست عضویت ارسال شده؛ پس از تأیید مدیر به مجموعه دسترسی پیدا می‌کنی.</div>' if pending else ""
+            button = "درخواست عضویت" if join_approval else "پیوستن"
+            button_html = '<div class="invite-pending">درخواست عضویت شما در انتظار تأیید است.</div>' if pending else '<form method="post"><button type="submit">' + button + '</button></form>'
+            content = f"""
+            <main class="container cyrus-invite-preview">
+              <style>
+                .cyrus-invite-preview{{min-height:calc(100dvh - 76px);padding:0;background:#0d1722}}
+                .invite-topbar{{height:56px;display:flex;align-items:center;gap:15px;padding:0 16px;background:#172331;border-bottom:1px solid #263442;color:#edf4f8}}
+                .invite-topbar a{{font-size:27px;color:#eaf2f8}}
+                .invite-topbar span{{font-size:16px;font-weight:600}}
+                .invite-summary{{text-align:center;padding:32px 20px 24px}}
+                .invite-summary img,.invite-avatar-symbol{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 14px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px;color:#d8b46a}}
+                .invite-summary h2{{margin:6px 0;color:#eef4f8;font-size:22px}}
+                .invite-summary .invite-count{{color:#7eb8e2;font-size:13px;margin:8px 0 15px}}
+                .invite-summary .invite-description{{color:#c3cfda;font-size:14px;line-height:1.9;white-space:pre-wrap}}
+                .invite-join{{position:sticky;bottom:calc(12px + env(safe-area-inset-bottom));margin:12px;padding:12px;background:#111e2b;border:1px solid #263442;border-radius:14px}}
+                .invite-join form{{margin:0}}
+                .invite-join button{{width:100%;margin:0;padding:13px;background:#248bd2;color:white;border:0;border-radius:10px;font-size:15px}}
+                .invite-pending{{margin:12px;padding:13px;background:#111e2b;border:1px solid #263442;border-radius:12px;color:#9fc7e5;text-align:center;font-size:13px;line-height:1.8}}
+              </style>
+              <div class="invite-topbar"><a href="/home" aria-label="بازگشت">‹</a><span>پیش‌نمایش {kind}</span></div>
+              <section class="invite-summary">
+                {avatar_html}
+                <h2>{title}</h2>
+                <div class="invite-count">{kind} · {member_count} عضو</div>
+                <div class="invite-description">{description or "توضیحی اضافه نشده است"}</div>
+              </section>
+              {notice}
+              <div class="invite-join">{button_html}</div>
+            </main>
+            """
+            return page(content)
+        except Exception:
+            return page('<div class="container card"><p>دریافت پیش‌نمایش دعوت ناموفق بود.</p><a href="/home">بازگشت</a></div>'), 502
+
     try:
         result = requests.post(
-            URL + "/rest/v1/rpc/cyrus_join_by_invite",
+            URL + "/rest/v1/rpc/cyrus_invite_join",
             json={"p_invite_code": invite_code},
             headers=headers,
             timeout=20
         )
         if not result.ok:
-            return page(
-                '<div class="container card"><p>عضویت با این لینک انجام نشد؛ '
-                'ممکن است لینک منقضی یا نامعتبر باشد.</p>'
-                '<a href="/">بازگشت به بارگاه</a></div>'
-            ), 400
-
-        value = result.json()
-        if isinstance(value, list) and value:
-            value = value[0]
-        if isinstance(value, dict):
-            value = value.get("cyrus_join_by_invite") or value.get("id")
-
-        room_id = str(uuid.UUID(str(value)))
+            return page('<div class="container card"><p>پیوستن به مجموعه ناموفق بود.</p><a href="/invite/' + html.escape(invite_code, quote=True) + '">بازگشت</a></div>'), 400
+        outcome = result.json()
+        if isinstance(outcome, list) and outcome:
+            outcome = outcome[0]
+        if not isinstance(outcome, dict):
+            return page('<div class="container card"><p>پاسخ عضویت نامعتبر بود.</p></div>'), 502
+        room_id = str(uuid.UUID(str(outcome.get("conversation_id") or "")))
+        if outcome.get("status") == "requested":
+            return redirect("/invite/" + quote(invite_code) + "?request_sent=1")
         return redirect(url_for("chat", conversation_id=room_id))
-
     except Exception:
-        return page(
-            '<div class="container card"><p>پیوستن به مجموعه ناموفق بود</p>'
-            '<a href="/">بازگشت</a></div>'
-        ), 502
-
+        return page('<div class="container card"><p>پیوستن به مجموعه ناموفق بود.</p><a href="/home">بازگشت</a></div>'), 502
 
 
 def cyrus_profile_headers():
