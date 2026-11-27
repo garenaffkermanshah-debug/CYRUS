@@ -3721,13 +3721,13 @@ def upload_chat_media(conversation_id):
                "Content-Type":"application/json","Prefer":"return=minimal"}
     try:
         room_response=requests.get(URL+"/rest/v1/cyrus_conversations",
-            params={"select":"id,type,created_by,member_permissions","id":"eq."+conversation_id,"limit":"1"},
+            params={"select":"id,type,created_by,member_permissions,slow_mode_seconds","id":"eq."+conversation_id,"limit":"1"},
             headers=headers,timeout=20)
         if not room_response.ok or not room_response.json():
             return "گفتگو پیدا نشد",404
         room=room_response.json()[0]
         member_response=requests.get(URL+"/rest/v1/cyrus_members",
-            params={"select":"role","conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user,"limit":"1"},
+            params={"select":"role,last_message_at","conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user,"limit":"1"},
             headers=headers,timeout=20)
         if not member_response.ok:
             return "بررسی عضویت ناموفق بود",503
@@ -3740,8 +3740,22 @@ def upload_chat_media(conversation_id):
             return "در این کانال اجازه انتشار فایل ندارید",403
         if room.get("type")=="group" and role not in ("owner","admin"):
             permissions=room.get("member_permissions") if isinstance(room.get("member_permissions"),dict) else {}
+            if not permissions.get("send_messages",True):
+                return "ارسال پیام برای اعضای عادی غیرفعال است",403
             if not permissions.get("send_media",True):
                 return "ارسال رسانه برای اعضای عادی غیرفعال است",403
+            slow_seconds=int(room.get("slow_mode_seconds") or 0)
+            last_message_at=member_rows[0].get("last_message_at")
+            if slow_seconds and last_message_at:
+                try:
+                    last_dt=datetime.fromisoformat(str(last_message_at).replace("Z","+00:00"))
+                    if last_dt.tzinfo is None:
+                        last_dt=last_dt.replace(tzinfo=timezone.utc)
+                    remaining=slow_seconds-(datetime.now(timezone.utc)-last_dt.astimezone(timezone.utc)).total_seconds()
+                    if remaining>0:
+                        return "حالت آهسته فعال است؛ "+str(int(remaining))+" ثانیه دیگر فایل بفرستید",429
+                except (TypeError,ValueError):
+                    pass
         if room.get("type")=="private":
             others=requests.get(URL+"/rest/v1/cyrus_members",
                 params={"select":"user_id","conversation_id":"eq."+conversation_id},
@@ -3798,6 +3812,14 @@ def upload_chat_media(conversation_id):
         if sent_count==0:
             detail="؛ ".join(html.escape(name)+": "+html.escape(reason) for name,reason in failures[:3])
             return page('<div class="container card"><h3>ارسال فایل انجام نشد</h3><p>'+detail+'</p><a href="/chat/'+conversation_id+'">بازگشت به گفتگو</a></div>'),400
+        if room.get("type")=="group" and sent_count:
+            requests.patch(
+                URL+"/rest/v1/cyrus_members",
+                params={"conversation_id":"eq."+conversation_id,"user_id":"eq."+current_user},
+                json={"last_message_at":datetime.now(timezone.utc).isoformat()},
+                headers=headers,
+                timeout=15
+            )
         if failures:
             flash(str(sent_count)+" فایل ارسال شد؛ "+str(len(failures))+" فایل ارسال نشد.")
         return redirect(url_for("chat",conversation_id=conversation_id))
