@@ -307,3 +307,19 @@ WITH CHECK (
   )
  )
 );
+
+
+
+-- Keep chat attachments private; app issues membership-checked signed URLs.
+UPDATE storage.buckets SET public=false WHERE id='cyrus-chat-files';
+DROP POLICY IF EXISTS cyrus_chat_files_authenticated_read ON storage.objects;
+CREATE POLICY cyrus_chat_files_authenticated_read ON storage.objects
+FOR SELECT TO authenticated USING (
+ bucket_id='cyrus-chat-files'
+ AND EXISTS (
+  SELECT 1 FROM public.cyrus_conversations c
+  WHERE c.id=(storage.foldername(name))[1]::uuid
+   AND (c.created_by=(SELECT auth.uid()) OR public.cyrus_is_member(c.id)
+        OR (c.type='channel' AND c.is_public=true))
+ )
+);
