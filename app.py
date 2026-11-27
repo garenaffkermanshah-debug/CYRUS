@@ -2908,7 +2908,7 @@ async function cyrusToggleVoiceRecord(b){
      if(button)button.disabled=true;
      voiceXhr=new XMLHttpRequest();voiceXhr.open("POST",uploadForm.action);voiceXhr.withCredentials=true;
      voiceXhr.upload.onprogress=e=>{if(e.lengthComputable)progress.value=Math.round(e.loaded/e.total*100);};
-     voiceXhr.onload=()=>{if(voiceXhr.status>=200&&voiceXhr.status<400){cleanup();location.reload();}else{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";cancelUpload.hidden=true;alert("ارسال پیام صوتی ناموفق بود ("+voiceXhr.status+")");}};
+     voiceXhr.onload=()=>{if(voiceXhr.status>=200&&voiceXhr.status<400){try{const roomId=uploadForm.action.split("/").filter(Boolean).slice(-2,-1)[0];sessionStorage.removeItem("cyrus-upload-nonce-"+roomId);}catch(e){}cleanup();location.reload();}else{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";cancelUpload.hidden=true;alert("ارسال پیام صوتی ناموفق بود ("+voiceXhr.status+")");}};
      voiceXhr.onerror=()=>{send.disabled=false;discard.disabled=false;send.textContent="تلاش دوباره";cancelUpload.hidden=true;alert("ارتباط برای ارسال صدا برقرار نشد");};
      voiceXhr.onabort=()=>{send.disabled=false;discard.disabled=false;send.textContent="ارسال دوباره";cancelUpload.hidden=true;progress.style.display="none";progress.value=0;};
      voiceXhr.onloadend=()=>{voiceXhr=null;if(button)button.disabled=false;};
@@ -2944,7 +2944,7 @@ async function cyrusToggleVoiceRecord(b){
   input.disabled=true;cancel.disabled=false;panel.hidden=false;bar.value=0;
   label.textContent="در حال آماده‌سازی "+count.toLocaleString("fa-IR")+" فایل…";
   xhr.upload.onprogress=e=>{if(e.lengthComputable){const p=Math.round(e.loaded/e.total*100);bar.value=p;label.textContent="در حال بارگذاری فایل‌ها · "+p.toLocaleString("fa-IR")+"٪";}};
-  xhr.onload=()=>{if(xhr.status>=200&&xhr.status<400){label.textContent="بارگذاری انجام شد؛ گفتگو در حال به‌روزرسانی است…";bar.value=100;location.reload();}else{panel.hidden=true;alert("بارگذاری ناموفق بود ("+xhr.status+")؛ فایل‌ها را دوباره انتخاب کنید.");input.value="";finish();}};
+  xhr.onload=()=>{if(xhr.status>=200&&xhr.status<400){try{sessionStorage.removeItem(nonceKey);}catch(e){}label.textContent="بارگذاری انجام شد؛ گفتگو در حال به‌روزرسانی است…";bar.value=100;location.reload();}else{panel.hidden=true;alert("بارگذاری ناموفق بود ("+xhr.status+")؛ فایل‌ها را دوباره انتخاب کنید.");input.value="";finish();}};
   xhr.onerror=()=>{panel.hidden=true;alert("ارتباط هنگام بارگذاری قطع شد؛ دوباره تلاش کنید.");input.value="";finish();};
   xhr.onabort=()=>{panel.hidden=true;label.textContent="بارگذاری لغو شد";input.value="";finish();};
   xhr.onloadend=()=>{if(xhr&&xhr.readyState===4&&xhr.status>=200&&xhr.status<400)finish();};
