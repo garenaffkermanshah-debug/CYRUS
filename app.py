@@ -1401,14 +1401,15 @@ def message_to_user(user_id):
     headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"], "Content-Type": "application/json", "Prefer": "return=minimal"}
     block_status = cyrus_block_status(user_id, headers)
     if block_status is None:
-        return page('<div class="container card"><p>بررسی مسدودسازی با سرور انجام نشد؛ پیام ارسال نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'),503
+        return page('<div class="container card"><p>بررسی مسدودسازی با سرور انجام نشد؛ پیام ارسال نشد.</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 503
     if block_status:
         return redirect("/user/" + user_id)
+    try:
         created = requests.post(URL + "/rest/v1/rpc/create_direct_conversation", json={"other_user":user_id}, headers=headers, timeout=20)
         if not created.ok or not isinstance(created.json(), str):
             return page('<div class="container card"><p>ساخت گفتگو انجام نشد</p><a href="/contacts">بازگشت</a></div>'), 400
         room_id = str(uuid.UUID(created.json()))
-        sent = requests.post(URL + "/rest/v1/cyrus_messages", json={"conversation_id":room_id,"sender_id":str(session.get("user_id")),"content":content,"message_type":"text"}, headers=headers, timeout=20)
+        sent = requests.post(URL + "/rest/v1/cyrus_messages", json={"conversation_id":room_id,"sender_id":own_id,"content":content,"message_type":"text"}, headers=headers, timeout=20)
         if not sent.ok:
             return page('<div class="container card"><p>ارسال پیام ناموفق بود</p><a href="/user/'+user_id+'">بازگشت</a></div>'), 400
         return redirect(url_for("chat", conversation_id=room_id))
@@ -3512,6 +3513,26 @@ def delete_saved_message(message_id):
     if not response.ok:
         return page('<div class="container card"><p>حذف پیام انجام نشد</p><a href="/saved-messages">بازگشت</a></div>'),400
     return redirect("/saved-messages")
+
+
+def cyrus_block_status(other_user_id, headers):
+    """Return True/False for a blocked pair, or None if the server check failed."""
+    try:
+        response = requests.post(
+            URL + "/rest/v1/rpc/cyrus_is_blocked_pair",
+            json={"other_user_id":str(other_user_id)},
+            headers={**headers, "Content-Type":"application/json"},
+            timeout=12
+        )
+        if response.ok:
+            value = response.json()
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, list) and value and isinstance(value[0], bool):
+                return value[0]
+    except Exception:
+        pass
+    return None
 
 
 def cyrus_block_status(other_user_id, headers):
