@@ -1704,7 +1704,8 @@ def chat(conversation_id):
         message_kind = str(msg.get("message_type") or "text")
         if attachment_url:
             safe_attachment = html.escape(attachment_url, quote=True)
-            safe_file_label = html.escape(str((msg.get("metadata") or {}).get("file_name") or msg.get("content") or "فایل"), quote=True)
+            file_meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
+            safe_file_label = html.escape(str(file_meta.get("file_name") or msg.get("content") or "فایل"), quote=True)
             if message_kind == "photo":
                 body = '<a href="' + safe_attachment + '" target="_blank" rel="noopener"><img class="cyrus-chat-photo" src="' + safe_attachment + '" alt="' + safe_file_label + '" loading="lazy"></a>' + (('<div>' + body + '</div>') if body else "")
             elif message_kind == "video":
