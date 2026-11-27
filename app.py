@@ -1855,7 +1855,7 @@ def chat(conversation_id):
         '<div class="composer-emoji-panel" id="cyrusEmojiPanel" style="display:none"><emoji-picker id="cyrusFullEmojiPicker" locale="en"></emoji-picker></div>'
         '<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/index.js"></script>'
         '<input type="hidden" name="client_nonce" value="">'
-        '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>
+        '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>'
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
         if room_type != "channel" or channel_can_post else
         '<div class="card"><p>این کانال عمومی است؛ اعضا فقط می‌توانند پست‌ها را مشاهده کنند.</p></div>'
