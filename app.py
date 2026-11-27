@@ -2188,6 +2188,11 @@ def chat(conversation_id):
         .message-context{{display:none;position:fixed;z-index:30;left:50%;bottom:calc(78px + env(safe-area-inset-bottom) + 12px);transform:translateX(-50%);width:min(355px,calc(100vw - 34px));filter:drop-shadow(0 12px 28px #0008);cursor:default}}
         .message.context-open .message-context{{display:block}}
         .reaction-strip{{display:flex;justify-content:space-around;align-items:center;gap:3px;padding:8px 9px;margin-bottom:8px;border-radius:30px;background:#253747;border:1px solid #354d61}}
+        .message-reaction-badges{{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}}
+        .message-reaction-badge{{display:inline-flex;align-items:center;gap:4px;margin:0;padding:3px 8px;border-radius:16px;border:1px solid #334b60;background:#203244;color:#eaf2f8;font-size:13px;line-height:1.2;cursor:pointer}}
+        .message-reaction-badge.mine{{border-color:#3998dc;background:#234d6d}}
+        .message-reaction-badge small{{display:inline!important;margin:0!important;color:#b6c9d9!important;font-size:10px!important;text-align:center!important}}
+
         .reaction-choice{{width:auto;min-width:0;margin:0;padding:3px 2px;background:transparent;border:0;border-radius:50%;font-size:25px;line-height:1.25}}
         .context-actions{{display:flex;flex-direction:column;padding:6px 0;border-radius:12px;background:#253747;border:1px solid #344b5e;overflow:hidden}}
         .context-actions>button,.context-actions form>button{{display:flex;align-items:center;gap:16px;width:100%;margin:0;padding:12px 18px;border:0;border-radius:0;background:transparent;color:#edf4f8;text-align:right;font-size:15px;font-weight:normal}}
@@ -2326,6 +2331,7 @@ def chat(conversation_id):
           const data=await response.json();
           let badges=message.querySelector('.message-reaction-badges');
           if(!badges){{badges=document.createElement('div');badges.className='message-reaction-badges';message.querySelector('.message-body').after(badges);}}
+          if(data.previous&&data.previous!==emoji){{const previous=[...badges.querySelectorAll('[data-emoji]')].find(x=>x.dataset.emoji===data.previous);if(previous){{if(Number(data.previous_count)>0){{const n=previous.querySelector('small');if(n)n.textContent=data.previous_count;}}else previous.remove();}}}}
           const current=[...badges.querySelectorAll('[data-emoji]')].find(x=>x.dataset.emoji===emoji);
           if(data.removed){{if(current)current.remove();}}
           else if(current){{const count=current.querySelector('small');if(count)count.textContent=data.count||'1';current.classList.add('mine');}}
@@ -2881,6 +2887,7 @@ def react_message(message_id):
             if not deleted.ok:
                 return Response('{"error":"reaction delete failed"}',status=502,mimetype="application/json")
             return Response(__import__("json").dumps({"removed":True,"count":0}),mimetype="application/json")
+        previous_emoji = str(existing.json()[0].get("emoji") or "") if existing.json() else ""
         if existing.json():
             requests.delete(URL+"/rest/v1/cyrus_message_reactions",params={"message_id":"eq."+message_id,"user_id":"eq."+uid},headers=headers,timeout=15)
         inserted=requests.post(URL+"/rest/v1/cyrus_message_reactions",json={"message_id":message_id,"conversation_id":conversation_id,"user_id":uid,"emoji":emoji},headers=headers,timeout=15)
@@ -2888,7 +2895,11 @@ def react_message(message_id):
             return Response('{"error":"reaction save failed"}',status=502,mimetype="application/json")
         count=requests.get(URL+"/rest/v1/cyrus_message_reactions",params={"select":"user_id","message_id":"eq."+message_id,"emoji":"eq."+emoji},headers=headers,timeout=15)
         total=len(count.json()) if count.ok else 1
-        return Response(__import__("json").dumps({"removed":False,"count":total}),mimetype="application/json")
+        previous_count=0
+        if previous_emoji:
+            old_count=requests.get(URL+"/rest/v1/cyrus_message_reactions",params={"select":"user_id","message_id":"eq."+message_id,"emoji":"eq."+previous_emoji},headers=headers,timeout=15)
+            previous_count=len(old_count.json()) if old_count.ok else 0
+        return Response(__import__("json").dumps({"removed":False,"count":total,"previous":previous_emoji,"previous_count":previous_count}),mimetype="application/json")
     except Exception:
         return Response('{"error":"server error"}',status=502,mimetype="application/json")
 
