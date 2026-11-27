@@ -3640,7 +3640,22 @@ def settings():
         .setting-info:active{{transform:scale(.99)}}
         .setting-info .info{{grid-column:1/2;font-size:15px;text-align:right;align-self:center;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
         .smal-title{{grid-column:2/3;grid-row:1/2;align-self:center;font-size:12px;padding:0 8px;color:#8fa4b7;white-space:nowrap}}
-        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}.setting-avatar-form{{grid-template-columns:42px minmax(0,1fr) auto;gap:8px}}.setting-avatar-form .button-title{{cursor:pointer}}.setting-avatar-form input[type=file]{{grid-column:2/4;grid-row:2;font-size:11px;max-width:100%;color:#b7c8d8}}.setting-avatar-form .avatar-submit{{grid-column:3;grid-row:1;background:#d8b45f;color:#17120a;border:0;border-radius:8px;padding:8px 10px;font:inherit;font-size:12px}}.setting-avatar-success{{color:#8ee0b0;text-align:center;font-size:12px;margin:4px 0}}
+        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}.setting-avatar-success{{color:#8ee0b0;text-align:center;font-size:12px;margin:4px 0}}
+        .setting-avatar-picker{{position:absolute;inset-inline-start:calc(50% - 64px);top:calc(50% - 64px);width:34px;height:34px;border:2px solid #0b1724;border-radius:50%;background:#2b9be8;color:#fff;display:grid;place-items:center;box-shadow:0 3px 12px #0008;cursor:pointer;z-index:3;padding:0;margin:0}}
+        .setting-avatar-picker svg{{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}}
+        .setting-avatar-hidden{{display:none!important}}
+        .setting-avatar-editor{{position:fixed;inset:0;z-index:60;background:#020711d9;backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:18px 14px calc(88px + env(safe-area-inset-bottom))}}
+        .setting-avatar-editor.open{{display:flex}}
+        .setting-avatar-sheet{{width:100%;max-width:390px;background:#0d1a28;border:1px solid #344b60;border-radius:22px;padding:20px;text-align:center;box-shadow:0 20px 70px #0009}}
+        .setting-avatar-sheet h3{{margin:0 0 7px;color:#e5bd69;font-size:18px;font-weight:500}}
+        .setting-avatar-sheet p{{font-size:12px;color:#91a6b9;line-height:1.8;margin:0 0 15px}}
+        .setting-avatar-crop{{width:220px;height:220px;max-width:70vw;max-height:70vw;border-radius:50%;overflow:hidden;border:2px solid #d8b45f;background:#14283b;margin:0 auto 18px;display:grid;place-items:center}}
+        .setting-avatar-crop img{{width:100%;height:100%;object-fit:cover;transform-origin:center;pointer-events:none}}
+        .setting-avatar-sheet input[type=range]{{width:100%;accent-color:#d8b45f;margin:7px 0 14px}}
+        .setting-avatar-actions{{display:flex;gap:9px}}
+        .setting-avatar-actions button{{flex:1;margin:0;padding:12px;font:inherit;border-radius:12px}}
+        .setting-avatar-confirm{{background:#d8b45f;color:#17120a}}
+        .setting-avatar-cancel{{background:#1a2a3a;color:#d8e3ec;border:1px solid #344b60}}
         .s-button{{display:grid;align-items:center;border-radius:12px;grid-template-columns:42px minmax(0,1fr) 20px;transition:.2s;cursor:pointer;background:#0e1b29;border:1px solid #1d3042;color:#edf2f7;text-align:right;text-decoration:none;padding:6px 12px;font:inherit}}
         .button-title{{font-size:14px;text-align:right;align-self:center;padding:0 12px;grid-column:2/3;grid-row:1/2}}
         .buttons-icons{{height:34px;width:34px;border-radius:10px;align-self:center;grid-column:1/2;background:#152b3e;color:#d6ad5b;display:grid;place-items:center}}
@@ -3657,7 +3672,10 @@ def settings():
       </style>
       <section class="setting-container">
         <section class="setting-img-container">
-          {avatar_html}
+          <div class="setting-avatar-wrap" style="position:relative;display:inline-flex;align-items:center;justify-content:center">
+            {avatar_html}
+            <button class="setting-avatar-picker" type="button" id="setting-avatar-open" aria-label="انتخاب عکس از گالری" title="انتخاب عکس از گالری"><svg viewBox="0 0 24 24"><path d="M4 7h3l1.5-2h7L17 7h3v12H4z"/><circle cx="12" cy="13" r="4"/></svg></button>
+          </div>
           <div class="setting-profile-name" data-edit="display_name" data-current="{display_name}">{display_name}</div>
           <div class="setting-profile-user" data-edit="username" data-current="{username}">@{username}</div>
           <div class="setting-profile-bio" data-edit="bio" data-current="{bio}">{bio or "بیوگرافی اضافه نشده · برای ویرایش لمس کنید"}</div>
@@ -3675,7 +3693,7 @@ def settings():
           </button>
         </section>
         <section class="setting-buttons">
-          <form class="s-button setting-avatar-form" method="post" action="/profile/avatar" enctype="multipart/form-data"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg></span><label class="button-title" for="setting-avatar-file">تغییر تصویر پروفایل</label><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required><button type="submit" class="avatar-submit">بارگذاری</button></form>
+          <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
           <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
           <a class="s-button" href="https://t.me/CyrusSupport_Aria" target="_blank" rel="noopener noreferrer"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M21.5 3.5 18 20.2a1.5 1.5 0 0 1-2.4.8l-4.7-3.5-2.3 2.2a1 1 0 0 1-1.7-.6l-.8-5.2L2.4 11a1.4 1.4 0 0 1 .1-2.6L20 2.8a1.2 1.2 0 0 1 1.5.7Z"/><path d="m6.2 13.7 11.2-8.1-6.5 11.9"/></svg></span><span class="button-title">پشتیبانی رسمی سرزمین‌های پارس</span><span>‹</span></a>
@@ -3686,6 +3704,51 @@ def settings():
         </section>
         <input id="cyrus-settings-share" type="hidden" value="{share_text}">
       </section>
+      <div class="setting-avatar-editor" id="setting-avatar-editor" role="dialog" aria-modal="true" aria-label="ویرایش عکس پروفایل">
+        <section class="setting-avatar-sheet">
+          <h3>ویرایش تصویر پروفایل</h3>
+          <p>عکس را از گالری انتخاب کن، اندازه‌اش را تنظیم کن و بعد تأیید کن.</p>
+          <div class="setting-avatar-crop"><img id="setting-avatar-preview" alt="پیش‌نمایش عکس پروفایل"></div>
+          <label for="setting-avatar-zoom" style="display:block;color:#b7c8d8;font-size:12px">بزرگ‌نمایی</label>
+          <input id="setting-avatar-zoom" type="range" min="1" max="3" step="0.05" value="1">
+          <div class="setting-avatar-actions"><button type="button" class="setting-avatar-cancel" id="setting-avatar-cancel">انصراف</button><button type="button" class="setting-avatar-confirm" id="setting-avatar-confirm">تأیید و ثبت پروفایل</button></div>
+        </section>
+      </div>
+      <script>
+      (function(){{
+        const picker=document.getElementById('setting-avatar-open'), file=document.getElementById('setting-avatar-file'), form=document.getElementById('setting-avatar-upload');
+        const modal=document.getElementById('setting-avatar-editor'), preview=document.getElementById('setting-avatar-preview'), zoom=document.getElementById('setting-avatar-zoom');
+        const cancel=document.getElementById('setting-avatar-cancel'), confirm=document.getElementById('setting-avatar-confirm');
+        let source=null, image=null;
+        picker.addEventListener('click',()=>file.click());
+        file.addEventListener('change',()=>{{
+          const chosen=file.files&&file.files[0]; if(!chosen)return;
+          if(!/^image\/(jpeg|png|webp)$/.test(chosen.type)){{alert('فقط عکس JPG، PNG یا WebP انتخاب کن');file.value='';return;}}
+          if(chosen.size>5*1024*1024){{alert('حجم عکس باید حداکثر ۵ مگابایت باشد');file.value='';return;}}
+          source=URL.createObjectURL(chosen); image=new Image();
+          image.onload=()=>{{preview.src=source;zoom.value='1';preview.style.transform='scale(1)';modal.classList.add('open');}};
+          image.onerror=()=>{{alert('باز کردن عکس ناموفق بود');file.value='';}}; image.src=source;
+        }});
+        zoom.addEventListener('input',()=>preview.style.transform='scale('+zoom.value+')');
+        function closeEditor(){{modal.classList.remove('open');if(source)URL.revokeObjectURL(source);source=null;image=null;file.value='';}}
+        cancel.addEventListener('click',closeEditor);
+        modal.addEventListener('click',e=>{{if(e.target===modal)closeEditor();}});
+        confirm.addEventListener('click',()=>{{
+          if(!image)return;
+          const side=512, scale=Math.max(side/image.naturalWidth,side/image.naturalHeight)*Number(zoom.value);
+          const canvas=document.createElement('canvas');canvas.width=side;canvas.height=side;
+          const ctx=canvas.getContext('2d');const w=image.naturalWidth*scale,h=image.naturalHeight*scale;
+          ctx.drawImage(image,(side-w)/2,(side-h)/2,w,h);
+          confirm.disabled=true;confirm.textContent='در حال آماده‌سازی…';
+          canvas.toBlob(blob=>{{
+            if(!blob){{confirm.disabled=false;confirm.textContent='تأیید و ثبت پروفایل';alert('آماده‌سازی عکس ناموفق بود');return;}}
+            const cropped=new File([blob],'profile.jpg',{{type:'image/jpeg'}});const transfer=new DataTransfer();transfer.items.add(cropped);file.files=transfer.files;
+            confirm.textContent='در حال ثبت عکس…';form.submit();
+          }},'image/jpeg',.92);
+        }});
+        document.addEventListener('keydown',e=>{{if(e.key==='Escape'&&modal.classList.contains('open'))closeEditor();}});
+      }})();
+      </script>
       <div class="setting-edit-overlay" id="cyrus-edit-overlay" role="dialog" aria-modal="true" aria-labelledby="cyrus-edit-title">
         <form class="setting-edit-sheet" method="post" id="cyrus-inline-edit">
           <h3 id="cyrus-edit-title">ویرایش اطلاعات</h3>
