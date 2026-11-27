@@ -1947,7 +1947,7 @@ def chat(conversation_id):
         const end=input.selectionEnd===null?start:input.selectionEnd;
         input.value=input.value.slice(0,start)+emoji+input.value.slice(end);
         input.focus();input.setSelectionRange(start+emoji.length,start+emoji.length);
-        input.dispatchEvent(new Event("input",{bubbles:true}));
+        input.dispatchEvent(new Event("input",{{bubbles:true}}));
         if(panel&&closePanel)panel.style.display="none";
       }}
       document.addEventListener('DOMContentLoaded',function(){{
