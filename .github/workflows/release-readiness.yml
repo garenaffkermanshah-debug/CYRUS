@@ -1,0 +1,37 @@
+name: CYRUS release readiness
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: دریافت کد
+        uses: actions/checkout@v4
+
+      - name: بررسی فایل‌های محرمانه و تنظیمات انتشار
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(\.env|\.env\..+)$' | grep -vE '(^|/)\.env\.example$'; then
+            echo "A real environment file is tracked in Git."
+            exit 1
+          fi
+          grep -Eq '^\.env$' .gitignore
+          grep -q '^USER cyrus$' Dockerfile
+          grep -q 'debug=False' app.py
+          grep -q '@app.route("/healthz"' app.py
+          grep -q '@app.route("/readyz"' app.py
+          grep -q 'SECRET_KEY=REPLACE_WITH_A_LONG_RANDOM_SECRET' .env.example
+          ! grep -Eq 'SUPABASE_KEY=eyJ|SUPABASE_KEY=sb_secret_' .env.example
+          cp .env.example .env
+          docker compose config --quiet
+          echo "CYRUS release-readiness checks passed."
