@@ -1295,7 +1295,7 @@ def public_user_profile(user_id):
         .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:12px}}
         .profile-media-tabs button{{flex:1;margin:0;padding:12px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:11px}}
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
-        .profile-media-content{{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
+        .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
         .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
         .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
@@ -1322,16 +1322,17 @@ def public_user_profile(user_id):
         <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
       </section>
       {send_link}
-      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
+      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><small class="profile-history-count" id="profileHistoryCount" aria-live="polite"></small><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
       {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
     </main>
     <script>
-    function cyrusCopyUsername(el){{const u="@"+(el.dataset.username||"");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>alert("نام کاربری کپی شد")).catch(()=>prompt("نام کاربری",u));else prompt("نام کاربری",u);}}
+    function cyrusCopyUsername(el){{const u="@"+(el.dataset.username||"");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>{{el.title="نام کاربری کپی شد";}}).catch(()=>prompt("نام کاربری",u));else prompt("نام کاربری",u);}}
+    document.querySelector('.user-profile-username')?.addEventListener('keydown',function(e){{if(e.key==='Enter'||e.key===' '){{e.preventDefault();cyrusCopyUsername(this);}}}});
     document.addEventListener('click',function(e){{if(!e.target.closest('.profile-more'))document.querySelectorAll('.profile-more[open]').forEach(x=>x.open=false);}});
     (function(){{
       const root=document.querySelector('.cyrus-user-profile'),box=document.getElementById('profile-media-content'),buttons=[...document.querySelectorAll('.profile-media-tabs button')];
       if(!root||!box||!buttons.length)return;
-      let loaded=false,items=[];
+      let loaded=false,items=[];const countLabel=document.getElementById("profileHistoryCount");
       function make(tag,cls){{const el=document.createElement(tag);if(cls)el.className=cls;return el;}}
       function linkCard(url,label){{const a=make('a','profile-history-file');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=label;return a;}}
       function render(key){{
@@ -1341,13 +1342,14 @@ def public_user_profile(user_id):
         if(key==='music')selected.push(...items.filter(x=>x.url&&/^(audio|music|voice)$/i.test(x.type)));
         if(key==='files')selected.push(...items.filter(x=>x.url&&!/^(photo|image|video|audio|music|voice)$/i.test(x.type)));
         if(key==='links')items.forEach(x=>{{(x.content.match(/https?:\/\/[^\s<>]+|www\.[^\s<>]+/gi)||[]).forEach(u=>selected.push({{type:'link',url:u,content:u}}));}});
+        const seen=new Set();const unique=selected.filter(x=>{{const key=String(x.url||x.content||"");if(seen.has(key))return false;seen.add(key);return true;}});selected.splice(0,selected.length,...unique);if(countLabel)countLabel.textContent=selected.length+" مورد";
         selected.forEach(x=>{{
           let node;
           const url=String(x.url||'');
           const typ=String(x.type||'').toLowerCase();
           if(key==='links'){{let u=String(x.url||'');if(!/^https?:\/\//i.test(u))u='https://'+u;node=linkCard(u,x.content||u);}}
-          else if(/^(photo|image)$/i.test(typ)){{node=make('a','profile-history-card');node.href=url;node.target='_blank';node.rel='noopener';const img=make('img');img.src=url;img.alt='تصویر گفتگو';node.appendChild(img);}}
-          else if(typ==='video'){{node=make('video','profile-history-video');node.src=url;node.controls=true;node.preload='metadata';}}
+          else if(/^(photo|image)$/i.test(typ)){{node=make('a','profile-history-card');node.href=url;node.target='_blank';node.rel='noopener';const img=make('img');img.src=url;img.alt='تصویر گفتگو';img.loading='lazy';node.appendChild(img);}}
+          else if(typ==='video'){{node=make('video','profile-history-video');node.src=url;node.controls=true;node.preload='metadata';node.playsInline=true;}}
           else if(/^(audio|music|voice)$/i.test(typ)){{node=make('audio','profile-history-audio');node.src=url;node.controls=true;node.preload='metadata';}}
           else node=linkCard(url,x.content||'فایل ارسال‌شده');
           box.appendChild(node);
@@ -1355,10 +1357,10 @@ def public_user_profile(user_id):
         if(!selected.length){{const empty=make('p','profile-history-empty');empty.textContent='در این بخش موردی پیدا نشد';box.appendChild(empty);}}
       }}
       async function load(key){{
-        if(!loaded){{box.textContent='در حال دریافت تاریخچه…';try{{const r=await fetch('/user/'+encodeURIComponent(root.dataset.profileUser)+'/shared-media',{{credentials:'same-origin'}});if(!r.ok)throw new Error('load');const d=await r.json();items=Array.isArray(d.items)?d.items:[];loaded=true;}}catch(e){{box.textContent='تاریخچهٔ رسانه در دسترس نیست';return;}}}}
+        if(!loaded){{box.textContent='در حال دریافت تاریخچه…';try{{const r=await fetch('/user/'+encodeURIComponent(root.dataset.profileUser)+'/shared-media',{{credentials:'same-origin'}});if(!r.ok)throw new Error('load');const d=await r.json();items=Array.isArray(d.items)?d.items:[];loaded=true;}}catch(e){{box.replaceChildren();const err=make('p','profile-history-empty');err.textContent='تاریخچهٔ رسانه در دسترس نیست';const retry=make('button');retry.type='button';retry.textContent='تلاش دوباره';retry.onclick=()=>{{loaded=false;load(key);}};box.append(err,retry);return;}}}}
         render(key);
       }}
-      buttons.forEach(b=>b.addEventListener('click',()=>{{buttons.forEach(x=>x.classList.toggle('active',x===b));load(b.dataset.tab||'media');}}));
+      buttons.forEach(b=>{{b.setAttribute('aria-selected',b.classList.contains('active')?'true':'false');b.addEventListener('click',()=>{{buttons.forEach(x=>{{x.classList.toggle('active',x===b);x.setAttribute('aria-selected',x===b?'true':'false');}});load(b.dataset.tab||'media');}});}});
       load('media');
     }})();
     </script>"""
