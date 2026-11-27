@@ -1975,15 +1975,21 @@ def chat(conversation_id):
           const sendButton=form.querySelector(".composer-send");
           const draftKey="cyrus-chat-draft-"+form.action.split("/").filter(Boolean).slice(-2, -1)[0];
           const makeNonce=()=>window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+Math.random().toString(36).slice(2));
+          let pendingText=null;
           try{{
             const saved=JSON.parse(localStorage.getItem(draftKey)||"null");
             if(saved&&typeof saved.text==="string"&&saved.text){{
               input.value=saved.text;
+              pendingText=saved.text;
               nonceInput.value=saved.nonce||makeNonce();
             }}
           }}catch(e){{}}
           if(!nonceInput.value)nonceInput.value=makeNonce();
           input.addEventListener("input",function(){{
+            if(pendingText!==null&&input.value!==pendingText){{
+              nonceInput.value=makeNonce();
+              pendingText=null;
+            }}
             try{{localStorage.setItem(draftKey,JSON.stringify({{text:input.value,nonce:nonceInput.value||makeNonce()}}));}}catch(e){{}}
           }});
           form.addEventListener("submit",async function(event){{
@@ -1993,6 +1999,7 @@ def chat(conversation_id):
             event.preventDefault();
             const nonce=nonceInput.value||makeNonce();
             nonceInput.value=nonce;
+            pendingText=text;
             try{{localStorage.setItem(draftKey,JSON.stringify({{text:text,nonce:nonce}}));}}catch(e){{}}
             form.dataset.sending="1";
             if(sendButton)sendButton.disabled=true;
@@ -2004,10 +2011,12 @@ def chat(conversation_id):
               const response=await fetch(form.action,{{method:"POST",body:payload,credentials:"same-origin",redirect:"follow"}});
               if(!response.ok)throw new Error("send failed");
               try{{localStorage.removeItem(draftKey);}}catch(e){{}}
+              pendingText=null;
               nonceInput.value=makeNonce();
               window.location.href=response.url||form.action;
             }}catch(e){{
               if(!input.value)input.value=text;
+              pendingText=text;
               form.dataset.sending="";
               if(sendButton)sendButton.disabled=false;
               input.focus();
