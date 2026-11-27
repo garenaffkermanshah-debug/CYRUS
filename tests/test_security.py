@@ -40,7 +40,7 @@ class CyrusSecurityTests(unittest.TestCase):
         )
 
     def test_browser_form_without_csrf_token_is_rejected(self):
-        response = self.client.post("/logout", data={})
+        response = self.client.post("/logout", data={"unused": "value"})
         self.assertEqual(response.status_code, 403)
 
     def test_browser_form_with_valid_csrf_token_is_accepted(self):
