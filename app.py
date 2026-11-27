@@ -102,7 +102,7 @@ def cyrus_refresh_auth_session():
 URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
 # Server-only Supabase Auth admin key; never expose this to clients.
-ADMIN_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+ADMIN_KEY = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 # شناسهٔ عمومی و ثابت کانال رسمی امپراتوری پارس
 CYRUS_OFFICIAL_CHANNEL_ID = "593beab2-c136-4434-84df-eb64bde32c99"
 
@@ -156,7 +156,12 @@ def cyrus_ensure_official_membership(user_id):
         return False
 
 def cyrus_security_headers():
-    return {"apikey": ADMIN_KEY, "Authorization": "Bearer " + ADMIN_KEY, "Content-Type": "application/json"}
+    """Build server-side Supabase headers for legacy JWT or new opaque secret keys."""
+    headers = {"apikey": ADMIN_KEY, "Content-Type": "application/json"}
+    # sb_secret_* keys are opaque API keys, not JWTs: never send them as Bearer.
+    if not ADMIN_KEY.startswith("sb_secret_"):
+        headers["Authorization"] = "Bearer " + ADMIN_KEY
+    return headers
 
 def cyrus_get_account_security(user_id):
     if not ADMIN_KEY:
@@ -238,7 +243,7 @@ def auth_find_user_by_email(email):
         response = requests.get(
             URL + "/auth/v1/admin/users",
             params={"filter": email, "per_page": 100},
-            headers={"apikey": ADMIN_KEY, "Authorization": "Bearer " + ADMIN_KEY},
+            headers=cyrus_security_headers(),
             timeout=15
         )
         if response.status_code != 200:
@@ -2307,7 +2312,7 @@ def manage_account_two_factor():
         email=str(session.get("cyrus_login_email") or "")
         if not email and ADMIN_KEY:
             try:
-                account=requests.get(URL+"/auth/v1/admin/users/"+uid,headers={"apikey":ADMIN_KEY,"Authorization":"Bearer "+ADMIN_KEY},timeout=12)
+                account=requests.get(URL+"/auth/v1/admin/users/"+uid,headers=cyrus_security_headers(),timeout=12)
                 if account.ok:
                     email=str(account.json().get("email") or "").strip().lower()
             except Exception:
