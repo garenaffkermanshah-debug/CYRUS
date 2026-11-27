@@ -320,26 +320,30 @@ body {
 {{ header|safe }}
 {{ content|safe }}
 {{ nav|safe }}
-<script>
-window.addEventListener('pageshow', function(event) {
-  const navEntry = performance.getEntriesByType('navigation')[0];
-  if ((event.persisted || (navEntry && navEntry.type === 'back_forward')) && (location.pathname === '/' || location.pathname === '/home')) {
-    location.reload();
-  }
-});
-
 <div id="cyrusInstallBar" style="display:none;position:fixed;z-index:999;left:12px;right:12px;bottom:calc(82px + env(safe-area-inset-bottom));padding:12px 14px;border:1px solid #35516a;border-radius:16px;background:#101d2b;box-shadow:0 8px 30px #0008;align-items:center;gap:10px;color:#eaf2f8"><span style="font-size:22px">𓊹</span><span style="flex:1;font-size:13px">نصب CYRUS روی گوشی</span><button id="cyrusInstallBtn" style="border:0;border-radius:20px;padding:9px 15px;background:#278bdc;color:#fff;font-weight:bold">نصب</button><button id="cyrusInstallClose" aria-label="بستن" style="border:0;background:transparent;color:#9fb1c2;font-size:20px">×</button></div>
 <script>
+window.addEventListener('pageshow',function(event){
+ const navEntry=performance.getEntriesByType('navigation')[0];
+ if((event.persisted||(navEntry&&navEntry.type==='back_forward'))&&(location.pathname==='/'||location.pathname==='/home'))location.reload();
+});
 (function(){
- let deferred=null;const bar=document.getElementById('cyrusInstallBar'),btn=document.getElementById('cyrusInstallBtn'),close=document.getElementById('cyrusInstallClose');
- if(!bar||!btn)return;
+ let deferred=null;
+ const bar=document.getElementById('cyrusInstallBar'),btn=document.getElementById('cyrusInstallBtn'),close=document.getElementById('cyrusInstallClose');
  if('serviceWorker' in navigator)navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
- window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;if(!sessionStorage.getItem('cyrus-install-dismissed'))bar.style.display='flex';});
- btn.addEventListener('click',async function(){if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;bar.style.display='none';});
- close.addEventListener('click',function(){bar.style.display='none';sessionStorage.setItem('cyrus-install-dismissed','1');});
+ if(!bar||!btn)return;
+ window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();deferred=e;
+  if(!sessionStorage.getItem('cyrus-install-dismissed'))bar.style.display='flex';
+ });
+ btn.addEventListener('click',async function(){
+  if(!deferred)return;
+  deferred.prompt();await deferred.userChoice;deferred=null;bar.style.display='none';
+ });
+ close.addEventListener('click',function(){
+  bar.style.display='none';sessionStorage.setItem('cyrus-install-dismissed','1');
+ });
  if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone)bar.style.display='none';
 })();
-</script>
 </script>
 </body>
 </html>
@@ -3122,6 +3126,37 @@ def chat(conversation_id):
         form.querySelector('[name="content"]').value = value.trim();
         form.submit();
       }}
+      // دریافت نزدیک‌به‌زنده پیام‌های تازه؛ هنگام مخفی بودن صفحه متوقف می‌شود.
+      (function(){{
+        const endpoint='/chat/{conversation_id}/updates';
+        let newest=document.querySelector('.message[data-message-id]')?.dataset.messageId||'';
+        let delay=7000,timer=null,stopped=false;
+        function schedule(){{if(stopped||document.hidden)return;clearTimeout(timer);timer=setTimeout(poll,delay);}}
+        async function poll(){{
+          if(stopped||document.hidden)return schedule();
+          try{{
+            const response=await fetch(endpoint,{{headers:{{'Accept':'application/json'}},cache:'no-store',credentials:'same-origin'}});
+            if(!response.ok)throw new Error('updates unavailable');
+            const data=await response.json();
+            delay=7000;
+            if(data.latest_id&&newest&&data.latest_id!==newest){{
+              const distance=Math.max(0,document.documentElement.scrollHeight-window.scrollY-window.innerHeight);
+              try{{sessionStorage.setItem('cyrus-chat-scroll-distance',String(distance));}}catch(e){{}}
+              location.reload();return;
+            }}
+            if(data.latest_id)newest=data.latest_id;
+          }}catch(e){{delay=Math.min(30000,Math.round(delay*1.7));}}
+          schedule();
+        }}
+        document.addEventListener('visibilitychange',()=>{{if(document.hidden)clearTimeout(timer);else{{delay=7000;schedule();}}}});
+        window.addEventListener('pagehide',()=>{{stopped=true;clearTimeout(timer);}});
+        const savedDistance=sessionStorage.getItem('cyrus-chat-scroll-distance');
+        if(savedDistance!==null){{
+          sessionStorage.removeItem('cyrus-chat-scroll-distance');
+          window.addEventListener('load',()=>{{const d=Number(savedDistance);if(Number.isFinite(d))window.scrollTo(0,Math.max(0,document.documentElement.scrollHeight-window.innerHeight-d));}},{{once:true}});
+        }}
+        schedule();
+      }})();
       </script>
       {send_box}
     </div>"""
@@ -3133,6 +3168,35 @@ def chat(conversation_id):
         except ValueError:
             pass
     return page(content)
+
+
+@app.route("/chat/<conversation_id>/updates")
+def chat_updates(conversation_id):
+    if not session.get("access_token"):
+        return app.response_class('{"error":"unauthorized"}', status=401, mimetype="application/json")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return app.response_class('{"error":"invalid_conversation"}', status=400, mimetype="application/json")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    try:
+        member=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,
+                    "user_id":"eq."+str(session.get("user_id") or ""),"limit":"1"},
+            headers=headers,timeout=10)
+        if not member.ok or not member.json():
+            return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
+        latest=requests.get(URL+"/rest/v1/cyrus_messages",
+            params={"select":"id,created_at","conversation_id":"eq."+conversation_id,
+                    "order":"created_at.desc","limit":"1"},
+            headers=headers,timeout=10)
+        if not latest.ok:
+            return app.response_class('{"error":"updates_unavailable"}',status=502,mimetype="application/json")
+        row=latest.json()[0] if latest.json() else {}
+        payload=__import__("json").dumps({"latest_id":str(row.get("id") or ""),"latest_at":row.get("created_at")},ensure_ascii=False)
+        return app.response_class(payload,mimetype="application/json",headers={"Cache-Control":"no-store"})
+    except Exception:
+        return app.response_class('{"error":"server_error"}',status=502,mimetype="application/json")
 
 
 @app.route("/chat/<conversation_id>/remove", methods=["POST"])
