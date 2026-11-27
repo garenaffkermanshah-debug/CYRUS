@@ -37,13 +37,16 @@ def cyrus_manifest():
         "lang": "fa", "dir": "rtl", "start_url": "/home", "scope": "/",
         "display": "standalone", "orientation": "portrait",
         "background_color": "#0d1722", "theme_color": "#0d1722",
-        "icons": [{"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+        "icons": [
+            {"src": "/static/cyrus-app-icon.webp", "sizes": "1536x1536", "type": "image/webp", "purpose": "any"},
+            {"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+        ]
     }
     return app.response_class(__import__("json").dumps(manifest, ensure_ascii=False), mimetype="application/manifest+json")
 
 @app.route("/service-worker.js")
 def cyrus_service_worker():
-    worker = r"""const CACHE='cyrus-static-v1';
+    worker = r"""const CACHE='cyrus-static-v2';
 const STATIC=['/static/cyrus-app-icon.svg','/static/cyrus-cylinder.jpg','/static/cyrus-tomb.jpg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
@@ -221,7 +224,9 @@ BASE = """
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="/static/cyrus-app-icon.webp" type="image/webp" sizes="1536x1536">
 <link rel="icon" href="/static/cyrus-app-icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/cyrus-app-icon.webp">
 <title>CYRUS | شاهنشاهی ارتباطات</title>
 <style>
 *{box-sizing:border-box}
@@ -458,7 +463,7 @@ def page(content):
         header = """
         <header class="top cyrus-home-top">
          <div class="brand">
-          <div class="emblem"><img src="/static/cyrus-cylinder.jpg" alt="منشور کوروش بزرگ"></div>
+          <div class="emblem"><img src="/static/cyrus-app-icon.webp" alt="نشان اصلی CYRUS" onerror="this.onerror=null;this.src='/static/cyrus-app-icon.svg'"></div>
           <div><div class="logo">CYRUS</div><div class="sub">پیوند پارسیان · شکوه هخامنشی</div></div>
          </div>
          <div class="top-actions"><a href="/search" aria-label="جستجو">⌕</a></div>
