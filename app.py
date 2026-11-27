@@ -584,7 +584,18 @@ def home():
                     if profile_response.ok and profile_response.json():
                         person = profile_response.json()[0]
                         person_name = str(person.get("display_name") or person.get("username") or room_title)
-                        search_extra = person_name + " " + str(person.get("username") or "")
+                        room_title = person_name
+                        try:
+                            saved_contact_response = requests.get(
+                                URL + "/rest/v1/cyrus_contacts",
+                                params={"select":"contact_name","owner_id":"eq."+str(session.get("user_id") or ""),"contact_user_id":"eq."+other_user_id,"limit":"1"},
+                                headers=headers, timeout=12
+                            )
+                            if saved_contact_response.ok and saved_contact_response.json():
+                                room_title = str(saved_contact_response.json()[0].get("contact_name") or room_title)
+                        except Exception:
+                            pass
+                        search_extra = room_title + " " + str(person.get("username") or "")
                         avatar_url = str(person.get("avatar_url") or "")
                         if avatar_url:
                             avatar_html = (
