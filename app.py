@@ -671,6 +671,7 @@ def home():
             <div class="chat-preview">{html.escape(preview)}</div>
           </div>
           {unread_badge}
+          <button type="button" class="cyrus-archive-chat" data-room-id="{room_id}" onclick="event.stopPropagation();cyrusArchiveToggle(this)">آرشیو</button>
           <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
             <button type="submit">حذف گفتگو</button>
           </form>
@@ -695,11 +696,43 @@ def home():
         .cyrus-chat-row:focus-visible{{outline:2px solid #3297df;outline-offset:-2px}}
         .cyrus-chat-row .chat-info{{cursor:pointer}}
       </style>
-      <div class="tabs">{tabs}</div>
+      <div class="tabs">{tabs}<a class="tab" href="/home?view=archive">آرشیو</a></div>
 
-      <div class="chat-list">{rows}</div>
+      <div class="chat-list" id="cyrus-main-chat-list">{rows}</div>
+      <script>
+      const CYRUS_ARCHIVE_KEY = 'cyrus_archived_chats_v1';
+      function cyrusArchivedIds(){{
+        try{{const v=JSON.parse(localStorage.getItem(CYRUS_ARCHIVE_KEY)||'[]');return Array.isArray(v)?v.map(String):[];}}
+        catch(_e){{return [];}}
+      }}
+      function cyrusApplyArchiveView(){{
+        const archived=new Set(cyrusArchivedIds());
+        const archiveView=new URLSearchParams(location.search).get('view')==='archive';
+        document.querySelectorAll('.cyrus-chat-row[data-room-id]').forEach(row=>{{
+          const isArchived=archived.has(row.dataset.roomId);
+          row.style.display=(archiveView===isArchived)?'':'none';
+          const button=row.querySelector('.cyrus-archive-chat');
+          if(button)button.textContent=isArchived?'بازگردانی':'آرشیو';
+        }});
+        const list=document.getElementById('cyrus-main-chat-list');
+        if(list&&!Array.from(list.querySelectorAll('.cyrus-chat-row')).some(row=>row.style.display!== 'none')){{
+          let empty=list.querySelector('.cyrus-archive-empty');
+          if(!empty){{empty=document.createElement('div');empty.className='empty cyrus-archive-empty';list.appendChild(empty);}}
+          empty.textContent=archiveView?'گفتگوی آرشیوشده‌ای ندارید':'گفتگویی در این بخش نیست';
+          empty.style.display='block';
+        }}else{{const empty=list&&list.querySelector('.cyrus-archive-empty');if(empty)empty.style.display='none';}}
+      }}
+      function cyrusArchiveToggle(button){{
+        const id=button.dataset.roomId;let ids=cyrusArchivedIds();
+        if(ids.includes(id))ids=ids.filter(x=>x!==id);else ids.push(id);
+        localStorage.setItem(CYRUS_ARCHIVE_KEY,JSON.stringify(ids));
+        cyrusApplyArchiveView();
+      }}
+      cyrusApplyArchiveView();
+      </script>
       <style>
         .cyrus-chat-row{{position:relative;touch-action:pan-y;min-height:64px;padding:8px 12px;background:transparent;border:0;border-bottom:1px solid #24313d;border-radius:0;box-shadow:none;gap:10px}} .cyrus-chat-row .avatar{{width:42px;height:42px;min-width:42px;flex:0 0 42px;font-size:18px}} .cyrus-chat-row .chat-info{{min-width:0;flex:1;padding:0 2px}} .cyrus-chat-row .chat-name{{font-size:14px;font-weight:600;color:#e8edf3;line-height:1.5}} .cyrus-chat-row .chat-preview{{font-size:12px;color:#94a5b4;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}} .cyrus-chat-row .unread-badge{{min-width:18px;height:18px;padding:0 5px;font-size:10px;display:flex;align-items:center;justify-content:center;border-radius:10px}} .cyrus-chat-row .cyrus-remove-chat button{{font-size:11px;padding:5px 8px}}
+        .cyrus-archive-chat{{width:auto;flex:0 0 auto;margin:0;padding:7px 9px;border:1px solid #34516a;border-radius:9px;background:#12263a;color:#b8d8ef;font-size:11px}}
         .cyrus-remove-chat{{display:none;margin:0}}
         .cyrus-remove-chat button{{width:auto;margin:0;padding:7px 10px;font-size:12px;background:#48252a;border:1px solid #a34a55;color:#ffd9dd}}
         .cyrus-chat-row.remove-open .cyrus-remove-chat{{display:block}}
