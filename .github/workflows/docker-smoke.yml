@@ -7,6 +7,8 @@ on:
       - "app.py"
       - "requirements.txt"
       - "Dockerfile"
+      - "compose.yaml"
+      - ".env.example"
       - ".dockerignore"
       - ".github/workflows/docker-smoke.yml"
   pull_request:
@@ -41,6 +43,11 @@ jobs:
           tags: cyrus:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: اعتبارسنجی Docker Compose
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
 
       - name: اجرای کانتینر و بررسی سلامت
         shell: bash
