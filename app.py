@@ -1827,14 +1827,28 @@ def chat(conversation_id):
             headers={**headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
             timeout=20
             )
+        message_before = str(request.args.get("before") or "").strip()
+        message_before_valid = False
+        if message_before:
+            try:
+                before_dt = datetime.fromisoformat(message_before.replace("Z","+00:00"))
+                if before_dt.tzinfo is None:
+                    before_dt = before_dt.replace(tzinfo=timezone.utc)
+                message_before = before_dt.astimezone(timezone.utc).isoformat()
+                message_before_valid = True
+            except ValueError:
+                message_before = ""
+        message_params = {
+            "select": "id,sender_id,content,message_type,attachment_url,created_at,edited_at,metadata",
+            "conversation_id": "eq." + conversation_id,
+            "order": "created_at.desc",
+            "limit": "201"
+        }
+        if message_before_valid:
+            message_params["created_at"] = "lt." + message_before
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
-            params={
-                "select": "id,sender_id,content,message_type,attachment_url,created_at,edited_at,metadata",
-                "conversation_id": "eq." + conversation_id,
-                "order": "created_at.desc",
-                "limit": "200"
-            },
+            params=message_params,
             headers=headers,
             timeout=20
         )
@@ -1842,7 +1856,9 @@ def chat(conversation_id):
         if not response.ok:
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
-        messages = list(reversed(response.json()))
+        fetched_messages = response.json()
+        has_older_messages = len(fetched_messages) > 200
+        messages = list(reversed(fetched_messages[:200]))
         # Deep links can target messages older than the normal 200-message window.
         # Fetch only the requested message through the same authenticated/RLS client.
         requested_message_id = request.args.get("message", "").strip()
@@ -2275,14 +2291,21 @@ def chat(conversation_id):
         if room_type in ("group", "channel") else ""
     )
 
+    older_messages_link = ""
+    if has_older_messages and messages:
+        oldest_stamp = str(messages[0].get("created_at") or "")
+        older_url = url_for("chat",conversation_id=conversation_id,before=oldest_stamp)
+        older_messages_link = '<a class="cyrus-older-messages" href="' + html.escape(older_url,quote=True) + '">↑ پیام‌های قدیمی‌تر</a>'
+    newer_messages_link = '<a class="cyrus-older-messages" href="' + html.escape(url_for("chat",conversation_id=conversation_id),quote=True) + '">↓ بازگشت به پیام‌های جدیدتر</a>' if message_before_valid else ""
     content = f"""
     <div class="container">
       {room_header}
       {pinned_banner}
+      {older_messages_link}{newer_messages_link}
       <style>
         .container:has(.cyrus-chat-header){{max-width:650px;min-height:calc(100dvh - 76px);padding:0 12px 12px;display:flex;flex-direction:column;background:linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9));}}
         .cyrus-chat-header{{position:sticky;top:0;z-index:8;flex:0 0 auto;box-shadow:0 4px 16px #0003}}
-        .messages-area{{flex:1 1 auto;min-height:45vh;}}
+        .messages-area{{flex:1 1 auto;min-height:45vh;}}.cyrus-older-messages{{display:block;width:max-content;max-width:90%;margin:10px auto;padding:9px 15px;border-radius:18px;background:#172b3d;border:1px solid #304b63;color:#9acdf2;text-decoration:none;font-size:12px;text-align:center}}
         .chat-date-divider{{display:flex;justify-content:center;margin:8px 0 12px;pointer-events:none}}
         .chat-date-divider span{{padding:5px 12px;border-radius:14px;background:#253646dd;color:#c4d3df;font-size:11px;}}
         .message{{max-width:min(84%,480px);padding:9px 12px 7px;backdrop-filter:blur(5px);transition:background .15s,border-color .15s}}
