@@ -26,7 +26,18 @@ CYRUS یک پیام‌رسان وب فارسی و راست‌چین است که 
 - Docker برای بسته‌بندی و استقرار
 - GitHub Actions برای بررسی کد و آزمون ساخت/اجرای کانتینر
 
-## اجرای محلی با Docker
+## اجرای محلی با Docker Compose
+
+```sh
+cp .env.example .env
+# مقادیر واقعی Supabase و SECRET_KEY را در .env وارد کنید
+docker compose up -d --build
+docker compose ps
+```
+
+برای مشاهده گزارش‌ها: `docker compose logs -f cyrus`؛ برای توقف: `docker compose down`. فایل واقعی `.env` را هرگز در Git قرار ندهید.
+
+## اجرای دستی با Docker
 
 ابتدا متغیرهای محیطی را تنظیم کنید؛ کلید service-role را هرگز در برنامه یا مخزن قرار ندهید.
 
