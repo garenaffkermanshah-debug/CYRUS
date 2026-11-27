@@ -1761,6 +1761,29 @@ def chat(conversation_id):
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
         messages = response.json()
+        # Deep links can target messages older than the normal 200-message window.
+        # Fetch only the requested message through the same authenticated/RLS client.
+        requested_message_id = request.args.get("message", "").strip()
+        if requested_message_id:
+            try:
+                uuid.UUID(requested_message_id)
+                if not any(str(item.get("id") or "") == requested_message_id for item in messages):
+                    target_response = requests.get(
+                        URL + "/rest/v1/cyrus_messages",
+                        params={
+                            "select": "id,sender_id,content,message_type,attachment_url,created_at,edited_at,metadata",
+                            "id": "eq." + requested_message_id,
+                            "conversation_id": "eq." + conversation_id,
+                            "limit": "1"
+                        },
+                        headers=headers,
+                        timeout=15
+                    )
+                    if target_response.ok and target_response.json():
+                        messages.append(target_response.json()[0])
+                        messages.sort(key=lambda item: str(item.get("created_at") or ""))
+            except ValueError:
+                pass
         if not room_data_for_history.get("history_visible", True) and joined_at_for_history:
             try:
                 joined_dt_for_history = datetime.fromisoformat(str(joined_at_for_history).replace("Z", "+00:00"))
@@ -2508,6 +2531,11 @@ def chat(conversation_id):
         cyrusCloseMessageMenus(false);
       }}
       const cyrusSelectedMessages=new Set();
+      function cyrusSelectedMessageTexts() {{
+        return [...document.querySelectorAll('.message[data-message-id]')]
+          .filter(message=>cyrusSelectedMessages.has(message.dataset.messageId))
+          .map(message=>message.dataset.content||'');
+      }}
       let cyrusSelectionBar=null;
       function cyrusEnsureSelectionBar() {{
         if(cyrusSelectionBar)return;
@@ -2517,7 +2545,7 @@ def chat(conversation_id):
         cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-clear>لغو</button>';
         cyrusSelectionBar.style.cssText='position:fixed;z-index:50;bottom:calc(84px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#102033;border:1px solid #42617a;border-radius:18px;box-shadow:0 8px 30px #0008;color:#eaf3fa';
         cyrusSelectionBar.querySelector('[data-copy]').addEventListener('click',async()=>{{
-          const texts=[...cyrusSelectedMessages].map(id=>document.getElementById('message-'+id)).filter(Boolean).map(m=>m.dataset.content||'');
+          const texts=cyrusSelectedMessageTexts();
           if(texts.length)await cyrusCopyValue(texts.join('\n\n'),'متن پیام‌های انتخاب‌شده کپی شد');
         }});
         cyrusSelectionBar.querySelector('[data-clear]').addEventListener('click',cyrusClearMessageSelection);
@@ -2532,7 +2560,7 @@ def chat(conversation_id):
         }});
         if(!count){{if(cyrusSelectionBar)cyrusSelectionBar.remove();cyrusSelectionBar=null;return;}}
         cyrusEnsureSelectionBar();
-        cyrusSelectionBar.querySelector('.cyrus-selection-count').textContent=count+' پیام انتخاب شد';
+        cyrusSelectionBar.querySelector('.cyrus-selection-count').textContent=new Intl.NumberFormat('fa-IR').format(count)+' پیام انتخاب شد';
       }}
       function cyrusToggleMessageSelection(button) {{
         const id=button.dataset.id||'';
