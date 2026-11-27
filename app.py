@@ -714,21 +714,7 @@ def home():
         catch(_e){{return [];}}
       }}
       function cyrusApplyArchiveView(){{
-        const archived=new Set(cyrusArchivedIds());
-        const archiveView=new URLSearchParams(location.search).get('view')==='archive';
-        document.querySelectorAll('.cyrus-chat-row[data-room-id]').forEach(row=>{{
-          const isArchived=archived.has(row.dataset.roomId);
-          row.style.display=(archiveView===isArchived)?'':'none';
-          const button=row.querySelector('.cyrus-archive-chat');
-          if(button)button.textContent=isArchived?'بازگردانی':'آرشیو';
-        }});
-        const list=document.getElementById('cyrus-main-chat-list');
-        if(list&&!Array.from(list.querySelectorAll('.cyrus-chat-row')).some(row=>row.style.display!== 'none')){{
-          let empty=list.querySelector('.cyrus-archive-empty');
-          if(!empty){{empty=document.createElement('div');empty.className='empty cyrus-archive-empty';list.appendChild(empty);}}
-          empty.textContent=archiveView?'گفتگوی آرشیوشده‌ای ندارید':'گفتگویی در این بخش نیست';
-          empty.style.display='block';
-        }}else{{const empty=list&&list.querySelector('.cyrus-archive-empty');if(empty)empty.style.display='none';}}
+        cyrusApplyListTools();
       }}
       function cyrusArchiveToggle(button){{
         const id=button.dataset.roomId;let ids=cyrusArchivedIds();
@@ -737,6 +723,14 @@ def home():
         cyrusApplyArchiveView();
       }}
       const CYRUS_PIN_KEY='cyrus_pinned_chats_v1',CYRUS_MUTE_KEY='cyrus_muted_chats_v1';
+      const CYRUS_LIST_PREFS_KEY='cyrus_chat_list_preferences_v1';
+      function cyrusLoadListPrefs(){{
+        try{{const p=JSON.parse(localStorage.getItem(CYRUS_LIST_PREFS_KEY)||'{{}}');const q=document.getElementById('cyrus-list-search'),u=document.getElementById('cyrus-unread-filter'),o=document.getElementById('cyrus-list-sort');if(q&&typeof p.query==='string')q.value=p.query;if(u&&p.unread===true){{u.setAttribute('aria-pressed','true');u.textContent='نمایش همه گفتگوها';}}if(o&&['recent','oldest','pinned'].includes(p.sort))o.value=p.sort;}}catch(_e){{}}
+      }}
+      function cyrusSaveListPrefs(){{
+        const q=document.getElementById('cyrus-list-search'),u=document.getElementById('cyrus-unread-filter'),o=document.getElementById('cyrus-list-sort');
+        try{{localStorage.setItem(CYRUS_LIST_PREFS_KEY,JSON.stringify({{query:q?.value||'',unread:u?.getAttribute('aria-pressed')==='true',sort:o?.value||'recent'}}));}}catch(_e){{}}
+      }}
       function cyrusReadSet(key){{try{{const v=JSON.parse(localStorage.getItem(key)||'[]');return new Set(Array.isArray(v)?v.map(String):[]);}}catch(_e){{return new Set();}}}}
       function cyrusWriteSet(key,set){{localStorage.setItem(key,JSON.stringify(Array.from(set)));}}
       function cyrusTogglePinned(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_PIN_KEY);set.has(id)?set.delete(id):set.add(id);cyrusWriteSet(CYRUS_PIN_KEY,set);cyrusApplyListTools();}}
@@ -757,6 +751,7 @@ def home():
           if(mb)mb.textContent=muted?'فعال‌کردن صدا':'بی‌صدا';
           const match=(row.dataset.search||'').includes(term);
           row.style.display=((archiveView===archived)&&match&&(!onlyUnread||unread)&&(sort!=='pinned'||pinned))?'':'none';
+          if(pb)pb.setAttribute('aria-pressed',String(pinned));if(mb)mb.setAttribute('aria-pressed',String(muted));
         }});
         const list=document.getElementById('cyrus-main-chat-list');
         if(list){{const visible=rows.filter(r=>r.style.display!=='none');visible.sort((a,b)=>{{
@@ -767,10 +762,13 @@ def home():
         const empty=list&&list.querySelector('.cyrus-archive-empty');
         if(list&&!rows.some(r=>r.style.display!=='none')){{let e=empty;if(!e){{e=document.createElement('div');e.className='empty cyrus-archive-empty';list.appendChild(e);}}e.textContent=archiveView?'گفتگوی آرشیوشده‌ای ندارید':'گفتگویی مطابق فیلترها پیدا نشد';e.style.display='block';}}
         else if(empty)empty.style.display='none';
+        cyrusSaveListPrefs();
       }}
+      cyrusLoadListPrefs();
       document.getElementById('cyrus-list-search')?.addEventListener('input',cyrusApplyListTools);
       document.getElementById('cyrus-unread-filter')?.addEventListener('click',function(){{const on=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',String(on));this.textContent=on?'نمایش همه گفتگوها':'فقط خوانده‌نشده‌ها';cyrusApplyListTools();}});
       document.getElementById('cyrus-list-sort')?.addEventListener('change',cyrusApplyListTools);
+      document.addEventListener('keydown',function(e){{const tag=document.activeElement?.tagName;if(e.key==='Escape'&&tag!=='INPUT'&&tag!=='TEXTAREA'&&tag!=='SELECT'){{const q=document.getElementById('cyrus-list-search');if(q&&q.value){{q.value='';cyrusApplyListTools();}}}}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){{const q=document.getElementById('cyrus-list-search');if(q){{e.preventDefault();q.focus();q.select();}}}}if(e.key==='/'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!['INPUT','TEXTAREA','SELECT'].includes(tag)){{const q=document.getElementById('cyrus-list-search');if(q){{e.preventDefault();q.focus();}}}}}});
       document.getElementById('cyrus-clear-list-filters')?.addEventListener('click',function(){{const q=document.getElementById('cyrus-list-search');if(q)q.value='';const f=document.getElementById('cyrus-unread-filter');if(f){{f.setAttribute('aria-pressed','false');f.textContent='فقط خوانده‌نشده‌ها';}}const sort=document.getElementById('cyrus-list-sort');if(sort)sort.value='recent';cyrusApplyListTools();}});
       cyrusApplyArchiveView();cyrusApplyListTools();
       </script>
@@ -2183,15 +2181,17 @@ def chat(conversation_id):
     </section>
     <script>
       const cyrusRoomKey='cyrus-room-{conversation_id}';
+      function cyrusSharedSet(key){{try{{const a=JSON.parse(localStorage.getItem(key)||'[]');return new Set(Array.isArray(a)?a.map(String):[]);}}catch(_e){{return new Set();}}}}
+      function cyrusSharedToggle(key,id){{const a=cyrusSharedSet(key);a.has(id)?a.delete(id):a.add(id);localStorage.setItem(key,JSON.stringify([...a]));return a.has(id);}}
       function cyrusRoomToast(msg){{let t=document.getElementById('cyrusRoomToast');if(!t){{t=document.createElement('div');t.id='cyrusRoomToast';t.style.cssText='position:fixed;z-index:9999;bottom:90px;left:50%;transform:translateX(-50%);background:#14283b;border:1px solid #34516a;color:#e9f2fa;padding:11px 16px;border-radius:20px;font:13px Tahoma;box-shadow:0 8px 25px #0008';document.body.appendChild(t);}}t.textContent=msg;t.style.display='block';clearTimeout(t._timer);t._timer=setTimeout(()=>t.style.display='none',1800);}}
       function cyrusToggleRoomMenu(e){{e.stopPropagation();const m=document.getElementById('cyrusRoomMenu');if(m){{m.hidden=!m.hidden;if(!m.hidden){{const b=m.querySelector('button');if(b)b.focus();cyrusUpdateRoomMenu();}}}}}}
-      function cyrusUpdateRoomMenu(){{const m=document.getElementById('cyrusRoomMenu');if(!m)return;const mute=localStorage.getItem(cyrusRoomKey+'-mute')==='1',pin=localStorage.getItem(cyrusRoomKey+'-pin')==='1';const bs=m.querySelectorAll('button');if(bs[0])bs[0].textContent=mute?'فعال‌کردن صدا':'بی‌صدا کردن';if(bs[1])bs[1].textContent=pin?'برداشتن سنجاق':'سنجاق گفتگو';}}
+      function cyrusUpdateRoomMenu(){{const m=document.getElementById('cyrusRoomMenu');if(!m)return;const mute=cyrusSharedSet('cyrus_muted_chats_v1').has("{conversation_id}"),pin=cyrusSharedSet('cyrus_pinned_chats_v1').has("{conversation_id}");const bs=m.querySelectorAll('button');if(bs[0])bs[0].textContent=mute?'فعال‌کردن صدا':'بی‌صدا کردن';if(bs[1])bs[1].textContent=pin?'برداشتن سنجاق':'سنجاق گفتگو';}}
       document.addEventListener('click',function(e){{const m=document.getElementById('cyrusRoomMenu');if(m&&!e.target.closest('.tg-chat-menu-wrap'))m.hidden=true;}});
       document.addEventListener('keydown',function(e){{const m=document.getElementById('cyrusRoomMenu');if(e.key==='Escape'&&m&&!m.hidden){{m.hidden=true;const b=document.querySelector('.chat-header-more');if(b)b.focus();}}}});
       function cyrusCopyRoomInvite(){{const u="{room_invite_safe}";if(!u)return;const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>cyrusRoomToast('لینک دعوت کپی شد')).catch(()=>cyrusRoomCopyFallback(u));else cyrusRoomCopyFallback(u);}}
       function cyrusRoomCopyFallback(u){{const a=document.createElement('textarea');a.value=u;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{{const ok=document.execCommand('copy');cyrusRoomToast(ok?'لینک دعوت کپی شد':'لینک را دستی کپی کنید');if(!ok)prompt('لینک دعوت',u);}}catch(_e){{prompt('لینک دعوت',u);}}a.remove();}}
-      function cyrusToggleMute(){{const k=cyrusRoomKey+'-mute',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');cyrusUpdateRoomMenu();cyrusRoomToast(v?'صدای گفتگو فعال شد':'گفتگو بی‌صدا شد');}}
-      function cyrusTogglePin(){{const k=cyrusRoomKey+'-pin',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');cyrusUpdateRoomMenu();cyrusRoomToast(v?'سنجاق گفتگو برداشته شد':'گفتگو سنجاق شد');}}
+      function cyrusToggleMute(){{const v=cyrusSharedToggle('cyrus_muted_chats_v1',"{conversation_id}");cyrusUpdateRoomMenu();cyrusRoomToast(v?'گفتگو بی‌صدا شد':'صدای گفتگو فعال شد');}}
+      function cyrusTogglePin(){{const v=cyrusSharedToggle('cyrus_pinned_chats_v1',"{conversation_id}");cyrusUpdateRoomMenu();cyrusRoomToast(v?'گفتگو سنجاق شد':'سنجاق گفتگو برداشته شد');}}
       let cyrusRoomSearchItems=[],cyrusRoomSearchIndex=-1,cyrusRoomSearchTerm='',cyrusRoomSearchLastFocus=null;
       function cyrusSearchInChat(){{const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;let box=document.getElementById('cyrusRoomSearch');if(!box){{box=document.createElement('div');box.id='cyrusRoomSearch';box.style.cssText='position:fixed;z-index:1000;top:70px;left:10px;right:10px;max-width:560px;margin:auto;padding:12px;background:#0d1b2a;border:1px solid #34516a;border-radius:14px;display:flex;gap:6px;align-items:center;box-shadow:0 8px 30px #0009';box.innerHTML='<input id="cyrusRoomSearchInput" aria-label="عبارت جستجو" placeholder="جستجو در پیام‌ها…" style="flex:1;min-width:0;background:#07121e;color:#fff;border:1px solid #30485e;border-radius:9px;padding:10px;font:14px Tahoma"><span id="cyrusRoomSearchCount" aria-live="polite" style="white-space:nowrap;color:#a9bed0;font:12px Tahoma">۰/۰</span><button type="button" id="cyrusRoomSearchPrev" aria-label="نتیجه قبلی" style="width:auto;margin:0;padding:8px">↑</button><button type="button" id="cyrusRoomSearchNext" aria-label="نتیجه بعدی" style="width:auto;margin:0;padding:8px">↓</button><button type="button" id="cyrusRoomSearchClose" aria-label="بستن" style="width:auto;margin:0;padding:8px;background:#25394d;color:#fff">×</button>';document.body.appendChild(box);box.querySelector('#cyrusRoomSearchInput').addEventListener('input',cyrusRoomSearchUpdate);box.querySelector('#cyrusRoomSearchInput').addEventListener('keydown',e=>{{if(e.key==='Enter'){{e.preventDefault();cyrusRoomSearchMove(e.shiftKey?-1:1);}}}});box.querySelector('#cyrusRoomSearchPrev').addEventListener('click',()=>cyrusRoomSearchMove(-1));box.querySelector('#cyrusRoomSearchNext').addEventListener('click',()=>cyrusRoomSearchMove(1));box.querySelector('#cyrusRoomSearchClose').addEventListener('click',cyrusRoomSearchClose);}}cyrusRoomSearchLastFocus=document.activeElement;box.style.display='flex';const input=box.querySelector('input');input.focus();input.select();if(input.value)cyrusRoomSearchUpdate();}}
       function cyrusRoomSearchUpdate(){{const input=document.getElementById('cyrusRoomSearchInput');cyrusRoomSearchTerm=(input.value||'').trim().toLocaleLowerCase();cyrusRoomSearchItems=Array.from(document.querySelectorAll('.message')).filter(x=>cyrusRoomSearchTerm&&x.textContent.toLocaleLowerCase().includes(cyrusRoomSearchTerm));cyrusRoomSearchIndex=cyrusRoomSearchItems.length?0:-1;const count=document.getElementById('cyrusRoomSearchCount');if(count)count.textContent=cyrusRoomSearchItems.length?('۱/'+cyrusRoomSearchItems.length):'۰/۰';const box=document.getElementById('cyrusRoomSearch');if(box)box.dataset.noResults=cyrusRoomSearchTerm&&!cyrusRoomSearchItems.length?'true':'false';cyrusRoomSearchShow();}}
