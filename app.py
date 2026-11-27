@@ -873,6 +873,115 @@ def register():
     return page(content)
 
 
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    error = ""
+    notice = ""
+    if request.method == "POST":
+        email = str(request.form.get("email") or "").strip().lower()
+        if not email or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+            error = "نشانی ایمیل معتبر وارد کنید"
+        else:
+            try:
+                redirect_to = request.host_url.rstrip("/") + url_for("reset_password")
+                code, data = auth_request(
+                    "/auth/v1/recover?redirect_to=" + quote(redirect_to, safe=""),
+                    {"email": email}
+                )
+                if code in (200, 204):
+                    notice = "اگر این ایمیل در CYRUS ثبت شده باشد، پیوند بازیابی برای آن ارسال می‌شود. پوشه هرزنامه را هم بررسی کنید."
+                else:
+                    # Do not reveal whether an account exists.
+                    notice = "در صورت وجود حساب، پیام بازیابی ارسال می‌شود. چند دقیقه بعد صندوق ایمیل را بررسی کنید."
+            except Exception:
+                error = "ارسال درخواست بازیابی انجام نشد؛ کمی بعد دوباره تلاش کنید"
+
+    content = f"""
+    <main class="container"><div class="card">
+      <h2>بازیابی گذرواژه</h2>
+      <p class="muted">ایمیل حساب خود را وارد کنید تا پیوند امن بازیابی برایتان ارسال شود.</p>
+      <p class="error">{html.escape(error)}</p>
+      <p class="muted" style="color:#9bd6b0">{html.escape(notice)}</p>
+      <form method="post">
+        <input name="email" type="email" placeholder="ایمیل حساب" required autocomplete="email" maxlength="254">
+        <button type="submit">ارسال پیوند بازیابی</button>
+      </form>
+      <p class="muted"><a class="form-link" href="/login">بازگشت به ورود</a></p>
+    </div></main>"""
+    return page(content)
+
+
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+    error = ""
+    success = ""
+    if request.method == "POST":
+        recovery_token = str(request.form.get("recovery_token") or "").strip()
+        password = request.form.get("password") or ""
+        confirm = request.form.get("password_confirm") or ""
+        if not recovery_token or len(recovery_token) > 4096:
+            error = "پیوند بازیابی معتبر نیست یا منقضی شده است؛ دوباره درخواست بازیابی بدهید."
+        elif len(password) < 8 or len(password) > 128:
+            error = "گذرواژه باید بین ۸ تا ۱۲۸ نویسه باشد."
+        elif password != confirm:
+            error = "گذرواژه‌ها با یکدیگر مطابقت ندارند."
+        else:
+            try:
+                update_response = requests.put(
+                    URL + "/auth/v1/user",
+                    json={"password": password},
+                    headers={"apikey": KEY, "Authorization": "Bearer " + recovery_token,
+                             "Content-Type": "application/json"},
+                    timeout=20
+                )
+                if update_response.ok:
+                    success = "گذرواژه با موفقیت تغییر کرد. اکنون با گذرواژه جدید وارد شوید."
+                else:
+                    error = "پیوند بازیابی منقضی یا نامعتبر است؛ دوباره درخواست پیوند بدهید."
+            except Exception:
+                error = "ارتباط با سرور برقرار نشد؛ دوباره تلاش کنید."
+
+    content = f"""
+    <main class="container"><div class="card">
+      <h2>تعیین گذرواژه تازه</h2>
+      <p class="muted">پیوند بازیابی را از ایمیل CYRUS باز کنید؛ سپس گذرواژه تازه را وارد کنید.</p>
+      <p class="error">{html.escape(error)}</p>
+      <p class="muted" style="color:#9bd6b0">{html.escape(success)}</p>
+      <form method="post" id="cyrusResetPasswordForm">
+        <input type="hidden" name="recovery_token" id="cyrusRecoveryToken">
+        <input name="password" type="password" placeholder="گذرواژه تازه (حداقل ۸ نویسه)" required minlength="8" maxlength="128" autocomplete="new-password">
+        <input name="password_confirm" type="password" placeholder="تکرار گذرواژه تازه" required minlength="8" maxlength="128" autocomplete="new-password">
+        <button type="submit">تغییر گذرواژه</button>
+      </form>
+      <p class="muted" id="cyrusResetHint">در حال بررسی پیوند بازیابی…</p>
+      <p class="muted"><a class="form-link" href="/login">بازگشت به ورود</a></p>
+    </div></main>
+    <script>
+    (function(){{
+      const params=new URLSearchParams(location.hash.slice(1));
+      const token=params.get('access_token')||'';
+      const type=params.get('type')||'';
+      const field=document.getElementById('cyrusRecoveryToken');
+      const form=document.getElementById('cyrusResetPasswordForm');
+      const hint=document.getElementById('cyrusResetHint');
+      if(token && (type==='recovery' || !type)){{
+        field.value=token;
+        hint.textContent='پیوند بازیابی شناسایی شد؛ گذرواژه تازه را وارد کنید.';
+        history.replaceState(null,'',location.pathname+location.search);
+      }}else if({str(bool(success)).lower()}){{
+        form.style.display='none';hint.textContent='اکنون می‌توانید وارد حساب شوید.';
+      }}else{{
+        form.style.display='none';
+        hint.textContent='پیوند معتبر پیدا نشد؛ از صفحه بازیابی، پیوند تازه دریافت کنید.';
+      }}
+      form.addEventListener('submit',function(e){{
+        if(!field.value){{e.preventDefault();hint.textContent='پیوند بازیابی معتبر نیست.';}}
+      }});
+    }})();
+    </script>"""
+    return page(content)
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = ""
@@ -935,6 +1044,7 @@ def login_password():
         <button>ورود به حساب</button>
       </form>
       <p class="muted"><a class="form-link" href="/login">بازگشت و تغییر ایمیل</a></p>
+      <p class="muted"><a class="form-link" href="/forgot-password">گذرواژه را فراموش کرده‌اید؟</a></p>
     </div></main>
     """
     return page(content)
