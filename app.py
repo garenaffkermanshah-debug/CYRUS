@@ -946,181 +946,123 @@ def welcome():
     """
     return page(content)
 
-@app.route("/register", methods=["GET","POST"])
+@app.route("/register", methods=["GET", "POST"])
 def register():
     error = ""
     if request.method == "POST":
         email = str(request.form.get("email") or "").strip().lower()
-        password = request.form.get("password","")
-        password_confirm = request.form.get("password_confirm","")
         username = str(request.form.get("username") or "").strip().lower()
-        if not email or not password or not password_confirm or not username:
-            error = "همه بخش‌ها را تکمیل کنید"
+        if not email or not username:
+            error = "ایمیل و نام کاربری را تکمیل کنید"
         elif len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
             error = "نشانی ایمیل معتبر وارد کنید"
         elif not (3 <= len(username) <= 24 and all(ch.isalnum() or ch in "_-" for ch in username)):
             error = "نام کاربری باید ۳ تا ۲۴ نویسه و شامل حروف انگلیسی، عدد، خط تیره یا زیرخط باشد"
-        elif len(password) < 8 or len(password) > 128:
-            error = "گذرواژه باید بین ۸ تا ۱۲۸ نویسه باشد"
-        elif password != password_confirm:
-            error = "گذرواژه‌ها با یکدیگر مطابقت ندارند"
         else:
-            code, data = auth_request("/auth/v1/signup", {"email":email,"password":password})
-            if code in (200,201) and data.get("access_token"):
-                # Start the newly registered account with a fresh session cookie.
+            code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": True})
+            if code in (200, 201, 202):
                 session.clear()
-                session["access_token"] = data["access_token"]
-                session["refresh_token"] = data.get("refresh_token", "")
-                session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
-                session.permanent = True
-                session["user_id"] = data["user"]["id"]
-                profile_created = False
-                try:
-                    profile_response = requests.post(
-                        URL + "/rest/v1/cyrus_profiles",
-                        json={"id":data["user"]["id"],"username":username,"display_name":username},
-                        headers={"apikey":KEY,"Authorization":"Bearer "+data["access_token"],
-                        "Content-Type":"application/json","Prefer":"resolution=merge-duplicates"},
-                        timeout=20
-                    )
-                    profile_created = profile_response.ok
-                except Exception:
-                    profile_created = False
+                session["cyrus_pending_email"] = email
+                session["cyrus_pending_username"] = username
+                session["cyrus_pending_flow"] = "register"
+                session["cyrus_otp_sent_at"] = time.time()
+                return redirect(url_for("verify_email"))
+            error = data.get("msg", data.get("message", "ارسال کد انجام نشد؛ تنظیمات ایمیل را بررسی کنید"))
 
-                # اگر نام کاربری تکراری باشد یا ارتباط لحظه‌ای قطع شود،
-                # پروفایل با نام جایگزین امن ساخته می‌شود.
-                if not profile_created:
-                    profile_created = bool(cyrus_ensure_profile(email))
-                if profile_created:
-                    return redirect(url_for("home"))
-
-                session.clear()
-                error = "حساب ساخته شد، اما ایجاد نمایه کامل نشد. دوباره وارد شوید تا ساخت نمایه تکرار شود."
-            if code in (200, 201) and data.get("user"):
-                error = "حساب ساخته شد، اما تأیید ایمیل لازم است. تا زمانی که ایمیل تأیید دریافت و تأیید نشود، ورود انجام نمی‌شود."
-            else:
-                error = data.get("msg", data.get("message", "ثبت‌نام انجام نشد؛ تنظیمات ارسال ایمیل را بررسی کنید"))
     content = f"""
     <main class="container"><div class="card">
-    <h2>پیوستن به CYRUS</h2><p class="muted">ساخت حساب کاربری</p>
-    <p class="error">{html.escape(str(error))}</p>
-    <form method="post">
-    <input name="username" placeholder="نام کاربری" required>
-    <input name="email" type="email" placeholder="ایمیل" required>
-    <input name="password" type="password" placeholder="رمز عبور" required autocomplete="new-password">
-    <input name="password_confirm" type="password" placeholder="تکرار رمز عبور" required autocomplete="new-password">
-    <button>ایجاد حساب</button></form>
-    <p class="muted"><a class="form-link" href="/login">قبلاً حساب ساخته‌اید؟ ورود</a></p>
+      <h2>پیوستن به CYRUS</h2>
+      <p class="muted">ساخت حساب با کد یک‌بارمصرف ایمیلی؛ بدون گذرواژه</p>
+      <p class="error">{html.escape(str(error))}</p>
+      <form method="post">
+        <input name="username" placeholder="نام کاربری" required minlength="3" maxlength="24" autocomplete="username">
+        <input name="email" type="email" placeholder="ایمیل" required maxlength="254" autocomplete="email">
+        <button>ارسال کد تأیید</button>
+      </form>
+      <p class="muted"><a class="form-link" href="/login">قبلاً حساب ساخته‌اید؟ ورود</a></p>
     </div></main>"""
     return page(content)
 
 
-@app.route("/forgot-password", methods=["GET", "POST"])
-def forgot_password():
+@app.route("/verify-email", methods=["GET", "POST"])
+def verify_email():
+    email = str(session.get("cyrus_pending_email") or "")
+    flow = str(session.get("cyrus_pending_flow") or "")
+    if not email or flow not in ("register", "login"):
+        return redirect(url_for("register"))
+
     error = ""
     notice = ""
     if request.method == "POST":
-        email = str(request.form.get("email") or "").strip().lower()
-        if not email or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
-            error = "نشانی ایمیل معتبر وارد کنید"
-        else:
-            try:
-                redirect_to = request.host_url.rstrip("/") + url_for("reset_password")
-                code, data = auth_request(
-                    "/auth/v1/recover?redirect_to=" + quote(redirect_to, safe=""),
-                    {"email": email}
-                )
-                if code in (200, 204):
-                    notice = "اگر این ایمیل در CYRUS ثبت شده باشد، پیوند بازیابی برای آن ارسال می‌شود. پوشه هرزنامه را هم بررسی کنید."
+        if str(request.form.get("resend") or "") == "1":
+            sent_at = float(session.get("cyrus_otp_sent_at", 0) or 0)
+            wait = int(60 - (time.time() - sent_at))
+            if wait > 0:
+                error = "برای ارسال دوباره کد، " + str(wait) + " ثانیه صبر کنید"
+            else:
+                code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": flow == "register"})
+                if code in (200, 201, 202):
+                    session["cyrus_otp_sent_at"] = time.time()
+                    notice = "کد تازه ارسال شد؛ صندوق ورودی و هرزنامه را بررسی کنید."
                 else:
-                    # Do not reveal whether an account exists.
-                    notice = "در صورت وجود حساب، پیام بازیابی ارسال می‌شود. چند دقیقه بعد صندوق ایمیل را بررسی کنید."
-            except Exception:
-                error = "ارسال درخواست بازیابی انجام نشد؛ کمی بعد دوباره تلاش کنید"
+                    error = data.get("msg", data.get("message", "ارسال دوباره کد انجام نشد"))
+        else:
+            token = str(request.form.get("token") or "").strip()
+            if not re.fullmatch(r"\d{6,8}", token):
+                error = "کد ۶ تا ۸ رقمی را درست وارد کنید"
+            else:
+                code, data = auth_request("/auth/v1/verify", {"type": "email", "email": email, "token": token})
+                if code == 200 and data.get("access_token") and data.get("user"):
+                    username = str(session.get("cyrus_pending_username") or "")
+                    session.clear()
+                    session["access_token"] = data["access_token"]
+                    session["refresh_token"] = data.get("refresh_token", "")
+                    session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
+                    session.permanent = True
+                    session["user_id"] = data["user"]["id"]
+                    if flow == "register" and username:
+                        profile_created = False
+                        try:
+                            profile_response = requests.post(
+                                URL + "/rest/v1/cyrus_profiles",
+                                json={"id": data["user"]["id"], "username": username, "display_name": username},
+                                headers={"apikey": KEY, "Authorization": "Bearer " + data["access_token"],
+                                         "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"},
+                                timeout=20
+                            )
+                            profile_created = profile_response.ok
+                        except Exception:
+                            profile_created = False
+                        if not profile_created:
+                            profile_created = bool(cyrus_ensure_profile(email))
+                        if not profile_created:
+                            session.clear()
+                            error = "حساب تأیید شد، اما ساخت نمایه کامل نشد؛ دوباره وارد شوید."
+                    else:
+                        cyrus_ensure_profile(email)
+                    if not error:
+                        return redirect(url_for("home"))
+                else:
+                    error = "کد نادرست یا منقضی شده است؛ دوباره بررسی کنید."
 
     content = f"""
     <main class="container"><div class="card">
-      <h2>بازیابی گذرواژه</h2>
-      <p class="muted">ایمیل حساب خود را وارد کنید تا پیوند امن بازیابی برایتان ارسال شود.</p>
+      <h2>تأیید ایمیل</h2>
+      <p class="muted">کد یک‌بارمصرف به این نشانی ارسال شد:</p>
+      <p class="muted" dir="ltr">{html.escape(email)}</p>
+      <p class="muted">درود، همراه پارسی! کد را از ایمیل CYRUS وارد کنید.</p>
       <p class="error">{html.escape(error)}</p>
       <p class="muted" style="color:#9bd6b0">{html.escape(notice)}</p>
       <form method="post">
-        <input name="email" type="email" placeholder="ایمیل حساب" required autocomplete="email" maxlength="254">
-        <button type="submit">ارسال پیوند بازیابی</button>
+        <input name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="کد یک‌بارمصرف" required autocomplete="one-time-code" dir="ltr">
+        <button>تأیید و ورود</button>
       </form>
-      <p class="muted"><a class="form-link" href="/login">بازگشت به ورود</a></p>
+      <form method="post">
+        <input type="hidden" name="resend" value="1">
+        <button type="submit" style="background:#172a3d;color:#d9e6f1;border:1px solid #304a63">ارسال دوباره کد</button>
+      </form>
+      <p class="muted"><a class="form-link" href="/login">تغییر ایمیل / بازگشت</a></p>
     </div></main>"""
-    return page(content)
-
-
-@app.route("/reset-password", methods=["GET", "POST"])
-def reset_password():
-    error = ""
-    success = ""
-    if request.method == "POST":
-        recovery_token = str(request.form.get("recovery_token") or "").strip()
-        password = request.form.get("password") or ""
-        confirm = request.form.get("password_confirm") or ""
-        if not recovery_token or len(recovery_token) > 4096:
-            error = "پیوند بازیابی معتبر نیست یا منقضی شده است؛ دوباره درخواست بازیابی بدهید."
-        elif len(password) < 8 or len(password) > 128:
-            error = "گذرواژه باید بین ۸ تا ۱۲۸ نویسه باشد."
-        elif password != confirm:
-            error = "گذرواژه‌ها با یکدیگر مطابقت ندارند."
-        else:
-            try:
-                update_response = requests.put(
-                    URL + "/auth/v1/user",
-                    json={"password": password},
-                    headers={"apikey": KEY, "Authorization": "Bearer " + recovery_token,
-                             "Content-Type": "application/json"},
-                    timeout=20
-                )
-                if update_response.ok:
-                    success = "گذرواژه با موفقیت تغییر کرد. اکنون با گذرواژه جدید وارد شوید."
-                else:
-                    error = "پیوند بازیابی منقضی یا نامعتبر است؛ دوباره درخواست پیوند بدهید."
-            except Exception:
-                error = "ارتباط با سرور برقرار نشد؛ دوباره تلاش کنید."
-
-    content = f"""
-    <main class="container"><div class="card">
-      <h2>تعیین گذرواژه تازه</h2>
-      <p class="muted">پیوند بازیابی را از ایمیل CYRUS باز کنید؛ سپس گذرواژه تازه را وارد کنید.</p>
-      <p class="error">{html.escape(error)}</p>
-      <p class="muted" style="color:#9bd6b0">{html.escape(success)}</p>
-      <form method="post" id="cyrusResetPasswordForm">
-        <input type="hidden" name="recovery_token" id="cyrusRecoveryToken">
-        <input name="password" type="password" placeholder="گذرواژه تازه (حداقل ۸ نویسه)" required minlength="8" maxlength="128" autocomplete="new-password">
-        <input name="password_confirm" type="password" placeholder="تکرار گذرواژه تازه" required minlength="8" maxlength="128" autocomplete="new-password">
-        <button type="submit">تغییر گذرواژه</button>
-      </form>
-      <p class="muted" id="cyrusResetHint">در حال بررسی پیوند بازیابی…</p>
-      <p class="muted"><a class="form-link" href="/login">بازگشت به ورود</a></p>
-    </div></main>
-    <script>
-    (function(){{
-      const params=new URLSearchParams(location.hash.slice(1));
-      const token=params.get('access_token')||'';
-      const type=params.get('type')||'';
-      const field=document.getElementById('cyrusRecoveryToken');
-      const form=document.getElementById('cyrusResetPasswordForm');
-      const hint=document.getElementById('cyrusResetHint');
-      if(token && (type==='recovery' || !type)){{
-        field.value=token;
-        hint.textContent='پیوند بازیابی شناسایی شد؛ گذرواژه تازه را وارد کنید.';
-        history.replaceState(null,'',location.pathname+location.search);
-      }}else if({str(bool(success)).lower()}){{
-        form.style.display='none';hint.textContent='اکنون می‌توانید وارد حساب شوید.';
-      }}else{{
-        form.style.display='none';
-        hint.textContent='پیوند معتبر پیدا نشد؛ از صفحه بازیابی، پیوند تازه دریافت کنید.';
-      }}
-      form.addEventListener('submit',function(e){{
-        if(!field.value){{e.preventDefault();hint.textContent='پیوند بازیابی معتبر نیست.';}}
-      }});
-    }})();
-    </script>"""
     return page(content)
 
 
@@ -1132,63 +1074,26 @@ def login():
         if not email or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
             error = "نشانی ایمیل معتبر وارد کنید"
         else:
-            session.clear()
-            session["cyrus_login_email"] = email
-            return redirect(url_for("login_password"))
+            code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": False})
+            if code in (200, 201, 202):
+                session.clear()
+                session["cyrus_pending_email"] = email
+                session["cyrus_pending_flow"] = "login"
+                session["cyrus_otp_sent_at"] = time.time()
+                return redirect(url_for("verify_email"))
+            # Keep the response generic so account existence is not disclosed.
+            error = "اگر این ایمیل حساب CYRUS داشته باشد، کد ورود ارسال می‌شود. صندوق ورودی و هرزنامه را بررسی کنید."
 
     content = f"""
     <main class="container"><div class="card">
       <h2>ورود به CYRUS</h2>
-      <p class="muted">ابتدا ایمیل حساب خود را وارد کنید</p>
+      <p class="muted">کد یک‌بارمصرف به ایمیل حساب شما ارسال می‌شود؛ نیازی به رمز عبور نیست.</p>
       <p class="error">{html.escape(error)}</p>
       <form method="post">
-        <input name="email" type="email" placeholder="ایمیل" required autocomplete="email">
-        <button>ادامه</button>
+        <input name="email" type="email" placeholder="ایمیل" required maxlength="254" autocomplete="email">
+        <button>ارسال کد ورود</button>
       </form>
       <p class="muted"><a class="form-link" href="/register">ساخت حساب جدید</a></p>
-      <p class="muted"><a class="form-link" href="/forgot-password">بازیابی گذرواژه فراموش‌شده</a></p>
-    </div></main>
-    """
-    return page(content)
-
-
-@app.route("/login/password", methods=["GET", "POST"])
-def login_password():
-    email = session.get("cyrus_login_email")
-    if not email:
-        return redirect(url_for("login"))
-
-    error = ""
-    if request.method == "POST":
-        password = request.form.get("password", "")
-        code, data = auth_request(
-            "/auth/v1/token?grant_type=password",
-            {"email": email, "password": password}
-        )
-        if code == 200 and data.get("access_token"):
-            # Rotate the client session after successful authentication.
-            session.clear()
-            session["access_token"] = data["access_token"]
-            session["refresh_token"] = data.get("refresh_token", "")
-            session["token_expires_at"] = time.time() + int(data.get("expires_in", 3600))
-            session.permanent = True
-            session["user_id"] = data["user"]["id"]
-            cyrus_ensure_profile(email)
-            session.pop("cyrus_login_email", None)
-            return redirect(url_for("home"))
-        error = "رمز عبور صحیح نیست؛ دوباره تلاش کنید"
-
-    content = f"""
-    <main class="container"><div class="card">
-      <h2>رمز عبور</h2>
-      <p class="muted">{html.escape(email)}</p>
-      <p class="error">{html.escape(error)}</p>
-      <form method="post">
-        <input name="password" type="password" placeholder="رمز عبور" required autocomplete="current-password">
-        <button>ورود به حساب</button>
-      </form>
-      <p class="muted"><a class="form-link" href="/login">بازگشت و تغییر ایمیل</a></p>
-      <p class="muted"><a class="form-link" href="/forgot-password">گذرواژه را فراموش کرده‌اید؟</a></p>
     </div></main>
     """
     return page(content)
@@ -1196,7 +1101,6 @@ def login_password():
 
 @app.route("/logout", methods=["POST"])
 def logout():
-    # Revoke the Supabase session server-side before clearing the local cookie.
     access_token = str(session.get("access_token") or "")
     if access_token and URL and KEY:
         try:
