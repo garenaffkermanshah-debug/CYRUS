@@ -2223,6 +2223,7 @@ def privacy_security():
       </script>
     </main>
     """
+    content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
     return page(content)
 
 
@@ -2304,7 +2305,6 @@ def verify_two_factor_setup():
     <p class="error">{html.escape(error)}</p>
     <form method="post"><input name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="کد ایمیل" autocomplete="one-time-code" required><button>تأیید و فعال‌سازی</button></form>
     </div></main>"""
-    content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
     return page(content)
 
 
