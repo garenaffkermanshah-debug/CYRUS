@@ -1887,7 +1887,7 @@ def send_message(conversation_id):
         room_response = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,type,created_by",
+                "select": "id,type,created_by,member_permissions,slow_mode_seconds",
                 "id": "eq." + conversation_id,
                 "limit": "1"
             },
@@ -1950,7 +1950,7 @@ def send_message(conversation_id):
             membership = requests.get(
                 URL + "/rest/v1/cyrus_members",
                 params={
-                    "select": "user_id",
+                    "select": "user_id,role,last_message_at",
                     "conversation_id": "eq." + conversation_id,
                     "user_id": "eq." + current_user,
                     "limit": "1"
@@ -1960,6 +1960,23 @@ def send_message(conversation_id):
             )
             if not membership.ok or not membership.json():
                 return "شما عضو این گفتگو نیستید", 403
+            member_row = membership.json()[0]
+            if room.get("type") == "group" and member_row.get("role") not in ("owner", "admin"):
+                permissions = room.get("member_permissions") or {}
+                if not isinstance(permissions, dict) or not permissions.get("send_messages", True):
+                    return "ارسال پیام برای اعضای عادی غیرفعال است", 403
+                slow_seconds = int(room.get("slow_mode_seconds") or 0)
+                last_message_at = member_row.get("last_message_at")
+                if slow_seconds and last_message_at:
+                    try:
+                        last_dt = datetime.fromisoformat(str(last_message_at).replace("Z", "+00:00"))
+                        if last_dt.tzinfo is None:
+                            last_dt = last_dt.replace(tzinfo=timezone.utc)
+                        remaining = slow_seconds - (datetime.now(timezone.utc) - last_dt.astimezone(timezone.utc)).total_seconds()
+                        if remaining > 0:
+                            return "حالت آهسته فعال است؛ " + str(int(remaining)) + " ثانیه دیگر پیام بفرستید", 429
+                    except (TypeError, ValueError):
+                        pass
 
         if room.get("type") == "channel":
             is_owner = str(room.get("created_by") or "") == current_user
@@ -2010,6 +2027,14 @@ def send_message(conversation_id):
                 + '</p><a href="/chat/' + conversation_id
                 + '">بازگشت به گفتگو</a></div>'
             ), 403
+        if room.get("type") == "group":
+            requests.patch(
+                URL + "/rest/v1/cyrus_members",
+                params={"conversation_id": "eq." + conversation_id, "user_id": "eq." + current_user},
+                json={"last_message_at": datetime.now(timezone.utc).isoformat()},
+                headers=headers,
+                timeout=15
+            )
 
     except Exception:
         return page(
