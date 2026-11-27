@@ -1832,7 +1832,7 @@ def chat(conversation_id):
             params={
                 "select": "id,sender_id,content,message_type,attachment_url,created_at,edited_at,metadata",
                 "conversation_id": "eq." + conversation_id,
-                "order": "created_at.asc",
+                "order": "created_at.desc",
                 "limit": "200"
             },
             headers=headers,
@@ -1842,7 +1842,7 @@ def chat(conversation_id):
         if not response.ok:
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
-        messages = response.json()
+        messages = list(reversed(response.json()))
         # Deep links can target messages older than the normal 200-message window.
         # Fetch only the requested message through the same authenticated/RLS client.
         requested_message_id = request.args.get("message", "").strip()
@@ -2013,6 +2013,7 @@ def chat(conversation_id):
             + '</div><div class="context-actions">'
             + f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}"><span>↶</span> پاسخ</button>'
             + f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}"><span>▢</span> کپی</button>'
+            + f'<form method="post" action="/chat/message/{msg_id}/save"><input type="hidden" name="conversation_id" value="{conversation_id}"><button type="submit"><span>♧</span> ذخیره در پیام‌های من</button></form>'
             + f'<button type="button" onclick="cyrusCopyTimestamp(this)" data-created="{message_created_iso}"><span>◷</span> کپی زمان</button>'
             + f'<button type="button" onclick="cyrusCopyMessageLink(this)" data-id="{msg_id}"><span>🔗</span> پیوند پیام</button>'
             + f'<button type="button" onclick="cyrusShareMessage(this)" data-content="{raw_content}" data-id="{msg_id}"><span>↗</span> اشتراک‌گذاری</button>'
@@ -3226,6 +3227,47 @@ def delete_selected_messages(conversation_id):
         return redirect(url_for("chat",conversation_id=conversation_id,deleted=deleted))
     except Exception:
         return "ارتباط با سرور برقرار نشد",502
+
+
+@app.route("/chat/message/<message_id>/save", methods=["POST"])
+def save_chat_message(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(message_id)
+        conversation_id = str(request.form.get("conversation_id") or "")
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه پیام یا گفتگو نامعتبر است", 400
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+               "Content-Type":"application/json","Prefer":"return=minimal"}
+    try:
+        own_id = str(session.get("user_id") or "")
+        membership = requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,"user_id":"eq."+own_id,"limit":"1"},
+            headers=headers,timeout=15)
+        room = requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"id,title,created_by","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=15)
+        if not room.ok or not room.json() or (not membership.ok or not membership.json()) and str((room.json() or [{}])[0].get("created_by") or "") != own_id:
+            return "به این گفتگو دسترسی ندارید", 403
+        found = requests.get(URL+"/rest/v1/cyrus_messages",
+            params={"select":"id,content,created_at","id":"eq."+message_id,"conversation_id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=15)
+        if not found.ok or not found.json():
+            return "پیام پیدا نشد", 404
+        item = found.json()[0]
+        title = str(room.json()[0].get("title") or "گفتگو")[:100]
+        saved_content = str(item.get("content") or "")[:10000]
+        source = request.host_url.rstrip("/") + url_for("chat", conversation_id=conversation_id) + "?message=" + quote(message_id)
+        payload = saved_content + "\n\n— ذخیره‌شده از «" + title + "»\n" + source
+        saved = requests.post(URL+"/rest/v1/cyrus_saved_messages",
+            json={"user_id":own_id,"content":payload},headers=headers,timeout=20)
+        if not saved.ok:
+            return "ذخیره پیام انجام نشد", 502
+        return redirect(url_for("chat",conversation_id=conversation_id))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد", 502
 
 
 @app.route("/chat/message/<message_id>/pin", methods=["POST"])
@@ -4531,7 +4573,7 @@ def saved_messages():
                     stamp = datetime.fromisoformat(created.replace("Z","+00:00")).astimezone().strftime("%Y/%m/%d · %H:%M")
                 except Exception:
                     stamp = ""
-                rows += f'<article class="saved-message-item"><div class="saved-message-text">{text_value}</div><small>{html.escape(stamp)}</small><form method="post" action="/saved-messages/{sid}/delete" onsubmit="return confirm(\'این پیام حذف شود؟\')"><button type="submit">حذف</button></form></article>'
+                rows += f'<article class="saved-message-item" data-saved-text="{html.escape(str(item.get("content") or "").lower(),quote=True)}"><div class="saved-message-text">{text_value}</div><small>{html.escape(stamp)}</small><div class="saved-message-actions"><button type="button" class="saved-copy" data-copy="{html.escape(str(item.get("content") or ""),quote=True)}">کپی متن</button><form method="post" action="/saved-messages/{sid}/delete" onsubmit="return confirm(\'این پیام حذف شود؟\')"><button type="submit">حذف</button></form></div></article>'
     except Exception:
         error = "ارتباط با سرور برقرار نشد"
     content = f"""
@@ -4547,17 +4589,27 @@ def saved_messages():
         .saved-message-item{{position:relative;background:#142536;border:1px solid #263b50;border-radius:12px;padding:13px;margin:9px 0;overflow-wrap:anywhere}}
         .saved-message-text{{white-space:pre-wrap;line-height:1.8;font-size:14px}}
         .saved-message-item small{{display:block;color:#8ea5b9;font-size:10px;margin-top:9px}}
+        .saved-message-actions{{display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px}}.saved-message-actions form{{margin:0}}.saved-message-actions button{{background:transparent;color:#9acdf2;border:1px solid #38556d;border-radius:8px;padding:6px 12px;font:inherit;font-size:12px}}.saved-message-actions form button{{color:#e6a5a5;border-color:#5a3c45}}
         .saved-message-item form{{text-align:left;margin-top:8px}}
         .saved-message-item button{{background:transparent;color:#e6a5a5;border:1px solid #5a3c45;border-radius:8px;padding:5px 12px}}
         .saved-messages-error{{color:#f1aeb4;text-align:center}}
       </style>
       <header class="saved-messages-header"><a class="saved-messages-back" href="/settings" aria-label="بازگشت">➜</a><h2>پیام‌های ذخیره‌شده</h2></header>
+      <input id="saved-message-search" type="search" placeholder="جستجو در پیام‌های ذخیره‌شده…" aria-label="جستجو در پیام‌های ذخیره‌شده" style="width:100%;box-sizing:border-box;padding:11px 13px;margin:0 0 12px;border-radius:10px;background:#07121e;color:#fff;border:1px solid #30485e;font:inherit">
+      <p id="saved-message-empty-search" hidden style="text-align:center;color:#8ea5b9">موردی پیدا نشد.</p>
       <form class="saved-messages-form" method="post" action="/saved-messages/add">
         <textarea name="content" maxlength="10000" placeholder="یادداشت، متن یا لینک مهم را برای خودت ذخیره کن..." required></textarea>
         <button type="submit">ذخیره پیام</button>
       </form>
       <p class="saved-messages-error">{html.escape(error)}</p>
       {rows or '<p style="text-align:center;color:#8ea5b9">هنوز پیامی ذخیره نکرده‌ای.</p>'}
+      <script>
+      (function(){{
+        const search=document.getElementById('saved-message-search'),items=Array.from(document.querySelectorAll('.saved-message-item')),empty=document.getElementById('saved-message-empty-search');
+        if(search)search.addEventListener('input',()=>{{const q=search.value.trim().toLocaleLowerCase();let shown=0;items.forEach(x=>{{const ok=(x.dataset.savedText||'').includes(q);x.hidden=!ok;if(ok)shown++;}}if(empty)empty.hidden=shown>0||!q;}});
+        document.querySelectorAll('.saved-copy').forEach(b=>b.addEventListener('click',async()=>{{const value=b.dataset.copy||'';try{{await navigator.clipboard.writeText(value);b.textContent='کپی شد';}}catch(_e){{window.prompt('متن را کپی کنید:',value);}}}}));
+      }})();
+      </script>
     </main>
     """
     return page(content)
