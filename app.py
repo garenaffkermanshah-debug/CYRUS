@@ -1418,12 +1418,35 @@ def message_to_user(user_id):
 
 @app.route("/start-chat/<user_id>", methods=["GET", "POST"])
 def start_chat(user_id):
-    # مسیر قدیمی فقط پروفایل را باز می‌کند و گفتگوی خالی نمی‌سازد.
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id = str(session.get("user_id") or "")
     try:
         uuid.UUID(user_id)
     except ValueError:
         return redirect("/contacts?error=شناسه%20کاربر%20نامعتبر%20است")
-    return redirect("/user/" + user_id)
+    if user_id == own_id:
+        return redirect("/settings")
+    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json"}
+    try:
+        blocked = requests.get(URL+"/rest/v1/cyrus_user_blocks",
+            params={"select":"blocker_id","blocker_id":"eq."+own_id,"blocked_id":"eq."+user_id,"limit":"1"},
+            headers=headers,timeout=15)
+        reverse_blocked = requests.get(URL+"/rest/v1/cyrus_user_blocks",
+            params={"select":"blocker_id","blocker_id":"eq."+user_id,"blocked_id":"eq."+own_id,"limit":"1"},
+            headers=headers,timeout=15)
+        if (blocked.ok and blocked.json()) or (reverse_blocked.ok and reverse_blocked.json()):
+            return redirect("/user/"+user_id)
+        created = requests.post(URL+"/rest/v1/rpc/create_direct_conversation",
+            json={"other_user":user_id},headers=headers,timeout=20)
+        if not created.ok:
+            return page('<div class="container card"><p>ساخت گفتگو انجام نشد</p><a href="/user/'+user_id+'">بازگشت</a></div>'),400
+        value = created.json()
+        room_id = str(value.get("id") if isinstance(value,dict) else value)
+        room_id = str(uuid.UUID(room_id))
+        return redirect("/chat/"+room_id)
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p><a href="/user/'+user_id+'">بازگشت</a></div>'),502
 
 
 @app.route("/conversation/<conversation_id>/profile")
