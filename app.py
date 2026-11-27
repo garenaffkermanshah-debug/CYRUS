@@ -142,6 +142,18 @@ def cyrus_protect_state_changes():
         return "مبدأ درخواست معتبر نیست", 403
 
 
+@app.before_request
+def cyrus_validate_form_csrf():
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return
+    # درخواست‌های فرم مرورگر باید توکن نشست معتبر داشته باشند.
+    if request.form:
+        expected = str(session.get("csrf_token") or "")
+        supplied = str(request.form.get("csrf_token") or "")
+        if not expected or not supplied or not secrets.compare_digest(expected, supplied):
+            return "اعتبار درخواست فرم تأیید نشد؛ صفحه را تازه‌سازی کنید", 403
+
+
 @app.after_request
 def cyrus_security_headers(response):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -388,6 +400,18 @@ window.addEventListener('pageshow',function(event){
 """
 
 def page(content):
+    # افزودن خودکار توکن ضد CSRF به همه فرم‌های POST که از پوستهٔ اصلی عبور می‌کنند.
+    csrf_token = session.get("csrf_token")
+    if not csrf_token:
+        csrf_token = secrets.token_urlsafe(32)
+        session["csrf_token"] = csrf_token
+    csrf_input = '<input type="hidden" name="csrf_token" value="' + html.escape(csrf_token, quote=True) + '">'
+    content = re.sub(
+        r'(<form\\b(?=[^>]*\\bmethod\\s*=\\s*["\\']?post\\b)[^>]*>)',
+        lambda match: match.group(1) + csrf_input,
+        str(content),
+        flags=re.IGNORECASE
+    )
     nav = ""
     header = ""
     current = request.path
