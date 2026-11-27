@@ -2887,7 +2887,7 @@ async function cyrusToggleVoiceRecord(b){
    const blob=new Blob(cyrusVoiceChunks,{type:recorder.mimeType||"audio/webm"});cyrusVoiceChunks=[];
    if(!blob.size){alert("ضبط صدا خالی بود");return;}
    const ext=blob.type.includes("ogg")?"ogg":blob.type.includes("mp4")?"m4a":"webm";
-   const form=new FormData();form.append("media",blob,"voice."+ext);
+   const uploadForm=document.getElementById("cyrusMediaUpload"),form=new FormData(uploadForm);form.delete("media");form.append("media",blob,"voice."+ext);
    const button=document.getElementById("cyrusVoiceButton");if(button)button.disabled=true;
    try{const res=await fetch(document.getElementById("cyrusMediaUpload").action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok)location.reload();else alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}
    catch(err){alert("ارتباط برای ارسال صدا برقرار نشد");}
