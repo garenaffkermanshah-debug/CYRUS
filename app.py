@@ -903,9 +903,9 @@ def home():
       <script>
       (()=>{{
         document.querySelectorAll('.cyrus-chat-row').forEach(row=>{{
-          let timer=null;
+          let timer=null,longPressed=false;
           const open=()=>{{document.querySelectorAll('.cyrus-chat-row.remove-open').forEach(r=>{{if(r!==row)r.classList.remove('remove-open');}});row.classList.add('remove-open');}};
-          const start=()=>{{timer=setTimeout(open,550);}};
+          const start=()=>{{longPressed=false;timer=setTimeout(()=>{{longPressed=true;timer=null;open();}},550);}};
           const cancel=()=>{{if(timer)clearTimeout(timer);timer=null;}};
           row.addEventListener('touchstart',start,{{passive:true}});
           row.addEventListener('touchend',cancel);
@@ -913,8 +913,11 @@ def home():
           row.addEventListener('pointerdown',e=>{{if(e.pointerType==='mouse')start();}});
           row.addEventListener('pointerup',cancel);
           row.addEventListener('pointerleave',cancel);
-          row.addEventListener('contextmenu',e=>{{e.preventDefault();open();}});
-          row.addEventListener('click',e=>{{if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-chat-actions')){{e.preventDefault();row.classList.remove('remove-open');}}}});
+          row.addEventListener('contextmenu',e=>{{e.preventDefault();longPressed=true;open();}});
+          row.addEventListener('click',e=>{{
+            if(longPressed){{e.preventDefault();e.stopPropagation();longPressed=false;return;}}
+            if(row.classList.contains('remove-open')&&!e.target.closest('.cyrus-chat-actions')){{e.preventDefault();row.classList.remove('remove-open');}}
+          }});
         }});
         document.addEventListener('click',e=>{{if(!e.target.closest('.cyrus-chat-row'))document.querySelectorAll('.cyrus-chat-row.remove-open').forEach(r=>r.classList.remove('remove-open'));}});
       }})();
