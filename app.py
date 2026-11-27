@@ -761,7 +761,7 @@ def home():
         const list=document.getElementById('cyrus-main-chat-list');
         if(list){{const visible=rows.filter(r=>r.style.display!=='none');visible.sort((a,b)=>{{
           if(sort==='pinned')return (pins.has(b.dataset.roomId)?1:0)-(pins.has(a.dataset.roomId)?1:0);
-          if(sort==='oldest')return rows.indexOf(a)-rows.indexOf(b);
+          if(sort==='oldest')return rows.indexOf(b)-rows.indexOf(a);
           return (pins.has(b.dataset.roomId)?1:0)-(pins.has(a.dataset.roomId)?1:0)||rows.indexOf(a)-rows.indexOf(b);
         }}).forEach(r=>list.appendChild(r));}}
         const empty=list&&list.querySelector('.cyrus-archive-empty');
