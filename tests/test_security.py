@@ -53,6 +53,23 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertEqual(icon_response.status_code, 200)
         self.assertEqual(icon_response.mimetype, "image/svg+xml")
 
+    def test_service_worker_cache_assets_exist_and_scope_is_root(self):
+        response = self.client.get("/service-worker.js")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("no-cache", response.headers.get("Cache-Control", ""))
+        self.assertEqual(response.headers.get("Service-Worker-Allowed"), "/")
+        worker = response.get_data(as_text=True)
+        self.assertIn("const CACHE='cyrus-static-v1'", worker)
+        for asset in (
+            "/static/cyrus-app-icon.svg",
+            "/static/cyrus-cylinder.jpg",
+            "/static/cyrus-tomb.jpg",
+        ):
+            with self.subTest(asset=asset):
+                self.assertIn(asset, worker)
+                asset_response = self.client.get(asset)
+                self.assertEqual(asset_response.status_code, 200)
+
     def test_media_signature_validation_accepts_matching_file_headers(self):
         valid_samples = [
             ("image/jpeg", b"\xff\xd8\xffsample"),
