@@ -6,6 +6,23 @@
 - دامنه و HTTPS برای استفاده عمومی
 
 ## ساخت و اجرا
+
+### روش ساده با Docker Compose
+
+در ریشه مخزن، فایل نمونه را کپی و مقادیر واقعی را فقط در فایل محلی `.env` وارد کنید:
+
+```sh
+cp .env.example .env
+# فایل .env را ویرایش و مقادیر واقعی را وارد کنید
+docker compose up -d --build
+docker compose ps
+```
+
+برای مشاهده گزارش‌ها: `docker compose logs -f cyrus` و برای توقف: `docker compose down`.
+فایل `.env` محرمانه است و نباید در Git بارگذاری شود. Compose سلامت پردازه را از مسیر `/healthz` کنترل می‌کند.
+
+### اجرای دستی Docker
+
 در ریشه مخزن:
 
 ```sh
