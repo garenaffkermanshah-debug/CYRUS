@@ -2957,7 +2957,7 @@ async function cyrusToggleVoiceRecord(b){
           function update(){const n=input.value.length;send.disabled=!input.value.trim();if(counter)counter.textContent=n.toLocaleString("fa-IR")+" / ۴۰۰۰";try{if(input.value)localStorage.setItem(draftKey,input.value);else localStorage.removeItem(draftKey);}catch(e){}}
           update();input.addEventListener("input",update);
           input.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!send.disabled)form.requestSubmit();}});
-          form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}if(nonceField){let nonce="";try{nonce=sessionStorage.getItem(nonceKey)||"";}catch(err){}if(!nonce){nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2));try{sessionStorage.setItem(nonceKey,nonce);}catch(err){}}nonceField.value=nonce;}form.dataset.sending="1";send.disabled=true;send.textContent="…";});
+          form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}if(nonceField){const body=input.value.trim();let saved=null;try{saved=JSON.parse(sessionStorage.getItem(nonceKey)||"null");}catch(err){}let nonce=saved&&saved.body===body&&saved.nonce?saved.nonce:"";if(!nonce){nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2));try{sessionStorage.setItem(nonceKey,JSON.stringify({body:body,nonce:nonce}));}catch(err){}}nonceField.value=nonce;}form.dataset.sending="1";send.disabled=true;send.textContent="…";});
           const picker=document.getElementById("cyrusFullEmojiPicker");if(picker)picker.addEventListener("emoji-click",function(e){const emoji=e.detail&&e.detail.unicode;if(!emoji)return;const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;input.setRangeText(emoji,start,end,"end");input.dispatchEvent(new Event("input",{bubbles:true}));input.focus();});
           document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;const a=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(a)a.hidden=true;if(p)p.style.display="none";});
         })();
@@ -3817,7 +3817,7 @@ def send_message(conversation_id):
 
     message = request.form.get("content", "").strip()
     if not message or len(message) > 4000:
-        return redirect(url_for("chat", conversation_id=conversation_id, sent="1"))
+        return redirect(url_for("chat", conversation_id=conversation_id))
 
     headers = {
         "apikey": KEY,
