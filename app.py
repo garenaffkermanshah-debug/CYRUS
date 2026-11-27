@@ -2713,6 +2713,19 @@ def manage_room(conversation_id):
             return "دریافت اعضا ناموفق بود", 502
 
         members = mr.json()
+        member_profiles = {}
+        member_ids_for_profiles = list(dict.fromkeys(str(m.get("user_id") or "") for m in members if m.get("user_id")))
+        if member_ids_for_profiles:
+            try:
+                profiles_response = requests.get(
+                    URL + "/rest/v1/cyrus_profiles",
+                    params={"select":"id,username,display_name,avatar_url","id":"in.(" + ",".join(member_ids_for_profiles) + ")"},
+                    headers=headers, timeout=20
+                )
+                if profiles_response.ok:
+                    member_profiles = {str(p.get("id")):p for p in profiles_response.json() if isinstance(p,dict)}
+            except Exception:
+                member_profiles = {}
         my_role = next(
             (m.get("role") for m in members
              if str(m.get("user_id")) == current), None
@@ -2901,7 +2914,12 @@ def manage_room(conversation_id):
             uid = str(m.get("user_id") or "")
             role = str(m.get("role") or "member")
             safe_uid = html.escape(uid, quote=True)
-            safe_role = html.escape(role)
+            safe_role = html.escape({"owner":"مالک","admin":"مدیر","member":"عضو"}.get(role,role))
+            profile = member_profiles.get(uid,{})
+            display_name = html.escape(str(profile.get("display_name") or profile.get("username") or "کاربر"))
+            username_text = html.escape(str(profile.get("username") or ""))
+            avatar_source = str(profile.get("avatar_url") or "")
+            avatar_html = ('<img class="tg-member-avatar" src="' + html.escape(avatar_source,quote=True) + '" alt="">') if avatar_source else '<span class="tg-member-avatar tg-member-avatar-fallback">♙</span>'
 
             controls = ""
             if uid != str(room.get("created_by") or ""):
@@ -2926,8 +2944,9 @@ def manage_room(conversation_id):
                     )
 
             rows += (
-                '<div class="card"><p>شناسه عضو: ' + safe_uid
-                + '</p><p>نقش: ' + safe_role + '</p>' + controls + '</div>'
+                '<div class="tg-member-row"><div class="tg-member-person">' + avatar_html
+                + '<span><b>' + display_name + '</b><small>' + ('@' + username_text if username_text else '') + '</small></span></div>'
+                + '<div class="tg-member-role">' + safe_role + '</div><div class="tg-member-actions">' + controls + '</div></div>'
             )
 
         if not rows:
@@ -2958,6 +2977,18 @@ def manage_room(conversation_id):
 
           <style>
             .tg-room-settings{{margin:0 0 14px;padding:0;background:#101a25;border:0;border-radius:0;color:#e8edf2;overflow:hidden}}
+            .tg-member-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:#111e2b;border-bottom:1px solid #263442;color:#eaf1f6}}
+            .tg-member-person{{display:flex;align-items:center;gap:11px;min-width:0;flex:1}}
+            .tg-member-avatar{{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;background:#26394a;display:grid;place-items:center}}
+            .tg-member-avatar-fallback{{color:#d8b46a;font-size:21px}}
+            .tg-member-person span{{display:flex;flex-direction:column;gap:4px;min-width:0}}
+            .tg-member-person b{{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+            .tg-member-person small{{font-size:11px;color:#8ea5b9;direction:ltr;text-align:right}}
+            .tg-member-role{{font-size:12px;color:#7eb8e2;white-space:nowrap}}
+            .tg-member-actions{{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end}}
+            .tg-member-actions form{{margin:0}}
+            .tg-member-actions button{{padding:7px 9px;margin:0;background:#20384d;border:0;border-radius:7px;color:#8dc9f5;font-size:11px;white-space:nowrap}}
+
             .tg-room-settings .tg-section-title{{padding:17px 16px 9px;color:#6ab5ee;font-size:14px;font-weight:600}}
             .tg-room-settings .tg-section{{padding:0 16px;border-bottom:8px solid #09131e}}
             .tg-room-settings .tg-field{{display:block;padding:13px 0;border-bottom:1px solid #263442;font-size:14px;color:#e3eaf0}}
