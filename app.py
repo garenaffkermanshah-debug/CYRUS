@@ -3623,6 +3623,29 @@ async function cyrusToggleVoiceRecord(b){
             content += f"""<script>window.addEventListener("load",function(){{var m=document.getElementById("message-{html.escape(jump_id, quote=True)}");if(m){{m.scrollIntoView({{behavior:"smooth",block:"center"}});m.classList.add("search-jump-highlight");setTimeout(function(){{m.classList.remove("search-jump-highlight")}},2600);}}}});</script><style>.search-jump-highlight{{outline:2px solid #e5bd69!important;box-shadow:0 0 0 6px #e5bd6922!important}}</style>"""
         except ValueError:
             pass
+    content += """
+    <style id="cyrus-chat-prefs-style">
+      .message .message-body{font-size:var(--cyrus-message-size,14px)!important}
+      .message{border-radius:var(--cyrus-message-radius,16px)!important}
+      .container:has(.cyrus-chat-header){background:var(--cyrus-chat-wallpaper,linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9)))!important}
+      .cyrus-chat-prefs-no-animation *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+    </style>
+    <script>
+    (function(){
+      try{
+        const p=JSON.parse(localStorage.getItem('cyrus-chat-preferences-v1')||'{}');
+        const root=document.documentElement;
+        root.style.setProperty('--cyrus-message-size',(Math.max(12,Math.min(22,Number(p.size)||16)))+'px');
+        root.style.setProperty('--cyrus-message-radius',p.bubble===false?'5px':'16px');
+        const walls={default:'linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9))',blue:'linear-gradient(160deg,#0b2540,#174b72,#081b31)',green:'linear-gradient(160deg,#102c28,#286454,#0b1d22)',purple:'linear-gradient(160deg,#251a3b,#514078,#151426)',gold:'linear-gradient(160deg,#302417,#70512b,#171a20)'};
+        if(walls[p.wall])root.style.setProperty('--cyrus-chat-wallpaper',walls[p.wall]);
+        if(p.animations===false)document.documentElement.classList.add('cyrus-chat-prefs-no-animation');
+        if(p.enter===true){const box=document.querySelector('.send-box input[name="content"]'),form=box&&box.closest('form');if(box&&form)box.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();form.requestSubmit();}});}
+        if(p.video===true)document.querySelectorAll('.message video').forEach(v=>{v.autoplay=true;v.play().catch(()=>{});});
+      }catch(e){}
+    })();
+    </script>
+    """
     return page(content)
 
 
@@ -5977,24 +6000,65 @@ def chat_settings():
     if not session.get("access_token"):
         return redirect("/login")
     content = """
-    <main style="max-width:430px;margin:0 auto;min-height:calc(100dvh - 76px);background:#17212b;color:#f5f5f5;padding-bottom:24px;font-family:Roboto,Tahoma,sans-serif">
-      <header style="height:56px;display:flex;align-items:center;gap:20px;padding:0 18px;border-bottom:1px solid #263440">
-        <a href="/settings" aria-label="بازگشت" style="color:#e7edf2;text-decoration:none;font-size:26px">‹</a>
-        <span style="font-size:20px;font-weight:500">تنظیمات گفتگو</span>
-      </header>
-      <section style="padding:18px 16px 8px">
-        <div style="color:#6ab5ee;font-size:14px;margin-bottom:12px">گفتگوها</div>
-        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">اندازهٔ متن پیام‌ها <span style="float:left;color:#9eabb6">۱۶</span></div>
-        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">پس‌زمینهٔ گفتگو <span style="float:left;color:#9eabb6">›</span></div>
-        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">گوشه‌های پیام <span style="float:left;color:#9eabb6">›</span></div>
+    <main class="tg-chat-settings">
+      <style>
+        .tg-chat-settings{max-width:430px;min-height:calc(100dvh - 76px);margin:0 auto;background:#17212b;color:#f1f5f8;font:14px Roboto,Tahoma,sans-serif;padding-bottom:30px}
+        .tgcs-head{height:56px;display:flex;align-items:center;gap:20px;padding:0 16px;background:#17212b;position:sticky;top:0;z-index:3}
+        .tgcs-head a{font-size:27px;color:#e8edf4;text-decoration:none}.tgcs-head h1{font-size:20px;font-weight:500;margin:0}
+        .tgcs-section{padding:17px 16px 6px}.tgcs-title{color:#6ab5ee;font-size:14px;margin:0 0 9px}
+        .tgcs-row{min-height:53px;display:flex;align-items:center;gap:14px;border-bottom:1px solid #263440;padding:10px 0}
+        .tgcs-row:last-child{border-bottom:0}.tgcs-label{flex:1;min-width:0}.tgcs-sub{display:block;color:#8999a7;font-size:12px;line-height:1.5;margin-top:4px}
+        .tgcs-value{color:#6ab5ee;min-width:32px;text-align:left}.tgcs-row input[type=range]{width:100%;accent-color:#248bd2}
+        .tgcs-switch{width:40px;height:24px;position:relative;flex:0 0 40px;border-radius:20px;background:#52606d;direction:ltr}
+        .tgcs-switch input{position:absolute;inset:0;width:100%;height:100%;opacity:0;margin:0;z-index:2;cursor:pointer}
+        .tgcs-switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;background:#e8edf2;border-radius:50%;transition:transform .15s}
+        .tgcs-switch:has(input:checked){background:#248bd2}.tgcs-switch input:checked+i{transform:translateX(16px)}
+        .tgcs-wallpaper{display:flex;gap:10px;flex-wrap:wrap;padding:8px 0 13px}
+        .tgcs-wall{width:54px;height:72px;border-radius:9px;border:2px solid #52606d;cursor:pointer;position:relative}
+        .tgcs-wall[aria-pressed=true]{border-color:#6ab5ee;box-shadow:0 0 0 2px #248bd244}
+        .tgcs-wall:after{content:'✓';position:absolute;bottom:4px;right:4px;background:#248bd2;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:11px;opacity:0}
+        .tgcs-wall[aria-pressed=true]:after{opacity:1}
+        .tgcs-status{font-size:12px;color:#7fce9d;min-height:18px;padding:0 16px}
+      </style>
+      <header class="tgcs-head"><a href="/settings" aria-label="بازگشت">‹</a><h1>تنظیمات گفتگو</h1></header>
+      <section class="tgcs-section">
+        <h2 class="tgcs-title">گفتگوها</h2>
+        <div class="tgcs-row" style="display:block">
+          <div style="display:flex;align-items:center;gap:12px"><span class="tgcs-label">اندازهٔ متن پیام‌ها</span><span class="tgcs-value" id="tgcs-size-value">16</span></div>
+          <input id="tgcs-size" type="range" min="12" max="22" step="1" value="16" aria-label="اندازهٔ متن پیام‌ها">
+        </div>
+        <div class="tgcs-row"><span class="tgcs-label">گوشه‌های پیام</span><span class="tgcs-value" id="tgcs-bubble-value">گرد</span><label class="tgcs-switch"><input id="tgcs-bubble" type="checkbox" checked aria-label="گوشه‌های گرد پیام"><i></i></label></div>
+        <div class="tgcs-row"><span class="tgcs-label">ارسال با کلید Enter<span class="tgcs-sub">در صفحهٔ گفتگو</span></span><label class="tgcs-switch"><input id="tgcs-enter" type="checkbox" aria-label="ارسال با Enter"><i></i></label></div>
+        <div class="tgcs-row" style="display:block"><span class="tgcs-label">پس‌زمینهٔ گفتگو</span><div class="tgcs-wallpaper" id="tgcs-wallpaper">
+          <button class="tgcs-wall" data-wall="default" aria-label="پس‌زمینهٔ اصلی" aria-pressed="true" style="background:linear-gradient(160deg,#07101b,#142638,#08121e)"></button>
+          <button class="tgcs-wall" data-wall="blue" aria-label="آبی" aria-pressed="false" style="background:linear-gradient(160deg,#0b2540,#174b72,#081b31)"></button>
+          <button class="tgcs-wall" data-wall="green" aria-label="سبز" aria-pressed="false" style="background:linear-gradient(160deg,#102c28,#286454,#0b1d22)"></button>
+          <button class="tgcs-wall" data-wall="purple" aria-label="بنفش" aria-pressed="false" style="background:linear-gradient(160deg,#251a3b,#514078,#151426)"></button>
+          <button class="tgcs-wall" data-wall="gold" aria-label="طلایی" aria-pressed="false" style="background:linear-gradient(160deg,#302417,#70512b,#171a20)"></button>
+        </div></div>
       </section>
-      <section style="padding:18px 16px 8px">
-        <div style="color:#6ab5ee;font-size:14px;margin-bottom:12px">رسانه</div>
-        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">پخش خودکار GIF <span style="float:left;color:#8b9aa7">خاموش</span></div>
-        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">پخش خودکار ویدیو <span style="float:left;color:#8b9aa7">خاموش</span></div>
-        <div style="padding:15px 0;border-bottom:1px solid #263440;font-size:15px">انیمیشن‌ها <span style="float:left;color:#8b9aa7">روشن</span></div>
+      <section class="tgcs-section">
+        <h2 class="tgcs-title">رسانه</h2>
+        <div class="tgcs-row"><span class="tgcs-label">پخش خودکار GIF</span><label class="tgcs-switch"><input id="tgcs-gif" type="checkbox" aria-label="پخش خودکار GIF"><i></i></label></div>
+        <div class="tgcs-row"><span class="tgcs-label">پخش خودکار ویدیو</span><label class="tgcs-switch"><input id="tgcs-video" type="checkbox" aria-label="پخش خودکار ویدیو"><i></i></label></div>
+        <div class="tgcs-row"><span class="tgcs-label">انیمیشن‌ها</span><label class="tgcs-switch"><input id="tgcs-animations" type="checkbox" checked aria-label="انیمیشن‌ها"><i></i></label></div>
       </section>
+      <p class="tgcs-status" id="tgcs-status" aria-live="polite">تنظیمات به‌صورت خودکار ذخیره می‌شوند.</p>
     </main>
+    <script>
+    (function(){
+      const key='cyrus-chat-preferences-v1';
+      const defaults={size:16,bubble:true,enter:false,gif:false,video:false,animations:true,wall:'default'};
+      let prefs={...defaults};try{prefs={...prefs,...JSON.parse(localStorage.getItem(key)||'{}')}}catch(e){}
+      const ids={size:'tgcs-size',bubble:'tgcs-bubble',enter:'tgcs-enter',gif:'tgcs-gif',video:'tgcs-video',animations:'tgcs-animations'};
+      Object.keys(ids).forEach(k=>{const el=document.getElementById(ids[k]);if(!el)return;if(el.type==='checkbox')el.checked=!!prefs[k];else el.value=String(prefs[k]);});
+      function show(){document.getElementById('tgcs-size-value').textContent=prefs.size;document.getElementById('tgcs-bubble-value').textContent=prefs.bubble?'گرد':'زاویه‌دار';document.querySelectorAll('.tgcs-wall').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.wall===prefs.wall)));}
+      function save(){try{localStorage.setItem(key,JSON.stringify(prefs));}catch(e){}show();document.getElementById('tgcs-status').textContent='ذخیره شد';}
+      Object.keys(ids).forEach(k=>{const el=document.getElementById(ids[k]);if(!el)return;el.addEventListener('input',()=>{prefs[k]=el.type==='checkbox'?el.checked:Number(el.value);save();});el.addEventListener('change',()=>{prefs[k]=el.type==='checkbox'?el.checked:Number(el.value);save();});});
+      document.querySelectorAll('.tgcs-wall').forEach(b=>b.addEventListener('click',()=>{prefs.wall=b.dataset.wall;save();}));
+      show();
+    })();
+    </script>
     """
     return page(content)
 
