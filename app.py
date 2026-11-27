@@ -2577,11 +2577,16 @@ def chat(conversation_id):
         cyrusSelectionBar=document.createElement('div');
         cyrusSelectionBar.className='cyrus-selection-bar';
         cyrusSelectionBar.setAttribute('role','toolbar');
-        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-clear>لغو</button>';
+        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-select-all>انتخاب همه</button><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-clear>لغو</button>';
         cyrusSelectionBar.style.cssText='position:fixed;z-index:50;bottom:calc(84px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#102033;border:1px solid #42617a;border-radius:18px;box-shadow:0 8px 30px #0008;color:#eaf3fa';
         cyrusSelectionBar.querySelector('[data-copy]').addEventListener('click',async()=>{{
           const texts=cyrusSelectedMessageTexts();
           if(texts.length)await cyrusCopyValue(texts.join('\n\n'),'متن پیام‌های انتخاب‌شده کپی شد');
+        }});
+        cyrusSelectionBar.querySelector('[data-select-all]').addEventListener('click',()=>{{
+          document.querySelectorAll('.message[data-message-id]').forEach(message=>cyrusSelectedMessages.add(message.dataset.messageId));
+          cyrusUpdateMessageSelection();
+          cyrusToast('همه پیام‌های بارگذاری‌شده انتخاب شدند');
         }});
         cyrusSelectionBar.querySelector('[data-clear]').addEventListener('click',cyrusClearMessageSelection);
         document.body.appendChild(cyrusSelectionBar);
