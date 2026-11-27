@@ -1,4 +1,4 @@
-import os, secrets, requests, html, uuid, time, hashlib, re
+import os, secrets, requests, html, uuid, time, hashlib, re, io, zipfile
 from urllib.parse import quote, urlsplit
 from pathlib import Path
 from datetime import timedelta, datetime, timezone
@@ -3570,6 +3570,49 @@ def serve_chat_media(conversation_id, owner_id, object_name):
         return "ارتباط با سرور ذخیره‌سازی برقرار نشد",502
 
 
+def cyrus_media_signature_valid(mime, data):
+    """Reject uploads whose bytes do not match their declared safe media type."""
+    if not data:
+        return False
+    if mime == "image/jpeg":
+        return data.startswith(b"\\xff\\xd8\\xff")
+    if mime == "image/png":
+        return data.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+    if mime == "image/webp":
+        return len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    if mime == "image/gif":
+        return data.startswith((b"GIF87a", b"GIF89a"))
+    if mime == "video/mp4" or mime == "audio/mp4":
+        return len(data) >= 12 and data[4:8] == b"ftyp"
+    if mime == "video/webm" or mime == "audio/webm":
+        return data.startswith(b"\\x1a\\x45\\xdf\\xa3")
+    if mime == "audio/ogg":
+        return data.startswith(b"OggS")
+    if mime == "audio/mpeg":
+        return data.startswith(b"ID3") or (len(data) >= 2 and data[0] == 0xff and (data[1] & 0xe0) == 0xe0)
+    if mime == "application/pdf":
+        return data.startswith(b"%PDF-")
+    if mime == "text/plain":
+        try:
+            return b"\\x00" not in data and data.decode("utf-8") is not None
+        except UnicodeDecodeError:
+            return False
+    if mime in ("application/zip",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"):
+        try:
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                names = set(archive.namelist())
+                if mime == "application/zip":
+                    return bool(names)
+                if mime.endswith("wordprocessingml.document"):
+                    return "[Content_Types].xml" in names and "word/document.xml" in names
+                return "[Content_Types].xml" in names and "xl/workbook.xml" in names
+        except (zipfile.BadZipFile, OSError):
+            return False
+    return False
+
+
 @app.route("/chat/<conversation_id>/upload", methods=["POST"])
 def upload_chat_media(conversation_id):
     if not session.get("access_token"):
@@ -3642,6 +3685,9 @@ def upload_chat_media(conversation_id):
             data=file.read(20*1024*1024+1)
             if not data or len(data)>20*1024*1024:
                 failures.append((file.filename,"حجم فایل باید حداکثر ۲۰ مگابایت باشد"))
+                continue
+            if not cyrus_media_signature_valid(mime, data):
+                failures.append((file.filename,"محتوای فایل با نوع اعلام‌شده سازگار نیست"))
                 continue
             filename=Path(file.filename).name[:180]
             safe_name=re.sub(r"[^A-Za-z0-9._-]","_",filename) or "file"
