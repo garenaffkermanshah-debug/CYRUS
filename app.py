@@ -1271,7 +1271,7 @@ def public_user_profile(user_id):
     back_href = "/chat/" + back_chat_id if back_chat_id else "/home"
     send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="/start-chat/{safe_id}" aria-label="ارسال پیام" title="ارسال پیام">➤</a>'
 
-    content = f"""<main class="container cyrus-user-profile">
+    content = f"""<main class="container cyrus-user-profile" data-profile-user="{safe_id}">
       <style>
         .cyrus-user-profile{{padding:0 0 88px;max-width:560px;background:#0d1722;min-height:calc(100dvh - 76px)}}
         .user-profile-card{{position:relative;background:#111e2b;border:0;border-radius:0;padding:15px 16px 20px;overflow:visible}}
@@ -1295,7 +1295,7 @@ def public_user_profile(user_id):
         .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:12px}}
         .profile-media-tabs button{{flex:1;margin:0;padding:12px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:11px}}
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
-        .profile-media-content{{padding:18px 14px;text-align:center;color:#8fa5b8;font-size:12px;line-height:1.8}}
+        .profile-media-content{{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
         .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
         .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
@@ -1322,13 +1322,81 @@ def public_user_profile(user_id):
         <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
       </section>
       {send_link}
-      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><div class="profile-media-content" id="profile-media-content">رسانه‌ها و فایل‌های گفتگو اینجا نمایش داده می‌شوند.</div>
+      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
       {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
     </main>
     <script>
     document.addEventListener('click',function(e){{if(!e.target.closest('.profile-more'))document.querySelectorAll('.profile-more[open]').forEach(x=>x.open=false);}});
+    (function(){{
+      const root=document.querySelector('.cyrus-user-profile'),box=document.getElementById('profile-media-content'),buttons=[...document.querySelectorAll('.profile-media-tabs button')];
+      if(!root||!box||!buttons.length)return;
+      let loaded=false,items=[];
+      function make(tag,cls){{const el=document.createElement(tag);if(cls)el.className=cls;return el;}}
+      function linkCard(url,label){{const a=make('a','profile-history-file');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=label;return a;}}
+      function render(key){{
+        box.replaceChildren();
+        const selected=[];
+        if(key==='media')selected.push(...items.filter(x=>x.url&&/^(photo|image|video)$/i.test(x.type)));
+        if(key==='music')selected.push(...items.filter(x=>x.url&&/^(audio|music|voice)$/i.test(x.type)));
+        if(key==='files')selected.push(...items.filter(x=>x.url&&!/^(photo|image|video|audio|music|voice)$/i.test(x.type)));
+        if(key==='links')items.forEach(x=>{{(x.content.match(/https?:\/\/[^\s<>]+|www\.[^\s<>]+/gi)||[]).forEach(u=>selected.push({{type:'link',url:u,content:u}}));}});
+        selected.forEach(x=>{{
+          let node;
+          const url=String(x.url||'');
+          const typ=String(x.type||'').toLowerCase();
+          if(key==='links'){{let u=String(x.url||'');if(!/^https?:\/\//i.test(u))u='https://'+u;node=linkCard(u,x.content||u);}}
+          else if(/^(photo|image)$/i.test(typ)){{node=make('a','profile-history-card');node.href=url;node.target='_blank';node.rel='noopener';const img=make('img');img.src=url;img.alt='تصویر گفتگو';node.appendChild(img);}}
+          else if(typ==='video'){{node=make('video','profile-history-video');node.src=url;node.controls=true;node.preload='metadata';}}
+          else if(/^(audio|music|voice)$/i.test(typ)){{node=make('audio','profile-history-audio');node.src=url;node.controls=true;node.preload='metadata';}}
+          else node=linkCard(url,x.content||'فایل ارسال‌شده');
+          box.appendChild(node);
+        }});
+        if(!selected.length){{const empty=make('p','profile-history-empty');empty.textContent='در این بخش موردی پیدا نشد';box.appendChild(empty);}}
+      }}
+      async function load(key){{
+        if(!loaded){{box.textContent='در حال دریافت تاریخچه…';try{{const r=await fetch('/user/'+encodeURIComponent(root.dataset.profileUser)+'/shared-media',{{credentials:'same-origin'}});if(!r.ok)throw new Error('load');const d=await r.json();items=Array.isArray(d.items)?d.items:[];loaded=true;}}catch(e){{box.textContent='تاریخچهٔ رسانه در دسترس نیست';return;}}}}
+        render(key);
+      }}
+      buttons.forEach(b=>b.addEventListener('click',()=>{{buttons.forEach(x=>x.classList.toggle('active',x===b));load(b.dataset.tab||'media');}}));
+      load('media');
+    }})();
     </script>"""
     return page(content)
+
+
+@app.route("/user/<user_id>/shared-media")
+def user_shared_media(user_id):
+    if not session.get("access_token"):
+        return Response('{"error":"unauthorized"}',status=401,mimetype="application/json")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return Response('{"error":"invalid user"}',status=400,mimetype="application/json")
+    own_id=str(session.get("user_id") or "")
+    if own_id==user_id:
+        return Response('{"items":[]}',mimetype="application/json")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    try:
+        own=requests.get(URL+"/rest/v1/cyrus_members",params={"select":"conversation_id","user_id":"eq."+own_id},headers=headers,timeout=15)
+        target=requests.get(URL+"/rest/v1/cyrus_members",params={"select":"conversation_id","user_id":"eq."+user_id},headers=headers,timeout=15)
+        own_ids={str(x.get("conversation_id") or "") for x in own.json()} if own.ok else set()
+        target_ids={str(x.get("conversation_id") or "") for x in target.json()} if target.ok else set()
+        shared=list(own_ids & target_ids)
+        if not shared:
+            return Response('{"items":[]}',mimetype="application/json")
+        rooms=requests.get(URL+"/rest/v1/cyrus_conversations",params={"select":"id,type","id":"in.("+",".join(shared)+")","type":"eq.private"},headers=headers,timeout=15)
+        if not rooms.ok or not rooms.json():
+            return Response('{"items":[]}',mimetype="application/json")
+        cid=str(rooms.json()[0].get("id") or "")
+        messages=requests.get(URL+"/rest/v1/cyrus_messages",params={"select":"content,message_type,attachment_url,created_at","conversation_id":"eq."+cid,"order":"created_at.desc","limit":"100"},headers=headers,timeout=20)
+        if not messages.ok:
+            return Response('{"items":[]}',mimetype="application/json")
+        items=[]
+        for row in messages.json():
+            items.append({"content":str(row.get("content") or "")[:4000],"type":str(row.get("message_type") or "text"),"url":str(row.get("attachment_url") or ""),"created_at":row.get("created_at")})
+        return Response(__import__("json").dumps({"items":items},ensure_ascii=False),mimetype="application/json")
+    except Exception:
+        return Response('{"error":"server error"}',status=502,mimetype="application/json")
 
 
 @app.route("/user/<user_id>/contact", methods=["POST"])
