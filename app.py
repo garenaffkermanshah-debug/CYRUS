@@ -3408,13 +3408,13 @@ def manage_room(conversation_id):
             if uid != str(room.get("created_by") or ""):
                 if owner and role == "member":
                     controls += (
-                        '<form method="post" onsubmit="return confirm('این عضو مدیر شود؟')"><input type="hidden" name="action" value="promote">'
+                        '<form method="post" onsubmit="return confirm(&quot;این عضو مدیر شود؟&quot;)"><input type="hidden" name="action" value="promote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>تعیین مدیر</button></form>'
                     )
                 if owner and role == "admin":
                     controls += (
-                        '<form method="post" onsubmit="return confirm('دسترسی مدیریت این عضو برداشته شود؟')"><input type="hidden" name="action" value="demote">'
+                        '<form method="post" onsubmit="return confirm(&quot;دسترسی مدیریت این عضو برداشته شود؟&quot;)"><input type="hidden" name="action" value="demote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>عزل مدیر</button></form>'
                     )
