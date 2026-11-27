@@ -53,6 +53,33 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertEqual(icon_response.status_code, 200)
         self.assertEqual(icon_response.mimetype, "image/svg+xml")
 
+    def test_media_signature_validation_accepts_matching_file_headers(self):
+        valid_samples = [
+            ("image/jpeg", b"\\xff\\xd8\\xffsample"),
+            ("image/png", b"\\x89PNG\\r\\n\\x1a\\nsample"),
+            ("image/gif", b"GIF89asample"),
+            ("video/mp4", b"\\x00\\x00\\x00\\x18ftypisom"),
+            ("audio/ogg", b"OggSsample"),
+            ("application/pdf", b"%PDF-1.7 sample"),
+            ("text/plain", "متن آزمایشی".encode("utf-8")),
+        ]
+        for mime, payload in valid_samples:
+            with self.subTest(mime=mime):
+                self.assertTrue(cyrus.cyrus_media_signature_valid(mime, payload))
+
+    def test_media_signature_validation_rejects_mismatched_and_empty_files(self):
+        invalid_samples = [
+            ("image/jpeg", b"not-a-jpeg"),
+            ("image/png", b"\\x89PNG-invalid"),
+            ("video/mp4", b"plain text pretending to be video"),
+            ("application/pdf", b"<html>not a PDF</html>"),
+            ("text/plain", b"binary\\x00payload"),
+            ("image/gif", b""),
+        ]
+        for mime, payload in invalid_samples:
+            with self.subTest(mime=mime, payload=payload):
+                self.assertFalse(cyrus.cyrus_media_signature_valid(mime, payload))
+
     def test_achaemenid_background_asset_is_available(self):
         response = self.client.get("/static/cyrus-tomb.jpg")
         self.assertEqual(response.status_code, 200)
