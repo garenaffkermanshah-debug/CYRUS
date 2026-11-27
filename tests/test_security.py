@@ -25,17 +25,23 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertIn("no-store", response.headers.get("Cache-Control", ""))
 
     def test_readiness_fails_closed_without_backend_configuration(self):
-        response = self.client.get("/readyz")
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json["status"], "not_ready")
-        self.assertNotIn("SUPABASE_KEY", response.get_data(as_text=True))
-
+        previous = (cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY)
+        cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = "", "", ""
+        try:
+            response = self.client.get("/readyz")
+            self.assertEqual(response.status_code, 503)
+            self.assertEqual(response.json["status"], "not_ready")
+            self.assertNotIn("SUPABASE_KEY", response.get_data(as_text=True))
+        finally:
+            cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = previous
 
     def test_readiness_succeeds_when_supabase_auth_is_reachable(self):
         from unittest.mock import Mock, patch
 
-        previous_url, previous_key = cyrus.URL, cyrus.KEY
-        cyrus.URL, cyrus.KEY = "https://project.example", "test-public-key"
+        previous = (cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY)
+        cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = (
+            "https://project.example", "test-public-key", "test-admin-key"
+        )
         try:
             backend = Mock(ok=True, status_code=200)
             with patch.object(cyrus.requests, "get", return_value=backend) as get:
@@ -50,13 +56,15 @@ class CyrusSecurityTests(unittest.TestCase):
             )
             self.assertNotIn("test-public-key", response.get_data(as_text=True))
         finally:
-            cyrus.URL, cyrus.KEY = previous_url, previous_key
+            cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = previous
 
     def test_readiness_fails_when_supabase_auth_returns_error(self):
         from unittest.mock import Mock, patch
 
-        previous_url, previous_key = cyrus.URL, cyrus.KEY
-        cyrus.URL, cyrus.KEY = "https://project.example", "test-public-key"
+        previous = (cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY)
+        cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = (
+            "https://project.example", "test-public-key", "test-admin-key"
+        )
         try:
             with patch.object(cyrus.requests, "get", return_value=Mock(ok=False)):
                 response = self.client.get("/readyz")
@@ -64,14 +72,16 @@ class CyrusSecurityTests(unittest.TestCase):
             self.assertEqual(response.json["status"], "not_ready")
             self.assertEqual(response.json["reason"], "backend")
         finally:
-            cyrus.URL, cyrus.KEY = previous_url, previous_key
+            cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = previous
 
     def test_readiness_fails_when_supabase_auth_times_out(self):
         from unittest.mock import patch
         import requests
 
-        previous_url, previous_key = cyrus.URL, cyrus.KEY
-        cyrus.URL, cyrus.KEY = "https://project.example", "test-public-key"
+        previous = (cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY)
+        cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = (
+            "https://project.example", "test-public-key", "test-admin-key"
+        )
         try:
             with patch.object(cyrus.requests, "get", side_effect=requests.Timeout):
                 response = self.client.get("/readyz")
@@ -79,7 +89,7 @@ class CyrusSecurityTests(unittest.TestCase):
             self.assertEqual(response.json["status"], "not_ready")
             self.assertEqual(response.json["reason"], "backend")
         finally:
-            cyrus.URL, cyrus.KEY = previous_url, previous_key
+            cyrus.URL, cyrus.KEY, cyrus.ADMIN_KEY = previous
 
     def test_expired_session_refreshes_and_rotates_tokens(self):
         from unittest.mock import Mock, patch
@@ -147,18 +157,27 @@ class CyrusSecurityTests(unittest.TestCase):
             self.assertGreater(state["token_expires_at"], 0)
 
     def test_login_page_issues_csrf_token_and_accepts_valid_form(self):
+        from unittest.mock import patch
+
         page = self.client.get("/login")
         self.assertEqual(page.status_code, 200)
         self.assertIn("csrf_token", page.get_data(as_text=True))
         with self.client.session_transaction() as state:
             token = state.get("csrf_token")
         self.assertTrue(token)
-        response = self.client.post(
-            "/login",
-            data={"csrf_token": token, "email": "pilot@example.com"},
-        )
+        existing = {"id": "user-123", "email_confirmed_at": "2026-01-01T00:00:00Z"}
+        with patch.object(cyrus, "auth_find_user_by_email", return_value=(existing, None)), \
+             patch.object(cyrus, "cyrus_get_account_security", return_value=(None, None)), \
+             patch.object(cyrus, "auth_request", return_value=(200, {})):
+            response = self.client.post(
+                "/login",
+                data={"csrf_token": token, "email": "pilot@example.com"},
+            )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["Location"], "/login/password")
+        self.assertEqual(response.headers["Location"], "/verify-email")
+        with self.client.session_transaction() as state:
+            self.assertEqual(state.get("cyrus_pending_email"), "pilot@example.com")
+            self.assertEqual(state.get("cyrus_pending_flow"), "login")
 
     def test_pwa_manifest_points_to_existing_app_icon(self):
         manifest_response = self.client.get("/manifest.webmanifest")
