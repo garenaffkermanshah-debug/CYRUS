@@ -323,3 +323,30 @@ FOR SELECT TO authenticated USING (
         OR (c.type='channel' AND c.is_public=true))
  )
 );
+
+
+-- Persistent per-user message reactions (Telegram-like)
+create table if not exists public.cyrus_message_reactions (
+  message_id uuid not null references public.cyrus_messages(id) on delete cascade,
+  conversation_id uuid not null references public.cyrus_conversations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  emoji text not null check (emoji in ('❤️','👍','👎','🔥','🥰','👏','🇮🇷','😂','😮','😢')),
+  created_at timestamptz not null default now(),
+  primary key (message_id,user_id)
+);
+create index if not exists cyrus_message_reactions_conversation_idx on public.cyrus_message_reactions(conversation_id,message_id);
+alter table public.cyrus_message_reactions enable row level security;
+grant select,insert,delete on public.cyrus_message_reactions to authenticated;
+drop policy if exists cyrus_reactions_read_member on public.cyrus_message_reactions;
+create policy cyrus_reactions_read_member on public.cyrus_message_reactions for select to authenticated using (
+  exists (select 1 from public.cyrus_members m where m.conversation_id=cyrus_message_reactions.conversation_id and m.user_id=auth.uid())
+  or exists (select 1 from public.cyrus_conversations c where c.id=cyrus_message_reactions.conversation_id and c.type='channel' and c.is_public=true)
+);
+drop policy if exists cyrus_reactions_insert_self_member on public.cyrus_message_reactions;
+create policy cyrus_reactions_insert_self_member on public.cyrus_message_reactions for insert to authenticated with check (
+  user_id=auth.uid()
+  and exists (select 1 from public.cyrus_messages msg where msg.id=cyrus_message_reactions.message_id and msg.conversation_id=cyrus_message_reactions.conversation_id)
+  and exists (select 1 from public.cyrus_members m where m.conversation_id=cyrus_message_reactions.conversation_id and m.user_id=auth.uid())
+);
+drop policy if exists cyrus_reactions_delete_self on public.cyrus_message_reactions;
+create policy cyrus_reactions_delete_self on public.cyrus_message_reactions for delete to authenticated using (user_id=auth.uid());
