@@ -1318,7 +1318,7 @@ def public_user_profile(user_id):
           </details>
         </div>
         <h2 class="user-profile-name">{html.escape(display_name)}</h2>
-        <div class="user-profile-username">@{html.escape(username)}</div>
+        <div class="user-profile-username" role="button" tabindex="0" title="برای کپی نام کاربری لمس کنید" data-username="{html.escape(username, quote=True)}" onclick="cyrusCopyUsername(this)">@{html.escape(username)}</div>
         <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
       </section>
       {send_link}
@@ -1326,6 +1326,7 @@ def public_user_profile(user_id):
       {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
     </main>
     <script>
+    function cyrusCopyUsername(el){{const u="@"+(el.dataset.username||"");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>alert("نام کاربری کپی شد")).catch(()=>prompt("نام کاربری",u));else prompt("نام کاربری",u);}}
     document.addEventListener('click',function(e){{if(!e.target.closest('.profile-more'))document.querySelectorAll('.profile-more[open]').forEach(x=>x.open=false);}});
     (function(){{
       const root=document.querySelector('.cyrus-user-profile'),box=document.getElementById('profile-media-content'),buttons=[...document.querySelectorAll('.profile-media-tabs button')];
