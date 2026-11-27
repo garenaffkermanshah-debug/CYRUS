@@ -1142,7 +1142,7 @@ def logout():
     session.clear()
     response = redirect("/login")
     response.delete_cookie(
-        app.config.get("SESSION_COOKIE_NAME", "session"),
+        app.config.get("SESSION_COOKIE_NAME", "cyrus_session"),
         path=app.config.get("SESSION_COOKIE_PATH", "/"),
         domain=app.config.get("SESSION_COOKIE_DOMAIN")
     )
