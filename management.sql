@@ -126,3 +126,37 @@ GRANT SELECT, INSERT, DELETE ON public.cyrus_saved_profiles TO authenticated;
 CREATE UNIQUE INDEX IF NOT EXISTS cyrus_messages_client_nonce_unique
 ON public.cyrus_messages (conversation_id, sender_id, (metadata->>'client_nonce'))
 WHERE metadata ? 'client_nonce';
+
+
+-- Private Saved Messages (each account can access only its own notes/messages)
+CREATE TABLE IF NOT EXISTS public.cyrus_saved_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  content text NOT NULL CHECK (char_length(content) BETWEEN 1 AND 10000),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.cyrus_saved_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cyrus_saved_messages_read_own ON public.cyrus_saved_messages;
+CREATE POLICY cyrus_saved_messages_read_own ON public.cyrus_saved_messages FOR SELECT TO authenticated USING (user_id = (SELECT auth.uid()));
+DROP POLICY IF EXISTS cyrus_saved_messages_insert_own ON public.cyrus_saved_messages;
+CREATE POLICY cyrus_saved_messages_insert_own ON public.cyrus_saved_messages FOR INSERT TO authenticated WITH CHECK (user_id = (SELECT auth.uid()));
+DROP POLICY IF EXISTS cyrus_saved_messages_delete_own ON public.cyrus_saved_messages;
+CREATE POLICY cyrus_saved_messages_delete_own ON public.cyrus_saved_messages FOR DELETE TO authenticated USING (user_id = (SELECT auth.uid()));
+GRANT SELECT, INSERT, DELETE ON public.cyrus_saved_messages TO authenticated;
+
+-- Safe pairwise block check: caller may check only a pair involving their own auth.uid().
+CREATE OR REPLACE FUNCTION public.cyrus_is_blocked_pair(other_user_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE WHEN auth.uid() IS NULL OR other_user_id IS NULL OR other_user_id = auth.uid()
+    THEN false
+    ELSE EXISTS (
+      SELECT 1 FROM public.cyrus_user_blocks b
+      WHERE (b.blocker_id = auth.uid() AND b.blocked_id = other_user_id)
+         OR (b.blocker_id = other_user_id AND b.blocked_id = auth.uid())
+    )
+  END
+$$;
+REVOKE ALL ON FUNCTION public.cyrus_is_blocked_pair(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.cyrus_is_blocked_pair(uuid) TO authenticated;
