@@ -1860,7 +1860,7 @@ def chat(conversation_id):
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
             '<a href="/rooms/' + html.escape(conversation_id,quote=True) + '/manage">مدیریت</a>'
             + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
-            + '<form method="post" action="/rooms/' + html.escape(conversation_id,quote=True) + '/leave" onsubmit="return confirm(\'از این مجموعه خارج می‌شوید؟\')"><button type="submit">ترک ' + ("گروه" if room_type=="group" else "کانال") + '</button></form>'
+            + ('' if is_room_owner else '<form method="post" action="/rooms/' + html.escape(conversation_id,quote=True) + '/leave" onsubmit="return confirm(\'از این مجموعه خارج می‌شوید؟\')"><button type="submit">ترک ' + ("گروه" if room_type=="group" else "کانال") + '</button></form>')
             + '</div></div>'
         )
     else:
@@ -2695,7 +2695,7 @@ def create_room():
         for member_id in dict.fromkeys(member_ids):
             added=requests.post(URL+"/rest/v1/rpc/cyrus_manage_add_member",json={"p_conversation_id":room_id,"p_user_id":member_id},headers=headers,timeout=15)
             if not added.ok: failed.append(member_id)
-        if failed: return page('<div class="container card"><p>کانال ساخته شد، اما افزودن بعضی مخاطبان ناموفق بود.</p><a href="/rooms/'+room_id+'/manage">مدیریت اعضا</a><a href="/chat/'+room_id+'">باز کردن کانال</a></div>'),502
+        if failed: return page('<div class="container card"><p>'+("گروه" if room_type=="group" else "کانال")+' ساخته شد، اما افزودن بعضی مخاطبان ناموفق بود.</p><a href="/rooms/'+room_id+'/manage">مدیریت اعضا</a><a href="/chat/'+room_id+'">باز کردن مجموعه</a></div>'),502
         return redirect(url_for("chat",conversation_id=room_id))
     except Exception: return cyrus_channel_member_picker(title,room_type,"ارتباط با سرور برقرار نشد یا پاسخ نامعتبر بود"),502
 
