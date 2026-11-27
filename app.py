@@ -2638,24 +2638,61 @@ def manage_room(conversation_id):
             <p class="muted">{subtitle}</p>
           </section>
 
-          <form class="card" method="post">
-            <h3>اطلاعات {kind}</h3>
+          <style>
+            .tg-room-settings{margin:0 0 14px;padding:0;background:#101a25;border:0;border-radius:0;color:#e8edf2;overflow:hidden}
+            .tg-room-settings .tg-section-title{padding:17px 16px 9px;color:#6ab5ee;font-size:14px;font-weight:600}
+            .tg-room-settings .tg-section{padding:0 16px;border-bottom:8px solid #09131e}
+            .tg-room-settings .tg-field{display:block;padding:13px 0;border-bottom:1px solid #263442;font-size:14px;color:#e3eaf0}
+            .tg-room-settings .tg-field:last-child{border-bottom:0}
+            .tg-room-settings .tg-field input[type=text],.tg-room-settings .tg-field input:not([type]),.tg-room-settings .tg-field textarea,.tg-room-settings .tg-field select{display:block;width:100%;margin:8px 0 0;padding:12px;background:#0a141f;border:1px solid #263b4d;border-radius:9px;color:#f1f5f8;font:inherit}
+            .tg-room-settings .tg-field textarea{resize:vertical}
+            .tg-room-settings .tg-switch-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:54px;padding:10px 0;border-bottom:1px solid #263442;color:#e2eaf1;font-size:14px}
+            .tg-room-settings .tg-switch-row:last-child{border-bottom:0}
+            .tg-room-settings .tg-switch{position:relative;flex:0 0 43px;width:43px;height:26px;border-radius:15px;background:#43515e;transition:background .18s;direction:ltr}
+            .tg-room-settings .tg-switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;z-index:2}
+            .tg-room-settings .tg-switch i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#f4f6f8;transition:transform .18s}
+            .tg-room-settings .tg-switch:has(input:checked){background:#248bd2}
+            .tg-room-settings .tg-switch input:checked+i{transform:translateX(17px)}
+            .tg-room-settings .tg-permissions{margin:0;background:#101a25}
+            .tg-room-settings .tg-permissions summary{display:flex;align-items:center;justify-content:space-between;padding:16px;cursor:pointer;list-style:none;color:#e8edf2;font-size:14px}
+            .tg-room-settings .tg-permissions summary::-webkit-details-marker{display:none}
+            .tg-room-settings .tg-permissions summary .tg-chevron{color:#7f94a7;transition:transform .18s}
+            .tg-room-settings .tg-permissions[open] summary .tg-chevron{transform:rotate(180deg)}
+            .tg-room-settings .tg-permissions-body{padding:0 16px 10px}
+            .tg-room-settings .tg-save{display:block;width:calc(100% - 32px);margin:16px auto;padding:13px;border:0;border-radius:10px;background:#248bd2;color:white;font-size:15px;font-weight:500}
+            .tg-room-settings hr{display:none}
+          </style>
+          <form class="tg-room-settings" method="post">
             <input type="hidden" name="action" value="save_settings">
-            <label>نام</label>
-            <input name="title" minlength="2" maxlength="60" value="{title}" required>
-            <label>توضیحات</label>
-            <textarea name="description" maxlength="500" rows="4">{description}</textarea>
-            <label>آدرس تصویر (اختیاری)</label>
-            <input name="avatar_url" maxlength="500" value="{avatar_url}" placeholder="https://...">
-            <label><input type="checkbox" name="reactions_enabled" {reactions_checked}> فعال بودن واکنش‌ها</label>
-            <hr>
-            <h3>نوع و دسترسی</h3>
-            <label><input type="checkbox" name="is_public" {public_checked}> {("گروه عمومی (قابل جستجو)" if room_type == "group" else "کانال عمومی (قابل جستجو)")}</label>
-            <label><input type="checkbox" name="join_approval" {approval_checked}> درخواست عضویت نیازمند تأیید مدیر</label>
-            <label><input type="checkbox" name="history_visible" {history_checked}> نمایش پیام‌های قبلی به اعضای جدید</label>
-            <hr>
-            {('<h3>مجوزهای اعضای گروه</h3><label><input type="checkbox" name="perm_send_messages" ' + perm_checks["send_messages"] + '> ارسال پیام</label><label><input type="checkbox" name="perm_send_media" ' + perm_checks["send_media"] + '> ارسال رسانه</label><label><input type="checkbox" name="perm_add_members" ' + perm_checks["add_members"] + '> افزودن اعضا</label><label><input type="checkbox" name="perm_pin_messages" ' + perm_checks["pin_messages"] + '> سنجاق پیام</label><label><input type="checkbox" name="perm_change_info" ' + perm_checks["change_info"] + '> تغییر اطلاعات گروه</label><label><input type="checkbox" name="topics_enabled" ' + topics_checked + '> فعال‌سازی موضوعات گروه</label><label>حالت آهسته ارسال پیام<select name="slow_mode_seconds">' + slow_options + '</select></label>') if room_type == "group" else ('<h3>تنظیمات کانال</h3><label><input type="checkbox" name="sign_messages" ' + sign_checked + '> نمایش امضای مدیر در پست‌ها</label><p class="muted">در کانال فقط مالک و مدیران مجاز به انتشار هستند.</p>')}
-            <button type="submit">ذخیره تنظیمات</button>
+            <div class="tg-section">
+              <div class="tg-section-title">اطلاعات {kind}</div>
+              <label class="tg-field">نام
+                <input name="title" minlength="2" maxlength="60" value="{title}" required>
+              </label>
+              <label class="tg-field">توضیحات
+                <textarea name="description" maxlength="500" rows="3">{description}</textarea>
+              </label>
+              <label class="tg-field">آدرس تصویر
+                <input name="avatar_url" maxlength="500" value="{avatar_url}" placeholder="https://..." dir="ltr">
+              </label>
+              <label class="tg-switch-row"><span>فعال بودن واکنش‌ها</span><span class="tg-switch"><input type="checkbox" name="reactions_enabled" {reactions_checked}><i></i></span></label>
+            </div>
+            <div class="tg-section">
+              <div class="tg-section-title">نوع و دسترسی</div>
+              <label class="tg-switch-row"><span>{("گروه عمومی (قابل جستجو)" if room_type == "group" else "کانال عمومی (قابل جستجو)")}</span><span class="tg-switch"><input type="checkbox" name="is_public" {public_checked}><i></i></span></label>
+              <label class="tg-switch-row"><span>درخواست عضویت نیازمند تأیید مدیر</span><span class="tg-switch"><input type="checkbox" name="join_approval" {approval_checked}><i></i></span></label>
+              <label class="tg-switch-row"><span>نمایش پیام‌های قبلی به اعضای جدید</span><span class="tg-switch"><input type="checkbox" name="history_visible" {history_checked}><i></i></span></label>
+            </div>
+            {('<div class="tg-section"><details class="tg-permissions"><summary><span>مجوزهای اعضا</span><span class="tg-chevron">⌄</span></summary><div class="tg-permissions-body">' + 
+              '<label class="tg-switch-row"><span>ارسال پیام</span><span class="tg-switch"><input type="checkbox" name="perm_send_messages" ' + perm_checks["send_messages"] + '><i></i></span></label>' +
+              '<label class="tg-switch-row"><span>ارسال رسانه</span><span class="tg-switch"><input type="checkbox" name="perm_send_media" ' + perm_checks["send_media"] + '><i></i></span></label>' +
+              '<label class="tg-switch-row"><span>افزودن اعضا</span><span class="tg-switch"><input type="checkbox" name="perm_add_members" ' + perm_checks["add_members"] + '><i></i></span></label>' +
+              '<label class="tg-switch-row"><span>سنجاق پیام</span><span class="tg-switch"><input type="checkbox" name="perm_pin_messages" ' + perm_checks["pin_messages"] + '><i></i></span></label>' +
+              '<label class="tg-switch-row"><span>تغییر اطلاعات گروه</span><span class="tg-switch"><input type="checkbox" name="perm_change_info" ' + perm_checks["change_info"] + '><i></i></span></label>' +
+              '</div></details></div><div class="tg-section">' +
+              '<label class="tg-switch-row"><span>فعال‌سازی موضوعات گروه</span><span class="tg-switch"><input type="checkbox" name="topics_enabled" ' + topics_checked + '><i></i></span></label>' +
+              '<label class="tg-field">حالت آهسته ارسال پیام<select name="slow_mode_seconds">' + slow_options + '</select></label></div>') if room_type == "group" else ('<div class="tg-section"><div class="tg-section-title">تنظیمات کانال</div><label class="tg-switch-row"><span>نمایش امضای مدیر در پست‌ها</span><span class="tg-switch"><input type="checkbox" name="sign_messages" ' + sign_checked + '><i></i></span></label><p class="muted">در کانال فقط مالک و مدیران مجاز به انتشار هستند.</p></div>')}
+            <button class="tg-save" type="submit">ذخیره تغییرات</button>
           </form>
 
           <div class="card">
