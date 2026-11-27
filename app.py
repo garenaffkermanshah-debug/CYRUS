@@ -2297,6 +2297,22 @@ def chat(conversation_id):
       }}
       document.addEventListener('DOMContentLoaded',function(){{
         window.scrollTo(0,document.body.scrollHeight);
+        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
+        if(deepLinkedMessage) {{
+          requestAnimationFrame(()=>requestAnimationFrame(()=>{{
+            const target=document.getElementById('message-'+deepLinkedMessage);
+            if(target) {{
+              target.scrollIntoView({{behavior:'smooth',block:'center'}});
+              target.classList.add('search-jump-highlight');
+              target.setAttribute('tabindex','-1');
+              target.focus({{preventScroll:true}});
+              clearTimeout(target._cyrusHighlightTimer);
+              target._cyrusHighlightTimer=setTimeout(()=>target.classList.remove('search-jump-highlight'),3200);
+            }} else if(typeof cyrusToast==='function') {{
+              cyrusToast('پیام پیوندشده در این گفتگو پیدا نشد');
+            }}
+          }}));
+        }}
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker)picker.addEventListener("emoji-click",function(event){{
           const value=event.detail&&event.detail.unicode;
