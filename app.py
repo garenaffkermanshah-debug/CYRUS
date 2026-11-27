@@ -1415,7 +1415,7 @@ def chat(conversation_id):
         room = requests.get(
             URL + "/rest/v1/cyrus_conversations",
             params={
-                "select": "id,title,type,created_by,description,avatar_url",
+                "select": "id,title,type,created_by,description,avatar_url,history_visible",
                 "id": "eq." + conversation_id
             },
             headers=headers,
@@ -1425,9 +1425,23 @@ def chat(conversation_id):
         if not room.ok or not room.json():
             return page('<div class="container card"><h3>گفتگو پیدا نشد یا دسترسی ندارید</h3><a href="/contacts">بازگشت به خویشان</a></div>'), 404
 
-        # ورود به گفتگو یعنی پیام‌های قبلی تا این لحظه خوانده شده‌اند.
-        requests.patch(
+        room_data_for_history = room.json()[0]
+        current_user_for_history = str(session.get("user_id") or "")
+        member_for_history = requests.get(
             URL + "/rest/v1/cyrus_members",
+            params={"select": "joined_at,role", "conversation_id": "eq." + conversation_id,
+                    "user_id": "eq." + current_user_for_history, "limit": "1"},
+            headers=headers, timeout=15
+        )
+        is_room_owner = str(room_data_for_history.get("created_by") or "") == current_user_for_history
+        if not member_for_history.ok or (not member_for_history.json() and not is_room_owner):
+            return page('<div class="container card"><h3>شما عضو این گفتگو نیستید</h3><a href="/contacts">بازگشت</a></div>'), 403
+        member_history_row = member_for_history.json()[0] if member_for_history.ok and member_for_history.json() else {}
+        joined_at_for_history = member_history_row.get("joined_at")
+        # ورود به گفتگو یعنی پیام‌های قبلی تا این لحظه خوانده شده‌اند.
+        if member_history_row:
+            requests.patch(
+                URL + "/rest/v1/cyrus_members",
             params={
                 "conversation_id": "eq." + conversation_id,
                 "user_id": "eq." + str(session.get("user_id"))
@@ -1435,7 +1449,7 @@ def chat(conversation_id):
             json={"last_read_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
             headers={**headers, "Content-Type": "application/json", "Prefer": "return=minimal"},
             timeout=20
-        )
+            )
         response = requests.get(
             URL + "/rest/v1/cyrus_messages",
             params={
@@ -1452,6 +1466,21 @@ def chat(conversation_id):
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
         messages = response.json()
+        if not room_data_for_history.get("history_visible", True) and joined_at_for_history:
+            try:
+                joined_dt_for_history = datetime.fromisoformat(str(joined_at_for_history).replace("Z", "+00:00"))
+                if joined_dt_for_history.tzinfo is None:
+                    joined_dt_for_history = joined_dt_for_history.replace(tzinfo=timezone.utc)
+                filtered_messages = []
+                for item in messages:
+                    item_dt = datetime.fromisoformat(str(item.get("created_at") or "").replace("Z", "+00:00"))
+                    if item_dt.tzinfo is None:
+                        item_dt = item_dt.replace(tzinfo=timezone.utc)
+                    if item_dt.astimezone(timezone.utc) >= joined_dt_for_history.astimezone(timezone.utc):
+                        filtered_messages.append(item)
+                messages = filtered_messages
+            except (TypeError, ValueError):
+                messages = []
         requested_message_id = request.args.get("message", "").strip()
         if requested_message_id:
             try:
@@ -1469,7 +1498,16 @@ def chat(conversation_id):
                 )
                 if target_response.ok and isinstance(target_response.json(), list) and target_response.json():
                     target_message = target_response.json()[0]
-                    if not any(str(m.get("id") or "") == requested_message_id for m in messages):
+                    if not room_data_for_history.get("history_visible", True) and joined_at_for_history:
+                        target_dt = datetime.fromisoformat(str(target_message.get("created_at") or "").replace("Z", "+00:00"))
+                        joined_dt = datetime.fromisoformat(str(joined_at_for_history).replace("Z", "+00:00"))
+                        if target_dt.tzinfo is None:
+                            target_dt = target_dt.replace(tzinfo=timezone.utc)
+                        if joined_dt.tzinfo is None:
+                            joined_dt = joined_dt.replace(tzinfo=timezone.utc)
+                        if target_dt.astimezone(timezone.utc) < joined_dt.astimezone(timezone.utc):
+                            target_message = None
+                    if target_message and not any(str(m.get("id") or "") == requested_message_id for m in messages):
                         messages.append(target_message)
                         messages.sort(key=lambda item: str(item.get("created_at") or ""))
             except ValueError:
