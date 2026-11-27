@@ -269,3 +269,41 @@ BEGIN
   UPDATE public.cyrus_messages SET metadata=coalesce(metadata,'{}'::jsonb)-'pinned' WHERE conversation_id=p_conversation_id AND coalesce(metadata->>'pinned','false')='true';
   IF p_pin THEN UPDATE public.cyrus_messages SET metadata=jsonb_set(coalesce(metadata,'{}'::jsonb),'{pinned}','true'::jsonb,true) WHERE id=p_message_id AND conversation_id=p_conversation_id; END IF;
 END; $$;
+
+
+
+-- CYRUS chat media bucket and upload policy (2026-11-27).
+INSERT INTO storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+VALUES('cyrus-chat-files','cyrus-chat-files',true,20971520,
+ARRAY['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','audio/mpeg','audio/mp4','audio/ogg','audio/webm','application/pdf','text/plain','application/zip','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
+ON CONFLICT(id) DO UPDATE SET public=true,file_size_limit=20971520,allowed_mime_types=EXCLUDED.allowed_mime_types;
+DROP POLICY IF EXISTS cyrus_chat_files_authenticated_upload ON storage.objects;
+CREATE POLICY cyrus_chat_files_authenticated_upload ON storage.objects
+FOR INSERT TO authenticated WITH CHECK (
+ bucket_id='cyrus-chat-files' AND (storage.foldername(name))[2]=(SELECT auth.uid())::text
+);
+DROP POLICY IF EXISTS cyrus_chat_files_authenticated_update ON storage.objects;
+CREATE POLICY cyrus_chat_files_authenticated_update ON storage.objects
+FOR UPDATE TO authenticated USING (
+ bucket_id='cyrus-chat-files' AND (storage.foldername(name))[2]=(SELECT auth.uid())::text
+) WITH CHECK (
+ bucket_id='cyrus-chat-files' AND (storage.foldername(name))[2]=(SELECT auth.uid())::text
+);
+
+-- Enforce distinct group permissions for text and media posts.
+DROP POLICY IF EXISTS cyrus_messages_send_secure ON public.cyrus_messages;
+CREATE POLICY cyrus_messages_send_secure
+ON public.cyrus_messages FOR INSERT TO authenticated
+WITH CHECK (
+ sender_id=(SELECT auth.uid()) AND EXISTS(
+  SELECT 1 FROM public.cyrus_conversations c WHERE c.id=cyrus_messages.conversation_id AND (
+   (c.type='private' AND EXISTS(SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=c.id AND m.user_id=(SELECT auth.uid()))
+    AND NOT EXISTS(SELECT 1 FROM public.cyrus_members om WHERE om.conversation_id=c.id AND om.user_id<>(SELECT auth.uid()) AND public.cyrus_is_blocked_pair(om.user_id)))
+   OR
+   (c.type='group' AND EXISTS(SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=c.id AND m.user_id=(SELECT auth.uid())
+    AND (m.role IN ('owner','admin') OR coalesce((c.member_permissions->>CASE WHEN cyrus_messages.message_type IN ('photo','video','audio','document','file') THEN 'send_media' ELSE 'send_messages' END)::boolean,true))))
+   OR
+   (c.type='channel' AND (c.created_by=(SELECT auth.uid()) OR EXISTS(SELECT 1 FROM public.cyrus_members m WHERE m.conversation_id=c.id AND m.user_id=(SELECT auth.uid()) AND m.role='admin')))
+  )
+ )
+);
