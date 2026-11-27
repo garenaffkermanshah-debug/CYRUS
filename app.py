@@ -3,7 +3,7 @@ from urllib.parse import quote
 from pathlib import Path
 from datetime import timedelta, datetime, timezone
 from dotenv import load_dotenv
-from flask import Flask, request, session, redirect, url_for, render_template, render_template_string
+from flask import Flask, request, session, redirect, url_for, render_template, render_template_string, Response
 
 load_dotenv()
 app = Flask(__name__)
@@ -24,6 +24,32 @@ app.secret_key = _session_key
 app.permanent_session_lifetime = timedelta(days=365)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+@app.route("/manifest.webmanifest")
+def cyrus_manifest():
+    manifest = {
+        "name": "CYRUS | پیوند پارسیان",
+        "short_name": "CYRUS",
+        "description": "پیام‌رسان پارسی با شکوه هخامنشی",
+        "lang": "fa", "dir": "rtl", "start_url": "/home", "scope": "/",
+        "display": "standalone", "orientation": "portrait",
+        "background_color": "#0d1722", "theme_color": "#0d1722",
+        "icons": [{"src": "/static/cyrus-app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
+    }
+    return app.response_class(__import__("json").dumps(manifest, ensure_ascii=False), mimetype="application/manifest+json")
+
+@app.route("/service-worker.js")
+def cyrus_service_worker():
+    worker = r"""const CACHE='cyrus-static-v1';
+const STATIC=['/static/cyrus-app-icon.svg','/static/cyrus-cylinder.jpg','/static/cyrus-tomb.jpg'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
+self.addEventListener('fetch',e=>{
+ const u=new URL(e.request.url);
+ if(e.request.method!=='GET'||u.origin!==self.location.origin||!u.pathname.startsWith('/static/'))return;
+ e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));}return r;})));
+});"""
+    return Response(worker, mimetype="application/javascript", headers={"Cache-Control":"no-cache","Service-Worker-Allowed":"/"})
 
 @app.before_request
 def cyrus_refresh_auth_session():
@@ -103,6 +129,12 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0d1722">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="/static/cyrus-app-icon.svg" type="image/svg+xml">
 <title>CYRUS | شاهنشاهی ارتباطات</title>
 <style>
 *{box-sizing:border-box}
@@ -295,6 +327,19 @@ window.addEventListener('pageshow', function(event) {
     location.reload();
   }
 });
+
+<div id="cyrusInstallBar" style="display:none;position:fixed;z-index:999;left:12px;right:12px;bottom:calc(82px + env(safe-area-inset-bottom));padding:12px 14px;border:1px solid #35516a;border-radius:16px;background:#101d2b;box-shadow:0 8px 30px #0008;align-items:center;gap:10px;color:#eaf2f8"><span style="font-size:22px">𓊹</span><span style="flex:1;font-size:13px">نصب CYRUS روی گوشی</span><button id="cyrusInstallBtn" style="border:0;border-radius:20px;padding:9px 15px;background:#278bdc;color:#fff;font-weight:bold">نصب</button><button id="cyrusInstallClose" aria-label="بستن" style="border:0;background:transparent;color:#9fb1c2;font-size:20px">×</button></div>
+<script>
+(function(){
+ let deferred=null;const bar=document.getElementById('cyrusInstallBar'),btn=document.getElementById('cyrusInstallBtn'),close=document.getElementById('cyrusInstallClose');
+ if(!bar||!btn)return;
+ if('serviceWorker' in navigator)navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+ window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();deferred=e;if(!sessionStorage.getItem('cyrus-install-dismissed'))bar.style.display='flex';});
+ btn.addEventListener('click',async function(){if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;bar.style.display='none';});
+ close.addEventListener('click',function(){bar.style.display='none';sessionStorage.setItem('cyrus-install-dismissed','1');});
+ if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone)bar.style.display='none';
+})();
+</script>
 </script>
 </body>
 </html>
