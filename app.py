@@ -1852,10 +1852,10 @@ def chat(conversation_id):
         '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
         '<input type="hidden" name="reply_to_id" id="cyrusReplyId" value="">'
         '<button class="composer-emoji" type="button" aria-label="ایموجی" onclick="cyrusToggleEmoji(event)">☺</button>'
-        '<div class="composer-emoji-panel" id="cyrusEmojiPanel" style="display:none">'
-        '<button type="button" onclick="cyrusInsertEmoji(\'😀\')">😀</button><button type="button" onclick="cyrusInsertEmoji(\'😂\')">😂</button><button type="button" onclick="cyrusInsertEmoji(\'🥰\')">🥰</button><button type="button" onclick="cyrusInsertEmoji(\'👍\')">👍</button><button type="button" onclick="cyrusInsertEmoji(\'❤️\')">❤️</button><button type="button" onclick="cyrusInsertEmoji(\'🔥\')">🔥</button><button type="button" onclick="cyrusInsertEmoji(\'👏\')">👏</button><button type="button" onclick="cyrusInsertEmoji(\'🙏\')">🙏</button><button type="button" onclick="cyrusInsertEmoji(\'🇮🇷\')">🇮🇷</button><button type="button" onclick="cyrusInsertEmoji(\'😎\')">😎</button><button type="button" onclick="cyrusInsertEmoji(\'🤔\')">🤔</button><button type="button" onclick="cyrusInsertEmoji(\'😍\')">😍</button>'
-        '</div>'
-        '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>'
+        '<div class="composer-emoji-panel" id="cyrusEmojiPanel" style="display:none"><emoji-picker id="cyrusFullEmojiPicker" locale="en"></emoji-picker></div>'
+        '<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/index.js"></script>'
+        '<input type="hidden" name="client_nonce" value="">'
+        '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
         if room_type != "channel" or channel_can_post else
         '<div class="card"><p>این کانال عمومی است؛ اعضا فقط می‌توانند پست‌ها را مشاهده کنند.</p></div>'
@@ -2105,6 +2105,30 @@ def send_message(conversation_id):
             replied = reply_response.json()[0]
             message_metadata = {"reply_to_id":reply_to_id,"reply_to_content":str(replied.get("content") or "")[:500]}
 
+        client_nonce = str(request.form.get("client_nonce") or "").strip()
+        if client_nonce:
+            try:
+                client_nonce = str(uuid.UUID(client_nonce))
+            except ValueError:
+                client_nonce = ""
+        if client_nonce:
+            message_metadata["client_nonce"] = client_nonce
+            # Retry after a weak connection reuses the same nonce; never insert it twice.
+            try:
+                duplicate_check = requests.get(
+                    URL + "/rest/v1/cyrus_messages",
+                    params={"select":"id,metadata","conversation_id":"eq."+conversation_id,
+                            "sender_id":"eq."+current_user,"order":"created_at.desc","limit":"100"},
+                    headers=headers, timeout=15
+                )
+                if duplicate_check.ok:
+                    for existing_message in duplicate_check.json():
+                        existing_meta = existing_message.get("metadata") if isinstance(existing_message.get("metadata"),dict) else {}
+                        if str(existing_meta.get("client_nonce") or "") == client_nonce:
+                            return redirect(url_for("chat", conversation_id=conversation_id))
+            except Exception:
+                pass
+
         # اگر کاربر، عضو دیگر گفتگوی خصوصی را مسدود کرده باشد، پیام جدید نپذیر.
         if room.get("type") == "private":
             members_check = requests.get(
@@ -2209,6 +2233,21 @@ def send_message(conversation_id):
         )
 
         if not response.ok:
+            if response.status_code == 409 and client_nonce:
+                try:
+                    duplicate_check = requests.get(
+                        URL + "/rest/v1/cyrus_messages",
+                        params={"select":"id,metadata","conversation_id":"eq."+conversation_id,
+                                "sender_id":"eq."+current_user,"order":"created_at.desc","limit":"100"},
+                        headers=headers, timeout=15
+                    )
+                    if duplicate_check.ok and any(
+                        isinstance(x.get("metadata"),dict) and str(x["metadata"].get("client_nonce") or "") == client_nonce
+                        for x in duplicate_check.json()
+                    ):
+                        return redirect(url_for("chat", conversation_id=conversation_id))
+                except Exception:
+                    pass
             return page(
                 '<div class="container card"><h3>ارسال پیام ناموفق بود</h3><p>'
                 + html.escape(response.text[:500])
