@@ -3366,6 +3366,29 @@ def toggle_message_pin(message_id):
     headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"],
                "Content-Type": "application/json"}
     try:
+        uid = str(session.get("user_id") or "")
+        room_response = requests.get(URL + "/rest/v1/cyrus_conversations",
+            params={"select":"id,type,created_by,member_permissions","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers, timeout=15)
+        if not room_response.ok or not room_response.json():
+            return "گفتگو پیدا نشد", 404
+        room = room_response.json()[0]
+        member_response = requests.get(URL + "/rest/v1/cyrus_members",
+            params={"select":"role","conversation_id":"eq."+conversation_id,"user_id":"eq."+uid,"limit":"1"},
+            headers=headers, timeout=15)
+        if not member_response.ok:
+            return "بررسی عضویت ناموفق بود", 502
+        member_rows = member_response.json()
+        is_owner = str(room.get("created_by") or "") == uid
+        role = str(member_rows[0].get("role") or "") if member_rows else ""
+        if not is_owner and not member_rows:
+            return "عضو این گفتگو نیستید", 403
+        if room.get("type") == "channel" and not (is_owner or role in ("owner","admin")):
+            return "در این کانال اجازه سنجاق پیام ندارید", 403
+        if room.get("type") == "group" and not (is_owner or role in ("owner","admin")):
+            permissions = room.get("member_permissions") if isinstance(room.get("member_permissions"), dict) else {}
+            if not permissions.get("pin_messages", True):
+                return "سنجاق پیام برای اعضای عادی غیرفعال است", 403
         found = requests.get(URL + "/rest/v1/cyrus_messages",
             params={"select":"id,conversation_id,metadata","id":"eq."+message_id,"limit":"1"},
             headers=headers, timeout=15)
@@ -3405,18 +3428,37 @@ def forward_message(message_id):
             return "پیام مبدأ پیدا نشد",404
         original=source.json()[0]
         dest=requests.get(URL+"/rest/v1/cyrus_conversations",
-            params={"select":"id,type,created_by","id":"eq."+destination,"limit":"1"},
+            params={"select":"id,type,created_by,member_permissions,slow_mode_seconds","id":"eq."+destination,"limit":"1"},
             headers=headers,timeout=15)
         if not dest.ok or not dest.json():
             return "گفتگوی مقصد پیدا نشد",404
         room=dest.json()[0]
         member=requests.get(URL+"/rest/v1/cyrus_members",
-            params={"select":"role","conversation_id":"eq."+destination,"user_id":"eq."+current_user,"limit":"1"},
+            params={"select":"role,last_message_at","conversation_id":"eq."+destination,"user_id":"eq."+current_user,"limit":"1"},
             headers=headers,timeout=15)
         if not member.ok or not member.json():
             return "عضو گفتگوی مقصد نیستید",403
-        if room.get("type")=="channel" and str(room.get("created_by") or "")!=current_user and member.json()[0].get("role") not in ("admin","owner"):
+        member_row=member.json()[0]
+        member_role=str(member_row.get("role") or "")
+        is_owner=str(room.get("created_by") or "")==current_user
+        if room.get("type")=="channel" and not is_owner and member_role not in ("admin","owner"):
             return "در این کانال اجازه انتشار ندارید",403
+        if room.get("type")=="group" and not is_owner and member_role not in ("admin","owner"):
+            permissions=room.get("member_permissions") if isinstance(room.get("member_permissions"),dict) else {}
+            if not permissions.get("send_messages",True):
+                return "ارسال پیام برای اعضای عادی غیرفعال است",403
+            slow_seconds=int(room.get("slow_mode_seconds") or 0)
+            last_message_at=member_row.get("last_message_at")
+            if slow_seconds and last_message_at:
+                try:
+                    last_dt=datetime.fromisoformat(str(last_message_at).replace("Z","+00:00"))
+                    if last_dt.tzinfo is None:
+                        last_dt=last_dt.replace(tzinfo=timezone.utc)
+                    remaining=slow_seconds-(datetime.now(timezone.utc)-last_dt.astimezone(timezone.utc)).total_seconds()
+                    if remaining>0:
+                        return "حالت آهسته فعال است؛ "+str(int(remaining))+" ثانیه دیگر می‌توانید پیام را انتقال دهید",429
+                except (TypeError,ValueError):
+                    pass
         if room.get("type")=="private":
             others=requests.get(URL+"/rest/v1/cyrus_members",
                 params={"select":"user_id","conversation_id":"eq."+destination},
@@ -3443,6 +3485,11 @@ def forward_message(message_id):
             headers=headers,timeout=20)
         if not saved.ok:
             return "انتقال پیام ناموفق بود",403
+        if room.get("type")=="group":
+            requests.patch(URL+"/rest/v1/cyrus_members",
+                params={"conversation_id":"eq."+destination,"user_id":"eq."+current_user},
+                json={"last_message_at":datetime.now(timezone.utc).isoformat()},
+                headers={**headers,"Prefer":"return=minimal"},timeout=15)
         return redirect(url_for("chat",conversation_id=destination))
     except Exception:
         return "ارتباط با سرور برقرار نشد",502
