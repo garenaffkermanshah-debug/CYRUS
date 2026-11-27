@@ -3281,14 +3281,14 @@ def manage_room(conversation_id):
             <button class="tg-save" type="submit" disabled>تأیید تغییرات</button>
           </form>
           <script>
-          (function(){
+          (function(){{
             const form=document.querySelector('.tg-room-settings'),save=form&&form.querySelector('.tg-save');
             if(!form||!save)return;
             let changed=false;
-            function mark(){changed=true;save.disabled=false;save.textContent='تأیید تغییرات';}
-            form.querySelectorAll('input,textarea,select').forEach(el=>{el.addEventListener('input',mark);el.addEventListener('change',mark);});
-            form.addEventListener('submit',function(){if(!changed){return;}save.disabled=true;save.textContent='در حال ذخیره…';});
-          })();
+            function mark(){{changed=true;save.disabled=false;save.textContent='تأیید تغییرات';}}
+            form.querySelectorAll('input,textarea,select').forEach(el=>{{el.addEventListener('input',mark);el.addEventListener('change',mark);}});
+            form.addEventListener('submit',function(){{if(!changed)return;save.disabled=true;save.textContent='در حال ذخیره…';}});
+          }})();
           </script>
 
 
