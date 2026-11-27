@@ -3247,7 +3247,7 @@ def manage_room(conversation_id):
             .tg-room-settings .tg-save{{position:fixed;left:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:25;width:auto;min-width:150px;margin:0;padding:13px 20px;border:0;border-radius:24px;background:#248bd2;color:white;font-size:14px;font-weight:600;box-shadow:0 5px 18px #0006}}\n            .tg-room-settings .tg-save:disabled{{background:#253747;color:#8193a2;box-shadow:none;opacity:.75}}\n            .tg-manage-topbar{{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#172331;border-bottom:1px solid #263442}}\n            .tg-manage-topbar a{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;font-size:25px;background:#203243}}\n            .tg-manage-topbar span{{flex:1;text-align:right;color:#eef4f8;font-size:16px;font-weight:600}}
             .tg-room-settings hr{{display:none}}
           </style>
-          <header class="tg-manage-topbar"><a href="/conversation/{conversation_id{'}'}/profile" aria-label="بازگشت به اطلاعات مجموعه">➜</a><span>مدیریت {kind{'}'}</span></header>
+          <header class="tg-manage-topbar"><a href="/conversation/{conversation_id}/profile" aria-label="بازگشت به اطلاعات مجموعه">➜</a><span>مدیریت {kind}</span></header>
           <form class="tg-room-settings" method="post">
             <input type="hidden" name="action" value="save_settings">
             <div class="tg-section">
