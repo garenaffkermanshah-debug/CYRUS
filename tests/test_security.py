@@ -30,6 +30,15 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertEqual(response.json["status"], "not_ready")
         self.assertNotIn("SUPABASE_KEY", response.get_data(as_text=True))
 
+    def test_achaemenid_background_asset_is_available(self):
+        response = self.client.get("/static/cyrus-tomb.jpg")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.mimetype.startswith("image/"))
+        with open(cyrus.__file__, encoding="utf-8") as source:
+            app_source = source.read()
+        self.assertIn("/static/cyrus-tomb.jpg", app_source)
+        self.assertNotIn("cyrus-iran-panorama.jpg", app_source)
+
     def test_security_headers_are_present(self):
         response = self.client.get("/healthz")
         self.assertEqual(response.headers.get("X-Content-Type-Options"), "nosniff")
