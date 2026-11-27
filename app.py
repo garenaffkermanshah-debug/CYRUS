@@ -3532,7 +3532,11 @@ async function cyrusToggleVoiceRecord(b){
               try{{sessionStorage.setItem('cyrus-chat-scroll-distance',String(distance));}}catch(e){{}}
               try{{
                 if(cyrusNotifyEnabled&&'Notification' in window&&Notification.permission==='granted'){{
-                  const notice=new Notification('پیام تازه در CYRUS',{{body:'در این گفتگو پیام جدیدی دریافت شد.',icon:'/static/cyrus-app-icon.svg',tag:'cyrus-chat-{conversation_id}'}});
+                  const senderName=String(data.sender_name||'');
+                  const preview=String(data.content||'').trim();
+                  const messageType=String(data.message_type||'text');
+                  const body=(senderName?senderName+' · ':'')+(messageType==='text'?(preview||'پیام جدید'):({{image:'عکس جدید',video:'ویدئوی جدید',audio:'پیام صوتی جدید',file:'فایل جدید'}}[messageType]||'پیام جدید'));
+                  const notice=new Notification('پیام تازه در CYRUS',{{body:body.slice(0,180),icon:'/static/cyrus-app-icon.svg',tag:'cyrus-chat-{conversation_id}'}});
                   notice.onclick=()=>{{window.focus();notice.close();}};
                 }}
                 if(navigator.vibrate)navigator.vibrate([90,45,90]);
@@ -3588,13 +3592,28 @@ def chat_updates(conversation_id):
             if not room.ok or not room.json() or str(room.json()[0].get("created_by") or "")!=str(session.get("user_id") or ""):
                 return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
         latest=requests.get(URL+"/rest/v1/cyrus_messages",
-            params={"select":"id,created_at","conversation_id":"eq."+conversation_id,
+            params={"select":"id,created_at,sender_id,content,message_type","conversation_id":"eq."+conversation_id,
                     "order":"created_at.desc","limit":"1"},
             headers=headers,timeout=10)
         if not latest.ok:
             return app.response_class('{"error":"updates_unavailable"}',status=502,mimetype="application/json")
         row=latest.json()[0] if latest.json() else {}
-        payload=__import__("json").dumps({"latest_id":str(row.get("id") or ""),"latest_at":row.get("created_at")},ensure_ascii=False)
+        sender_name=""
+        sender_id=str(row.get("sender_id") or "")
+        if sender_id:
+            sender=requests.get(URL+"/rest/v1/cyrus_profiles",
+                params={"select":"display_name,username","id":"eq."+sender_id,"limit":"1"},
+                headers=headers,timeout=8)
+            if sender.ok and sender.json():
+                sender_row=sender.json()[0]
+                sender_name=str(sender_row.get("display_name") or sender_row.get("username") or "")
+        payload=__import__("json").dumps({
+            "latest_id":str(row.get("id") or ""),
+            "latest_at":row.get("created_at"),
+            "sender_name":sender_name[:80],
+            "content":str(row.get("content") or "")[:180],
+            "message_type":str(row.get("message_type") or "text")
+        },ensure_ascii=False)
         return app.response_class(payload,mimetype="application/json",headers={"Cache-Control":"no-store"})
     except Exception:
         return app.response_class('{"error":"server_error"}',status=502,mimetype="application/json")
