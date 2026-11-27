@@ -100,6 +100,28 @@ def cyrus_refresh_auth_session():
 
 URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 KEY = os.getenv("SUPABASE_KEY", "")
+# Server-only Supabase Auth admin key; never expose this to clients.
+ADMIN_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+
+def auth_find_user_by_email(email):
+    """Exact email lookup via the server-only Auth Admin API; returns (user, error)."""
+    if not ADMIN_KEY:
+        return None, "missing_admin_key"
+    try:
+        response = requests.get(
+            URL + "/auth/v1/admin/users",
+            params={"filter": email, "per_page": 100},
+            headers={"apikey": ADMIN_KEY, "Authorization": "Bearer " + ADMIN_KEY},
+            timeout=15
+        )
+        if response.status_code != 200:
+            return None, "admin_lookup_failed"
+        users = response.json().get("users", [])
+        match = next((u for u in users if str(u.get("email") or "").strip().lower() == email.lower()), None)
+        return match, None
+    except Exception:
+        return None, "admin_lookup_failed"
+
 
 @app.route("/healthz", methods=["GET"])
 def cyrus_liveness():
@@ -959,15 +981,21 @@ def register():
         elif not (3 <= len(username) <= 24 and all(ch.isalnum() or ch in "_-" for ch in username)):
             error = "نام کاربری باید ۳ تا ۲۴ نویسه و شامل حروف انگلیسی، عدد، خط تیره یا زیرخط باشد"
         else:
-            code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": True})
-            if code in (200, 201, 202):
-                session.clear()
-                session["cyrus_pending_email"] = email
-                session["cyrus_pending_username"] = username
-                session["cyrus_pending_flow"] = "register"
-                session["cyrus_otp_sent_at"] = time.time()
-                return redirect(url_for("verify_email"))
-            error = data.get("msg", data.get("message", "ارسال کد انجام نشد؛ تنظیمات ایمیل را بررسی کنید"))
+            existing, lookup_error = auth_find_user_by_email(email)
+            if lookup_error:
+                error = "بررسی حساب انجام نشد؛ کلید امن Supabase را در تنظیمات محیطی سرور قرار دهید."
+            elif existing and existing.get("email_confirmed_at"):
+                error = "این ایمیل قبلاً ثبت‌نام و تأیید شده است؛ از بخش ورود کد دریافت کنید."
+            else:
+                code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": True})
+                if code in (200, 201, 202):
+                    session.clear()
+                    session["cyrus_pending_email"] = email
+                    session["cyrus_pending_username"] = username
+                    session["cyrus_pending_flow"] = "register"
+                    session["cyrus_otp_sent_at"] = time.time()
+                    return redirect(url_for("verify_email"))
+                error = data.get("msg", data.get("message", "ارسال کد انجام نشد؛ تنظیمات ایمیل را بررسی کنید"))
 
     content = f"""
     <main class="container"><div class="card">
@@ -1000,18 +1028,27 @@ def verify_email():
             if wait > 0:
                 error = "برای ارسال دوباره کد، " + str(wait) + " ثانیه صبر کنید"
             else:
-                code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": flow == "register"})
-                if code in (200, 201, 202):
-                    session["cyrus_otp_sent_at"] = time.time()
-                    notice = "کد تازه ارسال شد؛ صندوق ورودی و هرزنامه را بررسی کنید."
+                existing, lookup_error = auth_find_user_by_email(email)
+                if lookup_error:
+                    error = "بررسی حساب انجام نشد؛ تنظیمات امن سرور را بررسی کنید."
+                elif flow == "login" and (not existing or not existing.get("email_confirmed_at")):
+                    error = "حساب تأییدشده‌ای با این ایمیل پیدا نشد؛ از بخش ثبت‌نام اقدام کنید."
+                elif flow == "register" and existing and existing.get("email_confirmed_at"):
+                    session.clear()
+                    error = "این ایمیل قبلاً تأیید شده است؛ برای ورود از بخش ورود کد بگیرید."
                 else:
-                    error = data.get("msg", data.get("message", "ارسال دوباره کد انجام نشد"))
+                    code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": flow == "register"})
+                    if code in (200, 201, 202):
+                        session["cyrus_otp_sent_at"] = time.time()
+                        notice = "کد تازه ارسال شد؛ صندوق ورودی و هرزنامه را بررسی کنید."
+                    else:
+                        error = data.get("msg", data.get("message", "ارسال دوباره کد انجام نشد"))
         else:
             token = str(request.form.get("token") or "").strip()
             if not re.fullmatch(r"\d{6,8}", token):
                 error = "کد ۶ تا ۸ رقمی را درست وارد کنید"
             else:
-                code, data = auth_request("/auth/v1/verify", {"type": "email", "email": email, "token": token})
+                code, data = auth_request("/auth/v1/verify", {"type": "signup" if flow == "register" else "email", "email": email, "token": token})
                 if code == 200 and data.get("access_token") and data.get("user"):
                     username = str(session.get("cyrus_pending_username") or "")
                     session.clear()
@@ -1074,15 +1111,22 @@ def login():
         if not email or len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
             error = "نشانی ایمیل معتبر وارد کنید"
         else:
-            code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": False})
-            if code in (200, 201, 202):
-                session.clear()
-                session["cyrus_pending_email"] = email
-                session["cyrus_pending_flow"] = "login"
-                session["cyrus_otp_sent_at"] = time.time()
-                return redirect(url_for("verify_email"))
-            # Keep the response generic so account existence is not disclosed.
-            error = "اگر این ایمیل حساب CYRUS داشته باشد، کد ورود ارسال می‌شود. صندوق ورودی و هرزنامه را بررسی کنید."
+            existing, lookup_error = auth_find_user_by_email(email)
+            if lookup_error:
+                error = "بررسی حساب انجام نشد؛ کلید امن Supabase را در تنظیمات محیطی سرور قرار دهید."
+            elif not existing:
+                error = "ایمیل ناموجود است؛ لطفاً از بخش ثبت‌نام حساب CYRUS بسازید."
+            elif not existing.get("email_confirmed_at"):
+                error = "ایمیل این حساب هنوز تأیید نشده؛ از بخش ثبت‌نام کد تأیید دریافت کنید."
+            else:
+                code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": False})
+                if code in (200, 201, 202):
+                    session.clear()
+                    session["cyrus_pending_email"] = email
+                    session["cyrus_pending_flow"] = "login"
+                    session["cyrus_otp_sent_at"] = time.time()
+                    return redirect(url_for("verify_email"))
+                error = "ارسال کد ورود انجام نشد؛ دوباره تلاش کنید."
 
     content = f"""
     <main class="container"><div class="card">
