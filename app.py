@@ -3129,7 +3129,8 @@ def chat(conversation_id):
       // دریافت نزدیک‌به‌زنده پیام‌های تازه؛ هنگام مخفی بودن صفحه متوقف می‌شود.
       (function(){{
         const endpoint='/chat/{conversation_id}/updates';
-        let newest=document.querySelector('.message[data-message-id]')?.dataset.messageId||'';
+        const loadedMessages=document.querySelectorAll('.message[data-message-id]');
+        let newest=loadedMessages.length?loadedMessages[loadedMessages.length-1].dataset.messageId:'';
         let delay=7000,timer=null,stopped=false;
         function schedule(){{if(stopped||document.hidden)return;clearTimeout(timer);timer=setTimeout(poll,delay);}}
         async function poll(){{
