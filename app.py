@@ -1465,63 +1465,79 @@ def conversation_profile(conversation_id):
         uuid.UUID(conversation_id)
     except ValueError:
         return "شناسه گفتگو نامعتبر است", 400
-    headers = {"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
     try:
-        response = requests.get(
-            URL + "/rest/v1/cyrus_conversations",
-            params={"select":"id,title,type,created_by,description,avatar_url","id":"eq."+conversation_id,"limit":"1"},
-            headers=headers,timeout=20
-        )
-        if not response.ok or not response.json():
+        r=requests.get(URL+"/rest/v1/cyrus_conversations",params={"select":"id,title,type,created_by,description,avatar_url,invite_code,is_public","id":"eq."+conversation_id,"limit":"1"},headers=headers,timeout=20)
+        if not r.ok or not r.json():
             return page('<main class="container"><div class="empty">پروفایل مجموعه پیدا نشد</div></main>'),404
-        room=response.json()[0]
-        members_response=requests.get(
-            URL + "/rest/v1/cyrus_members",
-            params={"select":"user_id,role","conversation_id":"eq."+conversation_id},
-            headers=headers,timeout=20
-        )
-        members=members_response.json() if members_response.ok else []
+        room=r.json()[0]
+        mr=requests.get(URL+"/rest/v1/cyrus_members",params={"select":"user_id,role","conversation_id":"eq."+conversation_id},headers=headers,timeout=20)
+        members=mr.json() if mr.ok else []
+        profiles={}
+        ids=list(dict.fromkeys(str(m.get("user_id") or "") for m in members if m.get("user_id")))
+        if ids:
+            pr=requests.get(URL+"/rest/v1/cyrus_profiles",params={"select":"id,username,display_name,bio,avatar_url","id":"in.("+",".join(ids)+")"},headers=headers,timeout=20)
+            if pr.ok: profiles={str(p.get("id")):p for p in pr.json() if isinstance(p,dict)}
     except Exception:
         return page('<main class="container"><div class="empty">ارتباط با سرور برقرار نشد</div></main>'),502
+    kind={"group":"گروه","channel":"کانال"}.get(str(room.get("type") or ""),"گفتگوی خصوصی")
     title=html.escape(str(room.get("title") or "گفتگو"))
     desc=html.escape(str(room.get("description") or ""))
     avatar=str(room.get("avatar_url") or "")
-    avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="">') if avatar else '<div class="profile-room-symbol">𓊹</div>'
-    kind={"group":"گروه","channel":"کانال"}.get(str(room.get("type") or ""),"گفتگوی خصوصی")
-    uid=str(session.get("user_id") or "")
-    owner=str(room.get("created_by") or "")==uid
-    role=next((str(m.get("role") or "") for m in members if str(m.get("user_id") or "")==uid),"")
-    manage_link=f'<a class="profile-room-action" href="/rooms/{conversation_id}/manage">مدیریت {kind}</a>' if owner or role in ("admin","owner") else ""
-    content=f"""
-    <main class="container cyrus-room-profile">
-      <style>
-        .cyrus-room-profile{{padding:0 0 24px;background:#0d1722;min-height:calc(100dvh - 76px)}}
-        .room-profile-hero{{text-align:center;padding:0 16px 20px;background:transparent;border:0;border-radius:0}}
-        .room-profile-topbar{{height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 -16px 22px;padding:0 16px;background:#172331;border-bottom:1px solid #263442;text-align:right}}
-        .room-profile-topbar a{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;font-size:25px;background:#203243}}
-        .room-profile-topbar span{{flex:1;color:#eef4f8;font-size:16px;font-weight:600}}
-        .room-profile-hero img,.profile-room-symbol{{width:104px;height:104px;border-radius:50%;object-fit:cover;margin:0 auto 13px;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:42px;color:#d8b46a}}
-        .room-profile-hero h2{{margin:5px 0;color:#eef4f8;font-size:21px;font-weight:600}}
-        .room-profile-kind{{color:#7eb8e2;font-size:13px;margin-top:6px}}
-        .room-profile-bio{{color:#c3cfda;font-size:14px;line-height:1.9;margin:14px 0;white-space:pre-wrap}}
-        .room-profile-action{{display:block;margin:0;padding:15px 16px;border-radius:0;text-align:right;background:#111e2b;color:#69b9f7;border-bottom:1px solid #263442;font-size:14px}}
-        .room-profile-actions{{margin:12px 0;background:#111e2b;border-top:1px solid #263442;border-bottom:1px solid #263442}}
-        .room-profile-actions .room-profile-action:first-child{{color:#69b9f7}}
-      </style>
-      <section class="room-profile-hero">
-        <div class="room-profile-topbar"><a href="/chat/{conversation_id}" aria-label="بازگشت به گفتگو">‹</a><span>{kind}</span>{('<a href="/rooms/'+conversation_id+'/manage" aria-label="تنظیمات">⋮</a>' if owner or role in ("admin","owner") else '<span style="width:38px"></span>')}</div>
-        {avatar_html}
-        <h2>{title}</h2>
-        <div class="room-profile-kind">{kind} · {len(members)} عضو</div>
-        <p class="room-profile-bio">{desc or "توضیحی اضافه نشده است"}</p>
-      </section>
-      <div class="room-profile-actions">
-        <a class="profile-room-action" href="/chat/{conversation_id}">بازگشت به گفتگو</a>
-        {manage_link}
-      </div>
-    </main>"""
+    avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="">') if avatar else '<div class="rp-avatar-fallback">𓊹</div>'
+    me=str(session.get("user_id") or "")
+    owner=str(room.get("created_by") or "")==me
+    myrole=next((str(m.get("role") or "") for m in members if str(m.get("user_id") or "")==me),"")
+    manager=owner or myrole in ("owner","admin")
+    gear='<a class="rp-gear" href="/rooms/'+html.escape(conversation_id,quote=True)+'/manage" aria-label="مدیریت کانال">⚙</a>' if manager else '<span class="rp-gear-space"></span>'
+    code=str(room.get("invite_code") or "")
+    invite=request.host_url.rstrip("/")+"/invite/"+code if code else ""
+    invite_html=('<a class="rp-link" href="'+html.escape(invite,quote=True)+'">'+html.escape(invite)+'</a>' if invite else '<span class="rp-link">لینک در دسترس نیست</span>')
+    rows=""
+    for m in members:
+        mid=str(m.get("user_id") or "")
+        p=profiles.get(mid,{})
+        nm=html.escape(str(p.get("display_name") or p.get("username") or "کاربر"))
+        un=html.escape(str(p.get("username") or ""))
+        role=str(m.get("role") or "member")
+        roletext={"owner":"مالک","admin":"مدیر","member":"عضو"}.get(role,role)
+        photo=str(p.get("avatar_url") or "")
+        pic='<img src="'+html.escape(photo,quote=True)+'" alt="">' if photo else '<span class="rp-member-avatar">♙</span>'
+        safe=html.escape(mid,quote=True)
+        controls=""
+        if manager and mid!=str(room.get("created_by") or ""):
+            if owner and role=="member":
+                controls+='<form method="post" action="/rooms/'+conversation_id+'/manage"><input type="hidden" name="action" value="promote"><input type="hidden" name="user_id" value="'+safe+'"><button>تعیین مدیر</button></form>'
+            if owner and role=="admin":
+                controls+='<form method="post" action="/rooms/'+conversation_id+'/manage"><input type="hidden" name="action" value="demote"><input type="hidden" name="user_id" value="'+safe+'"><button>عزل مدیر</button></form>'
+            if owner or (myrole=="admin" and role=="member"):
+                controls+='<form method="post" action="/rooms/'+conversation_id+'/manage" onsubmit="return confirm(\'عضو حذف شود؟\')"><input type="hidden" name="action" value="remove"><input type="hidden" name="user_id" value="'+safe+'"><button class="rp-danger">حذف از کانال</button></form>'
+        rows+='<details class="rp-member"><summary>'+pic+'<span class="rp-member-name"><b>'+nm+'</b><small>'+('@'+un if un else '')+'</small></span><span class="rp-role">'+html.escape(roletext)+'</span></summary><div class="rp-actions"><a href="/user/'+safe+'?from_chat=1">مشاهده پروفایل</a>'+controls+'</div></details>'
+    if not rows: rows='<p class="rp-empty">هنوز عضوی وجود ندارد</p>'
+    content="""<main class="container cyrus-room-profile">
+<style>
+.cyrus-room-profile{padding:0 0 28px;background:#0d1722;min-height:calc(100dvh - 76px);color:#eaf1f6}
+.rp-top{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#172331;border-bottom:1px solid #263442}
+.rp-back,.rp-gear{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;background:#203243;font-size:24px}
+.rp-title{flex:1;text-align:right;font-size:16px;font-weight:600}.rp-gear{color:#e5bd69;font-size:21px}.rp-gear-space{width:38px}
+.rp-hero{padding:20px 16px 18px;background:#111e2b;border-bottom:1px solid #263442}
+.rp-head{display:flex;align-items:center;gap:14px}.rp-head img,.rp-avatar-fallback{width:76px;height:76px;flex:0 0 76px;border-radius:50%;object-fit:cover;border:2px solid #2d8ecb;display:grid;place-items:center;font-size:32px;color:#d8b46a}
+.rp-main{flex:1;min-width:0;text-align:right}.rp-main h2{margin:0;text-align:right;color:#eef4f8;font-size:20px;overflow-wrap:anywhere}.rp-kind{font-size:12px;color:#8ca8be;margin-top:6px}
+.rp-link-label{font-size:12px;color:#8ca8be;margin:18px 0 5px}.rp-link{display:block;direction:ltr;text-align:left;overflow-wrap:anywhere;font-size:12px;color:#69b9f7;padding:10px 12px;background:#0a1521;border-radius:10px;border:1px solid #263b50}
+.rp-bio{color:#c3cfda;font-size:14px;line-height:1.9;margin:15px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.rp-members-title{display:flex;justify-content:space-between;padding:16px 15px 10px;font-size:14px}.rp-search{display:block;width:calc(100% - 28px);margin:0 14px 10px;padding:12px 14px;background:#091521;border:1px solid #263b50;border-radius:12px;color:#fff;font:inherit}
+.rp-member{background:#111e2b;border-bottom:1px solid #263442}.rp-member summary{display:flex;align-items:center;gap:11px;padding:12px 14px;list-style:none;cursor:pointer}.rp-member summary::-webkit-details-marker{display:none}
+.rp-member img,.rp-member-avatar{width:44px;height:44px;flex:0 0 44px;border-radius:50%;object-fit:cover;background:#203243;display:grid;place-items:center;color:#d8b46a;font-size:22px}
+.rp-member-name{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}.rp-member-name b{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rp-member-name small{font-size:11px;color:#8ea5b9;direction:ltr;text-align:right}.rp-role{font-size:11px;color:#7eb8e2;white-space:nowrap}
+.rp-actions{padding:8px 14px 13px 69px;display:flex;flex-wrap:wrap;gap:7px}.rp-actions a,.rp-actions button{display:inline-block;width:auto;margin:0;padding:8px 11px;border:1px solid #2d455b;border-radius:9px;background:#20384d;color:#8dc9f5;text-decoration:none;font-size:12px}.rp-actions form{margin:0}.rp-actions .rp-danger{color:#f1aeb4}.rp-empty{padding:20px;text-align:center;color:#8fa5b8;font-size:13px}
+</style>
+<header class="rp-top"><a class="rp-back" href="/chat/__ID__" aria-label="بازگشت">‹</a><span class="rp-title">اطلاعات __KIND__</span>__GEAR__</header>
+<section class="rp-hero"><div class="rp-head">__AVATAR__<div class="rp-main"><h2>__TITLE__</h2><div class="rp-kind">__KIND__ · __COUNT__ عضو</div></div></div><div class="rp-link-label">لینک کانال / دعوت</div>__LINK__<p class="rp-bio">__DESC__</p></section>
+<div class="rp-members-title"><span>اعضا</span><span>__COUNT__</span></div><input class="rp-search" id="rp-search" placeholder="جستجوی اعضا"><section id="rp-list">__ROWS__</section></main>
+<script>(function(){const i=document.getElementById("rp-search"),r=[...document.querySelectorAll(".rp-member")];i.addEventListener("input",()=>{const q=i.value.trim().toLocaleLowerCase();r.forEach(x=>x.style.display=x.textContent.toLocaleLowerCase().includes(q)?"":"none");});})();</script>"""
+    for k,v in {"__ID__":html.escape(conversation_id,quote=True),"__KIND__":kind,"__GEAR__":gear,"__AVATAR__":avatar_html,"__TITLE__":title,"__COUNT__":str(len(members)),"__LINK__":invite_html,"__DESC__":desc or "توضیحی اضافه نشده است","__ROWS__":rows}.items():
+        content=content.replace(k,v)
     return page(content)
-
 
 def cyrus_format_message_text(value):
     text_value = str(value or "")
@@ -1920,19 +1936,25 @@ def chat(conversation_id):
                 )
 
     send_box = (
-        f'<form class="media-upload-box" method="post" enctype="multipart/form-data" action="/chat/{conversation_id}/upload">'
-        '<label class="media-upload-label">＋ رسانه یا فایل<input type="file" name="media" accept="image/*,video/mp4,video/webm,audio/*,.pdf,.txt,.zip,.docx,.xlsx" required></label>'
-        '<button type="submit">ارسال فایل</button></form>'
+        f'<form class="media-picker-form" id="cyrusMediaUpload" method="post" enctype="multipart/form-data" action="/chat/{conversation_id}/upload">'
+        '<input type="file" id="cyrusMediaInput" name="media" accept="image/*,video/mp4,video/webm,audio/*,.pdf,.txt,.zip,.docx,.xlsx" hidden>'
+        '<button type="submit" id="cyrusMediaSubmit" hidden>ارسال</button></form>'
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
-        '<div id="cyrusReplyBar" class="cyrus-reply-composer" style="display:none">'
-        '<span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
+        '<div id="cyrusReplyBar" class="cyrus-reply-composer" style="display:none"><span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
         '<input type="hidden" name="reply_to_id" id="cyrusReplyId" value="">'
         '<button class="composer-emoji" type="button" aria-label="ایموجی" onclick="cyrusToggleEmoji(event)">☺</button>'
         '<div class="composer-emoji-panel" id="cyrusEmojiPanel" style="display:none"><emoji-picker id="cyrusFullEmojiPicker" locale="en"></emoji-picker></div>'
         '<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/index.js"></script>'
-        '<input type="hidden" name="client_nonce" value="">'
-        '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>'
+        '<div class="composer-attach-wrap"><button class="composer-attach" type="button" aria-label="پیوست" onclick="cyrusToggleAttach(event)">📎</button><div class="composer-attach-menu" id="cyrusAttachMenu" hidden>'
+        '<button type="button" onclick="cyrusPickMedia(\'photo\')"><span>▧</span> عکس و ویدئو</button>'
+        '<button type="button" onclick="cyrusPickMedia(\'music\')"><span>♫</span> موسیقی و صدا</button>'
+        '<button type="button" onclick="cyrusPickMedia(\'file\')"><span>▤</span> فایل</button></div></div>'
+        '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
+        '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
+        'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
+        'document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});'
+        'document.addEventListener("click",function(e){const m=document.getElementById("cyrusAttachMenu");if(m&&!e.target.closest(".composer-attach-wrap"))m.hidden=true;});</script>'
         if (room_type != "channel" or channel_can_post) and not room_blocked else
         (
             ('<div class="cyrus-blocked-composer"><p>این کاربر را مسدود کرده‌اید.</p><form method="post" action="/user/' + html.escape(room_other_user_id, quote=True) + '/block?from_chat=' + html.escape(conversation_id, quote=True) + '"><button type="submit">رفع مسدودیت</button></form></div>' if room_blocked_by_me else
