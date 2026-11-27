@@ -1,0 +1,65 @@
+name: CYRUS Docker image and runtime smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app.py"
+      - "requirements.txt"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/docker-smoke.yml"
+  pull_request:
+    paths:
+      - "app.py"
+      - "requirements.txt"
+      - "Dockerfile"
+      - ".dockerignore"
+      - ".github/workflows/docker-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: دریافت کد
+        uses: actions/checkout@v4
+
+      - name: آماده‌سازی Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: ساخت تصویر
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: cyrus:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: اجرای کانتینر و بررسی سلامت
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --name cyrus-smoke \
+            -p 8080:8080 \
+            -e PORT=8080 \
+            -e SUPABASE_URL=https://example.supabase.co \
+            -e SUPABASE_KEY=ci-placeholder-key \
+            -e SECRET_KEY=ci-only-not-a-production-secret \
+            -e COOKIE_SECURE=0 \
+            cyrus:ci
+          cleanup() { docker logs cyrus-smoke || true; docker rm -f cyrus-smoke >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8080/healthz > /tmp/cyrus-health.json; then
+              break
+            fi
+            sleep 2
+          done
+          grep -q '"status":"alive"' /tmp/cyrus-health.json
+          echo "CYRUS container liveness smoke test passed."
