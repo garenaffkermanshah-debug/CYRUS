@@ -108,7 +108,7 @@ CYRUS_OFFICIAL_CHANNEL_ID = "593beab2-c136-4434-84df-eb64bde32c99"
 
 
 def cyrus_verified_badge_html(size=19):
-    """Eight-point blue verification rosette with a white check."""
+    """Nine-sided blue verification badge with a white check."""
     try:
         px = max(14, min(24, int(size)))
     except (TypeError, ValueError):
@@ -116,7 +116,7 @@ def cyrus_verified_badge_html(size=19):
     return ('<svg class="cyrus-verified-badge" viewBox="0 0 24 24" width="' + str(px) + '" height="' + str(px) + '" '
             'role="img" aria-label="کانال رسمی تأییدشده" title="کانال رسمی تأییدشده" '
             'style="display:inline-block;vertical-align:-3px;flex:0 0 auto">'
-            '<path d="M12 1L18.5 3.1L22.5 8.5L22.5 15.5L18.5 20.9L12 23L5.5 20.9L1.5 15.5L1.5 8.5L5.5 3.1Z" fill="#229ED9"/>'
+            '<polygon points="12.00,1.00 19.07,3.57 22.83,10.09 21.53,17.50 15.76,22.34 8.24,22.34 2.47,17.50 1.17,10.09 4.93,3.57" fill="#229ED9"/>'
             '<path d="M7.1 12.1l3.1 3.1 6.8-6.7" fill="none" stroke="#fff" stroke-width="2.15" '
             'stroke-linecap="round" stroke-linejoin="round"/></svg>')
 
