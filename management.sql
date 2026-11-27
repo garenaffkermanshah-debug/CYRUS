@@ -237,3 +237,35 @@ WITH CHECK (
       )
   )
 );
+
+
+-- CYRUS enforce add-member and pin-message permissions server-side (2026-11-27).
+CREATE OR REPLACE FUNCTION public.cyrus_manage_add_member(p_conversation_id uuid,p_user_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_role text; v_type text; v_permissions jsonb;
+BEGIN
+  v_role:=public.cyrus_room_actor_role(p_conversation_id);
+  SELECT type,coalesce(member_permissions,'{}'::jsonb) INTO v_type,v_permissions FROM public.cyrus_conversations WHERE id=p_conversation_id;
+  IF v_type IS NULL OR v_type NOT IN ('group','channel') THEN RAISE EXCEPTION 'مجموعه پیدا نشد'; END IF;
+  IF v_role NOT IN ('owner','admin') THEN
+    IF v_type<>'group' OR NOT coalesce((v_permissions->>'add_members')::boolean,false) THEN RAISE EXCEPTION 'اجازه افزودن عضو ندارید'; END IF;
+  END IF;
+  IF p_user_id IS NULL OR p_user_id=auth.uid() THEN RAISE EXCEPTION 'کاربر نامعتبر است'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.cyrus_profiles WHERE id=p_user_id) THEN RAISE EXCEPTION 'کاربر پیدا نشد'; END IF;
+  INSERT INTO public.cyrus_members(conversation_id,user_id,role) VALUES(p_conversation_id,p_user_id,'member') ON CONFLICT DO NOTHING;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.cyrus_pin_message(p_conversation_id uuid,p_message_id uuid,p_pin boolean)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_role text; v_type text; v_permissions jsonb;
+BEGIN
+  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'ورود لازم است'; END IF;
+  v_role:=public.cyrus_room_actor_role(p_conversation_id);
+  SELECT type,coalesce(member_permissions,'{}'::jsonb) INTO v_type,v_permissions FROM public.cyrus_conversations WHERE id=p_conversation_id;
+  IF v_type IS NULL THEN RAISE EXCEPTION 'گفتگو پیدا نشد'; END IF;
+  IF v_type='channel' AND v_role NOT IN ('owner','admin') THEN RAISE EXCEPTION 'فقط مالک یا مدیر کانال می‌تواند پیام سنجاق کند'; END IF;
+  IF v_type='group' AND v_role NOT IN ('owner','admin') AND NOT coalesce((v_permissions->>'pin_messages')::boolean,false) THEN RAISE EXCEPTION 'اجازه سنجاق پیام ندارید'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.cyrus_messages WHERE id=p_message_id AND conversation_id=p_conversation_id) THEN RAISE EXCEPTION 'پیام پیدا نشد'; END IF;
+  UPDATE public.cyrus_messages SET metadata=coalesce(metadata,'{}'::jsonb)-'pinned' WHERE conversation_id=p_conversation_id AND coalesce(metadata->>'pinned','false')='true';
+  IF p_pin THEN UPDATE public.cyrus_messages SET metadata=jsonb_set(coalesce(metadata,'{}'::jsonb),'{pinned}','true'::jsonb,true) WHERE id=p_message_id AND conversation_id=p_conversation_id; END IF;
+END; $$;
