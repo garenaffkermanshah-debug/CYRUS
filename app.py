@@ -1017,6 +1017,7 @@ def home():
       <p class="error">{html.escape(error)}</p>
     </div>
     """
+    content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
     return page(content)
 
 
@@ -2112,6 +2113,25 @@ def export_account_data():
 def privacy_security():
     if not session.get("access_token"):
         return redirect("/login")
+    security, security_error = cyrus_get_account_security(session.get("user_id"))
+    if security_error:
+        return page('<main class="container card"><p>وضعیت امنیتی حساب دریافت نشد؛ دوباره تلاش کنید.</p><a href="/settings">بازگشت</a></main>'), 502
+    two_factor_enabled = bool(security and security.get("two_factor_enabled"))
+    two_factor_row = (
+        '<form class="cps-row" method="post" action="/privacy-security/2fa">'
+        '<input type="hidden" name="action" value="disable"><span class="cps-icon">✓</span>'
+        '<span class="cps-main"><span class="cps-name">تأیید دومرحله‌ای</span><span class="cps-value">فعال است · برای خاموش‌کردن گذرواژه را وارد کن</span></span>'
+        '<input name="current_password" type="password" minlength="10" maxlength="128" placeholder="گذرواژه فعلی" required style="width:115px;margin:0;padding:8px;font-size:11px">'
+        '<button type="submit" style="width:auto;margin:0;padding:8px 10px">خاموش</button></form>'
+        if two_factor_enabled else
+        '<form class="cps-row" method="post" action="/privacy-security/2fa" style="display:block">'
+        '<input type="hidden" name="action" value="enable"><div style="display:flex;align-items:center;gap:11px">'
+        '<span class="cps-icon">✓</span><span class="cps-main"><span class="cps-name">تأیید دومرحله‌ای</span>'
+        '<span class="cps-value">خاموش است · ابتدا گذرواژه و سپس کد ایمیل لازم خواهد بود</span></span></div>'
+        '<input name="new_password" type="password" minlength="10" maxlength="128" placeholder="گذرواژه دومرحله‌ای جدید" autocomplete="new-password" required>'
+        '<input name="confirm_password" type="password" minlength="10" maxlength="128" placeholder="تکرار گذرواژه" autocomplete="new-password" required>'
+        '<button type="submit" style="width:100%;margin:7px 0 0;padding:10px">فعال‌سازی و تأیید ایمیل</button></form>'
+    )
     content = """
     <main class="cyrus-privacy-page">
       <style>
@@ -2163,7 +2183,7 @@ def privacy_security():
       <section class="cps-section">
         <h2 class="cps-title">امنیت</h2>
         <label class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">قفل با رمز عبور هنوز در دسترس نیست</span></span><input class="cps-switch" type="checkbox" disabled aria-label="قفل برنامه"></label>
-        <label class="cps-row"><span class="cps-icon">✓</span><span class="cps-main"><span class="cps-name">تأیید دومرحله‌ای</span><span class="cps-value">برای حساب CYRUS هنوز راه‌اندازی نشده</span></span><input class="cps-switch" type="checkbox" disabled aria-label="تأیید دومرحله‌ای"></label>
+        __CYRUS_2FA_ROW__
         <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">مدیریت نشست‌ها در نسخه فعلی موجود نیست</span></span><span class="cps-chevron">›</span></div>
       </section>
       <a class="cps-blocked" href="/blocked-users"><span>⊘</span><span class="cps-main"><span class="cps-name">کاربران مسدودشده</span><small>مشاهده و رفع مسدودیت کاربران</small></span><span class="cps-chevron">›</span></a>
@@ -2200,6 +2220,75 @@ def privacy_security():
       </script>
     </main>
     """
+    return page(content)
+
+
+@app.route("/privacy-security/2fa", methods=["POST"])
+def manage_account_two_factor():
+    if not session.get("access_token"):
+        return redirect("/login")
+    uid=str(session.get("user_id") or "")
+    action=str(request.form.get("action") or "")
+    record, lookup_error=cyrus_get_account_security(uid)
+    if lookup_error:
+        return page('<main class="container card"><p>بررسی امنیت حساب انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
+    if action=="enable":
+        password=str(request.form.get("new_password") or "")
+        confirm=str(request.form.get("confirm_password") or "")
+        if len(password)<10 or len(password)>128 or password!=confirm:
+            return page('<main class="container card"><p>گذرواژه باید حداقل ۱۰ نویسه باشد و هر دو ورودی یکسان باشند.</p><a href="/privacy-security">بازگشت</a></main>'),400
+        email=str(session.get("cyrus_login_email") or "")
+        if not email:
+            return page('<main class="container card"><p>ایمیل حساب در نشست پیدا نشد؛ دوباره وارد شوید.</p><a href="/login">ورود</a></main>'),400
+        code,data=auth_request("/auth/v1/otp",{"email":email,"create_user":False})
+        if code not in (200,201,202):
+            return page('<main class="container card"><p>ارسال کد تأیید فعال‌سازی انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
+        session["cyrus_2fa_setup_hash"]=generate_password_hash(password,method="scrypt")
+        session["cyrus_2fa_setup_email"]=email
+        session["cyrus_2fa_setup_started"]=time.time()
+        return redirect("/privacy-security/2fa/verify")
+    if action=="disable":
+        password=str(request.form.get("current_password") or "")
+        if not record or not record.get("two_factor_enabled") or not record.get("password_hash") or not check_password_hash(str(record["password_hash"]),password):
+            return page('<main class="container card"><p>گذرواژه دومرحله‌ای نادرست است؛ تأیید دومرحله‌ای همچنان فعال ماند.</p><a href="/privacy-security">بازگشت</a></main>'),400
+        if not cyrus_save_account_security(uid,{"two_factor_enabled":False,"password_hash":None,"failed_attempts":0,"locked_until":None}):
+            return page('<main class="container card"><p>خاموش‌کردن تأیید دومرحله‌ای انجام نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
+        return redirect("/privacy-security")
+    return "درخواست نامعتبر است",400
+
+
+@app.route("/privacy-security/2fa/verify", methods=["GET","POST"])
+def verify_two_factor_setup():
+    if not session.get("access_token"):
+        return redirect("/login")
+    email=str(session.get("cyrus_2fa_setup_email") or "")
+    password_hash=str(session.get("cyrus_2fa_setup_hash") or "")
+    started=float(session.get("cyrus_2fa_setup_started",0) or 0)
+    if not email or not password_hash or time.time()-started>600:
+        for k in ("cyrus_2fa_setup_email","cyrus_2fa_setup_hash","cyrus_2fa_setup_started"): session.pop(k,None)
+        return redirect("/privacy-security")
+    error=""
+    if request.method=="POST":
+        token=str(request.form.get("token") or "").strip()
+        if not re.fullmatch(r"\d{6,8}",token):
+            error="کد ۶ تا ۸ رقمی را وارد کنید."
+        else:
+            code,data=auth_request("/auth/v1/verify",{"type":"email","email":email,"token":token})
+            verified_user=data.get("user") if isinstance(data,dict) else None
+            if code==200 and verified_user and str(verified_user.get("id"))==str(session.get("user_id")):
+                saved=cyrus_save_account_security(session.get("user_id"),{"two_factor_enabled":True,"password_hash":password_hash,"failed_attempts":0,"locked_until":None})
+                if saved:
+                    for k in ("cyrus_2fa_setup_email","cyrus_2fa_setup_hash","cyrus_2fa_setup_started"): session.pop(k,None)
+                    return redirect("/privacy-security")
+                error="ذخیره تنظیمات امنیتی انجام نشد؛ دوباره تلاش کنید."
+            else:
+                error="کد تأیید نادرست یا منقضی شده است."
+    content=f"""
+    <main class="container"><div class="card"><h2>تأیید فعال‌سازی دومرحله‌ای</h2>
+    <p class="muted">کد تأیید به ایمیل حساب ارسال شده است: <span dir="ltr">{html.escape(email)}</span></p>
+    <p class="error">{html.escape(error)}</p>
+    <form method="post"><input name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="کد ایمیل" autocomplete="one-time-code" required><button>تأیید و فعال‌سازی</button></form>
+    </div></main>"""
     return page(content)
 
 
