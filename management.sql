@@ -506,3 +506,75 @@ REVOKE ALL ON FUNCTION public.cyrus_manage_update_room_settings(uuid,text,text,t
 GRANT EXECUTE ON FUNCTION public.cyrus_manage_update_room_settings(uuid,text,text,text,boolean,boolean,boolean,boolean,integer,boolean,boolean,jsonb) TO authenticated;
 REVOKE ALL ON FUNCTION public.cyrus_room_actor_role(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.cyrus_room_actor_role(uuid) TO authenticated;
+
+
+-- CYRUS optional account second factor (server-only; no client policies).
+CREATE TABLE IF NOT EXISTS public.cyrus_account_security (
+    user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    two_factor_enabled boolean NOT NULL DEFAULT false,
+    password_hash text,
+    failed_attempts integer NOT NULL DEFAULT 0,
+    locked_until timestamptz,
+    pending_password_hash text,
+    pending_expires_at timestamptz,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT cyrus_account_security_hash_check
+      CHECK (two_factor_enabled = false OR (password_hash IS NOT NULL AND length(password_hash) > 20))
+);
+ALTER TABLE public.cyrus_account_security
+    ADD COLUMN IF NOT EXISTS pending_password_hash text,
+    ADD COLUMN IF NOT EXISTS pending_expires_at timestamptz;
+ALTER TABLE public.cyrus_account_security ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.cyrus_account_security FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cyrus_account_security TO service_role;
+
+-- Publicly readable group/channel images; uploads are restricted to owners/admins by object RLS.
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('cyrus-room-avatars','cyrus-room-avatars',true,5242880,ARRAY['image/jpeg','image/png','image/webp'])
+ON CONFLICT (id) DO UPDATE SET
+    public=true,
+    file_size_limit=5242880,
+    allowed_mime_types=ARRAY['image/jpeg','image/png','image/webp'];
+
+DROP POLICY IF EXISTS "CYRUS room avatar upload by managers" ON storage.objects;
+CREATE POLICY "CYRUS room avatar upload by managers"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+    bucket_id = 'cyrus-room-avatars'
+    AND (storage.foldername(name))[1] ~* '^[0-9a-f-]{36}$'
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+    AND EXISTS (
+        SELECT 1 FROM public.cyrus_conversations c
+        WHERE c.id::text = (storage.foldername(name))[1]
+          AND (
+              c.created_by = (SELECT auth.uid())
+              OR EXISTS (
+                  SELECT 1 FROM public.cyrus_members m
+                  WHERE m.conversation_id = c.id
+                    AND m.user_id = (SELECT auth.uid())
+                    AND m.role IN ('owner','admin')
+              )
+          )
+    )
+);
+
+DROP POLICY IF EXISTS "CYRUS room avatar delete by managers" ON storage.objects;
+CREATE POLICY "CYRUS room avatar delete by managers"
+ON storage.objects FOR DELETE TO authenticated
+USING (
+    bucket_id = 'cyrus-room-avatars'
+    AND (storage.foldername(name))[2] = (SELECT auth.uid())::text
+    AND EXISTS (
+        SELECT 1 FROM public.cyrus_conversations c
+        WHERE c.id::text = (storage.foldername(name))[1]
+          AND (
+              c.created_by = (SELECT auth.uid())
+              OR EXISTS (
+                  SELECT 1 FROM public.cyrus_members m
+                  WHERE m.conversation_id = c.id
+                    AND m.user_id = (SELECT auth.uid())
+                    AND m.role IN ('owner','admin')
+              )
+          )
+    )
+);
