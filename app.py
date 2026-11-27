@@ -1229,6 +1229,7 @@ def public_user_profile(user_id):
         .user-profile-photo img{{width:100%;height:100%;object-fit:cover}}
         .profile-user-symbol{{font-size:28px;color:#d8b46a}}
         .profile-more{{position:absolute;left:12px;top:12px;z-index:15}}
+        .profile-back{{position:absolute;left:52px;top:12px;z-index:15;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:23px;text-decoration:none;background:#172838}}
         .profile-more summary{{list-style:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:25px;cursor:pointer}}
         .profile-more summary::-webkit-details-marker{{display:none}}
         .profile-more-menu{{position:absolute;left:0;top:39px;width:205px;padding:5px;background:#223344;border:1px solid #3a5267;border-radius:12px;box-shadow:0 8px 28px #0008;z-index:20}}
@@ -1249,6 +1250,7 @@ def public_user_profile(user_id):
         .profile-contact-edit button{{margin-top:10px;width:100%;padding:12px;background:#248bd0;color:white;border:0;border-radius:9px}}
       </style>
       <section class="user-profile-card">
+        <a class="profile-back" href="/home" aria-label="بازگشت به بارگاه" title="بازگشت">➜</a>
         <div class="user-profile-top">
           <div class="user-profile-photo">{avatar_html}</div>
           <details class="profile-more">
@@ -1766,6 +1768,7 @@ def chat(conversation_id):
     room_avatar_source = str(room_data.get("avatar_url") or "")
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
     room_last_seen = "آخرین بازدید نامشخص"
+    room_blocked = False
     room_profile_href = "/conversation/" + conversation_id + "/profile"
     if room_type == "private":
         try:
@@ -1784,7 +1787,7 @@ def chat(conversation_id):
             if other_id:
                 person_response = requests.get(
                     URL + "/rest/v1/cyrus_profiles",
-                    params={"select":"display_name,username,avatar_url","id":"eq."+other_id,"limit":"1"},
+                    params={"select":"display_name,username,avatar_url,last_seen_at","id":"eq."+other_id,"limit":"1"},
                     headers=headers, timeout=15
                 )
                 if person_response.ok and person_response.json():
@@ -1801,19 +1804,42 @@ def chat(conversation_id):
                             room_title_text = str(saved_contact_response.json()[0].get("contact_name") or room_title_text)
                     except Exception:
                         pass
-                    seen_raw = ""
+                    seen_raw = str(person.get("last_seen_at") or "").strip()
                     if seen_raw:
                         try:
-                            seen_dt = datetime.fromisoformat(seen_raw.replace("Z", "+00:00")).astimezone()
-                            now_dt = datetime.now().astimezone()
-                            if (now_dt - seen_dt).total_seconds() <= 300:
+                            seen_dt = datetime.fromisoformat(seen_raw.replace("Z", "+00:00"))
+                            if seen_dt.tzinfo is None:
+                                seen_dt = seen_dt.replace(tzinfo=timezone.utc)
+                            seen_local = seen_dt.astimezone()
+                            now_dt = datetime.now(timezone.utc)
+                            age_seconds = max(0, (now_dt - seen_dt.astimezone(timezone.utc)).total_seconds())
+                            if age_seconds <= 300:
                                 room_last_seen = "آنلاین"
-                            elif seen_dt.date() == now_dt.date():
-                                room_last_seen = "آخرین بازدید امروز " + seen_dt.strftime("%H:%M")
+                            elif age_seconds < 7 * 86400:
+                                room_last_seen = "آخرین بازدید " + seen_local.strftime("%Y/%m/%d · %H:%M")
+                            elif age_seconds < 30 * 86400:
+                                room_last_seen = "آخرین بازدید یک هفته پیش"
                             else:
-                                room_last_seen = "آخرین بازدید " + seen_dt.strftime("%Y-%m-%d %H:%M")
-                        except Exception:
+                                room_last_seen = "مدتی پیش"
+                        except (TypeError, ValueError, OverflowError):
                             room_last_seen = "آخرین بازدید نامشخص"
+                    # Show the blocked state in the conversation and prevent composing.
+                    try:
+                        own_block = requests.get(
+                            URL + "/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+str(current_user),"blocked_id":"eq."+other_id,"limit":"1"},
+                            headers=headers, timeout=12
+                        )
+                        other_block = requests.get(
+                            URL + "/rest/v1/cyrus_user_blocks",
+                            params={"select":"blocker_id","blocker_id":"eq."+other_id,"blocked_id":"eq."+str(current_user),"limit":"1"},
+                            headers=headers, timeout=12
+                        )
+                        room_blocked = bool((own_block.ok and own_block.json()) or (other_block.ok and other_block.json()))
+                        if room_blocked:
+                            room_last_seen = "این گفتگو مسدود است"
+                    except Exception:
+                        room_blocked = False
                     room_profile_href = "/user/" + other_id + "?from_chat=1"
         except Exception:
             pass
@@ -1868,8 +1894,9 @@ def chat(conversation_id):
         '<input type="hidden" name="client_nonce" value="">'
         '<input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" required>'
         '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
-        if room_type != "channel" or channel_can_post else
-        '<div class="card"><p>این کانال عمومی است؛ اعضا فقط می‌توانند پست‌ها را مشاهده کنند.</p></div>'
+        if (room_type != "channel" or channel_can_post) and not room_blocked else
+        ('<div class="card"><p>این گفتگو مسدود است؛ برای ادامه ابتدا از پروفایل کاربر رفع مسدودیت کنید.</p></div>' if room_blocked else
+        '<div class="card"><p>این کانال عمومی است؛ اعضا فقط می‌توانند پست‌ها را مشاهده کنند.</p></div>')
     )
 
     room_manage_link = (
@@ -3424,6 +3451,102 @@ def profile():
     return page(content)
 
 
+@app.route("/saved-messages", methods=["GET"])
+def saved_messages():
+    if not session.get("access_token"):
+        return redirect("/login")
+    own_id = str(session.get("user_id") or "")
+    headers = {"apikey":KEY, "Authorization":"Bearer "+session["access_token"]}
+    error = ""
+    rows = ""
+    try:
+        result = requests.get(
+            URL + "/rest/v1/cyrus_saved_messages",
+            params={"select":"id,content,created_at","user_id":"eq."+own_id,"order":"created_at.desc","limit":"300"},
+            headers=headers, timeout=20
+        )
+        if not result.ok:
+            error = "پیام‌های ذخیره‌شده بارگذاری نشد"
+        else:
+            for item in result.json():
+                sid = html.escape(str(item.get("id") or ""), quote=True)
+                text_value = html.escape(str(item.get("content") or ""))
+                created = str(item.get("created_at") or "")
+                try:
+                    stamp = datetime.fromisoformat(created.replace("Z","+00:00")).astimezone().strftime("%Y/%m/%d · %H:%M")
+                except Exception:
+                    stamp = ""
+                rows += f'<article class="saved-message-item"><div class="saved-message-text">{text_value}</div><small>{html.escape(stamp)}</small><form method="post" action="/saved-messages/{sid}/delete" onsubmit="return confirm(\'این پیام حذف شود؟\')"><button type="submit">حذف</button></form></article>'
+    except Exception:
+        error = "ارتباط با سرور برقرار نشد"
+    content = f"""
+    <main class="container card cyrus-saved-messages">
+      <style>
+        .cyrus-saved-messages{{max-width:620px;margin:12px auto;padding:16px 14px 90px;background:#0d1a28;border:1px solid #263b50;border-radius:16px;color:#edf2f7}}
+        .saved-messages-header{{display:flex;align-items:center;gap:12px;margin-bottom:16px}}
+        .saved-messages-back{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;background:#172b3d;color:#e8eef5;text-decoration:none;font-size:22px}}
+        .saved-messages-header h2{{font-size:18px;font-weight:500;margin:0}}
+        .saved-messages-form{{display:grid;gap:10px;margin-bottom:16px}}
+        .saved-messages-form textarea{{width:100%;box-sizing:border-box;min-height:110px;padding:13px;border-radius:12px;background:#07121e;color:#fff;border:1px solid #30485e;font:inherit;resize:vertical}}
+        .saved-messages-form button{{padding:12px;border:0;border-radius:12px;background:#248bd0;color:#fff;font:inherit}}
+        .saved-message-item{{position:relative;background:#142536;border:1px solid #263b50;border-radius:12px;padding:13px;margin:9px 0;overflow-wrap:anywhere}}
+        .saved-message-text{{white-space:pre-wrap;line-height:1.8;font-size:14px}}
+        .saved-message-item small{{display:block;color:#8ea5b9;font-size:10px;margin-top:9px}}
+        .saved-message-item form{{text-align:left;margin-top:8px}}
+        .saved-message-item button{{background:transparent;color:#e6a5a5;border:1px solid #5a3c45;border-radius:8px;padding:5px 12px}}
+        .saved-messages-error{{color:#f1aeb4;text-align:center}}
+      </style>
+      <header class="saved-messages-header"><a class="saved-messages-back" href="/settings" aria-label="بازگشت">➜</a><h2>پیام‌های ذخیره‌شده</h2></header>
+      <form class="saved-messages-form" method="post" action="/saved-messages/add">
+        <textarea name="content" maxlength="10000" placeholder="یادداشت، متن یا لینک مهم را برای خودت ذخیره کن..." required></textarea>
+        <button type="submit">ذخیره پیام</button>
+      </form>
+      <p class="saved-messages-error">{html.escape(error)}</p>
+      {rows or '<p style="text-align:center;color:#8ea5b9">هنوز پیامی ذخیره نکرده‌ای.</p>'}
+    </main>
+    """
+    return page(content)
+
+
+@app.route("/saved-messages/add", methods=["POST"])
+def add_saved_message():
+    if not session.get("access_token"):
+        return redirect("/login")
+    content = str(request.form.get("content") or "").strip()
+    if not content or len(content) > 10000:
+        return redirect("/saved-messages")
+    response = requests.post(
+        URL + "/rest/v1/cyrus_saved_messages",
+        json={"user_id":str(session.get("user_id") or ""),"content":content},
+        headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+                 "Content-Type":"application/json","Prefer":"return=minimal"},
+        timeout=20
+    )
+    if not response.ok:
+        return page('<div class="container card"><p>ذخیره پیام انجام نشد؛ دوباره تلاش کنید.</p><a href="/saved-messages">بازگشت</a></div>'),400
+    return redirect("/saved-messages")
+
+
+@app.route("/saved-messages/<message_id>/delete", methods=["POST"])
+def delete_saved_message(message_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(message_id)
+    except ValueError:
+        return "شناسه پیام نامعتبر است",400
+    response = requests.delete(
+        URL + "/rest/v1/cyrus_saved_messages",
+        params={"id":"eq."+message_id,"user_id":"eq."+str(session.get("user_id") or "")},
+        headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],
+                "Prefer":"return=minimal"},
+        timeout=20
+    )
+    if not response.ok:
+        return page('<div class="container card"><p>حذف پیام انجام نشد</p><a href="/saved-messages">بازگشت</a></div>'),400
+    return redirect("/saved-messages")
+
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     if not session.get("access_token"):
@@ -3546,6 +3669,7 @@ def settings():
         <section class="setting-buttons">
           <form class="s-button setting-avatar-form" method="post" action="/profile/avatar" enctype="multipart/form-data"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg></span><label class="button-title" for="setting-avatar-file">تغییر تصویر پروفایل</label><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required><button type="submit" class="avatar-submit">بارگذاری</button></form>
           {avatar_notice}
+          <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
           <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
           <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
           <a class="s-button" href="/logout"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg></span><span class="button-title">خروج از حساب</span><span>‹</span></a>
