@@ -5,6 +5,7 @@ __pycache__/
 app.py.before_*
 *.db
 .env.*
+!.env.example
 *.bak
 *.before_*
 app.py.bak*
