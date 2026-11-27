@@ -107,6 +107,20 @@ ADMIN_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 CYRUS_OFFICIAL_CHANNEL_ID = "593beab2-c136-4434-84df-eb64bde32c99"
 
 
+def cyrus_verified_badge_html(size=19):
+    """Telegram-like blue verification circle with a crisp white check."""
+    try:
+        px = max(14, min(24, int(size)))
+    except (TypeError, ValueError):
+        px = 19
+    return ('<svg class="cyrus-verified-badge" viewBox="0 0 24 24" width="' + str(px) + '" height="' + str(px) + '" '
+            'role="img" aria-label="کانال رسمی تأییدشده" title="کانال رسمی تأییدشده" '
+            'style="display:inline-block;vertical-align:-3px;flex:0 0 auto">'
+            '<circle cx="12" cy="12" r="11" fill="#229ED9"/>'
+            '<path d="M6.8 12.2l3.3 3.2 7.2-7.1" fill="none" stroke="#fff" stroke-width="2.25" '
+            'stroke-linecap="round" stroke-linejoin="round"/></svg>')
+
+
 def cyrus_official_channel_id():
     """Resolve the official channel, falling back to its verified fixed ID."""
     if ADMIN_KEY and URL:
@@ -910,7 +924,7 @@ def home():
             except Exception:
                 pass
 
-        official_badge = '<span class="cyrus-verified-badge" title="کانال رسمی تأییدشده" aria-label="تأییدشده">✓</span>' if room_id == official_channel_id else ""
+        official_badge = cyrus_verified_badge_html(18) if room_id == official_channel_id else ""
         room_title_html = html.escape(str(room_title)) + official_badge
         rows += f"""
         <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-unread="{unread}" data-title="{html.escape(str(room_title), quote=True)}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
@@ -3199,7 +3213,7 @@ def chat(conversation_id):
       <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
-        <h2>{room_title}{'<span class="cyrus-verified-badge" title="کانال رسمی تأییدشده" aria-label="تأییدشده">✓</span>' if is_official_channel else ''}</h2>
+        <h2>{room_title}{cyrus_verified_badge_html(18) if is_official_channel else ''}</h2>
         <span class="room-type">{room_last_seen if room_type == 'private' else room_subtitle}</span>
       </a>
       {room_more_html}
