@@ -1295,7 +1295,7 @@ def public_user_profile(user_id):
         .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:12px}}
         .profile-media-tabs button{{flex:1;margin:0;padding:12px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:11px}}
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
-        .profile-media-content{{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
+        .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
         .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
         .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
@@ -1318,19 +1318,21 @@ def public_user_profile(user_id):
           </details>
         </div>
         <h2 class="user-profile-name">{html.escape(display_name)}</h2>
-        <div class="user-profile-username">@{html.escape(username)}</div>
+        <div class="user-profile-username" role="button" tabindex="0" title="برای کپی نام کاربری لمس کنید" data-username="{html.escape(username, quote=True)}" onclick="cyrusCopyUsername(this)">@{html.escape(username)}</div>
         <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
       </section>
       {send_link}
-      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
+      {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><small class="profile-history-count" id="profileHistoryCount" aria-live="polite"></small><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
       {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
     </main>
     <script>
+    function cyrusCopyUsername(el){{const u="@"+(el.dataset.username||"");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>{{el.title="نام کاربری کپی شد";}}).catch(()=>prompt("نام کاربری",u));else prompt("نام کاربری",u);}}
+    document.querySelector('.user-profile-username')?.addEventListener('keydown',function(e){{if(e.key==='Enter'||e.key===' '){{e.preventDefault();cyrusCopyUsername(this);}}}});
     document.addEventListener('click',function(e){{if(!e.target.closest('.profile-more'))document.querySelectorAll('.profile-more[open]').forEach(x=>x.open=false);}});
     (function(){{
       const root=document.querySelector('.cyrus-user-profile'),box=document.getElementById('profile-media-content'),buttons=[...document.querySelectorAll('.profile-media-tabs button')];
       if(!root||!box||!buttons.length)return;
-      let loaded=false,items=[];
+      let loaded=false,items=[];const countLabel=document.getElementById("profileHistoryCount");
       function make(tag,cls){{const el=document.createElement(tag);if(cls)el.className=cls;return el;}}
       function linkCard(url,label){{const a=make('a','profile-history-file');a.href=url;a.target='_blank';a.rel='noopener';a.textContent=label;return a;}}
       function render(key){{
@@ -1340,13 +1342,14 @@ def public_user_profile(user_id):
         if(key==='music')selected.push(...items.filter(x=>x.url&&/^(audio|music|voice)$/i.test(x.type)));
         if(key==='files')selected.push(...items.filter(x=>x.url&&!/^(photo|image|video|audio|music|voice)$/i.test(x.type)));
         if(key==='links')items.forEach(x=>{{(x.content.match(/https?:\/\/[^\s<>]+|www\.[^\s<>]+/gi)||[]).forEach(u=>selected.push({{type:'link',url:u,content:u}}));}});
+        const seen=new Set();const unique=selected.filter(x=>{{const key=String(x.url||x.content||"");if(seen.has(key))return false;seen.add(key);return true;}});selected.splice(0,selected.length,...unique);if(countLabel)countLabel.textContent=selected.length+" مورد";
         selected.forEach(x=>{{
           let node;
           const url=String(x.url||'');
           const typ=String(x.type||'').toLowerCase();
           if(key==='links'){{let u=String(x.url||'');if(!/^https?:\/\//i.test(u))u='https://'+u;node=linkCard(u,x.content||u);}}
-          else if(/^(photo|image)$/i.test(typ)){{node=make('a','profile-history-card');node.href=url;node.target='_blank';node.rel='noopener';const img=make('img');img.src=url;img.alt='تصویر گفتگو';node.appendChild(img);}}
-          else if(typ==='video'){{node=make('video','profile-history-video');node.src=url;node.controls=true;node.preload='metadata';}}
+          else if(/^(photo|image)$/i.test(typ)){{node=make('a','profile-history-card');node.href=url;node.target='_blank';node.rel='noopener';const img=make('img');img.src=url;img.alt='تصویر گفتگو';img.loading='lazy';node.appendChild(img);}}
+          else if(typ==='video'){{node=make('video','profile-history-video');node.src=url;node.controls=true;node.preload='metadata';node.playsInline=true;}}
           else if(/^(audio|music|voice)$/i.test(typ)){{node=make('audio','profile-history-audio');node.src=url;node.controls=true;node.preload='metadata';}}
           else node=linkCard(url,x.content||'فایل ارسال‌شده');
           box.appendChild(node);
@@ -1354,10 +1357,10 @@ def public_user_profile(user_id):
         if(!selected.length){{const empty=make('p','profile-history-empty');empty.textContent='در این بخش موردی پیدا نشد';box.appendChild(empty);}}
       }}
       async function load(key){{
-        if(!loaded){{box.textContent='در حال دریافت تاریخچه…';try{{const r=await fetch('/user/'+encodeURIComponent(root.dataset.profileUser)+'/shared-media',{{credentials:'same-origin'}});if(!r.ok)throw new Error('load');const d=await r.json();items=Array.isArray(d.items)?d.items:[];loaded=true;}}catch(e){{box.textContent='تاریخچهٔ رسانه در دسترس نیست';return;}}}}
+        if(!loaded){{box.textContent='در حال دریافت تاریخچه…';try{{const r=await fetch('/user/'+encodeURIComponent(root.dataset.profileUser)+'/shared-media',{{credentials:'same-origin'}});if(!r.ok)throw new Error('load');const d=await r.json();items=Array.isArray(d.items)?d.items:[];loaded=true;}}catch(e){{box.replaceChildren();const err=make('p','profile-history-empty');err.textContent='تاریخچهٔ رسانه در دسترس نیست';const retry=make('button');retry.type='button';retry.textContent='تلاش دوباره';retry.onclick=()=>{{loaded=false;load(key);}};box.append(err,retry);return;}}}}
         render(key);
       }}
-      buttons.forEach(b=>b.addEventListener('click',()=>{{buttons.forEach(x=>x.classList.toggle('active',x===b));load(b.dataset.tab||'media');}}));
+      buttons.forEach(b=>{{b.setAttribute('aria-selected',b.classList.contains('active')?'true':'false');b.addEventListener('click',()=>{{buttons.forEach(x=>{{x.classList.toggle('active',x===b);x.setAttribute('aria-selected',x===b?'true':'false');}});load(b.dataset.tab||'media');}});}});
       load('media');
     }})();
     </script>"""
@@ -1758,6 +1761,29 @@ def chat(conversation_id):
             return page('<div class="container card"><p>دریافت پیام‌ها ناموفق بود</p></div>'), 502
 
         messages = response.json()
+        # Deep links can target messages older than the normal 200-message window.
+        # Fetch only the requested message through the same authenticated/RLS client.
+        requested_message_id = request.args.get("message", "").strip()
+        if requested_message_id:
+            try:
+                uuid.UUID(requested_message_id)
+                if not any(str(item.get("id") or "") == requested_message_id for item in messages):
+                    target_response = requests.get(
+                        URL + "/rest/v1/cyrus_messages",
+                        params={
+                            "select": "id,sender_id,content,message_type,attachment_url,created_at,edited_at,metadata",
+                            "id": "eq." + requested_message_id,
+                            "conversation_id": "eq." + conversation_id,
+                            "limit": "1"
+                        },
+                        headers=headers,
+                        timeout=15
+                    )
+                    if target_response.ok and target_response.json():
+                        messages.append(target_response.json()[0])
+                        messages.sort(key=lambda item: str(item.get("created_at") or ""))
+            except ValueError:
+                pass
         if not room_data_for_history.get("history_visible", True) and joined_at_for_history:
             try:
                 joined_dt_for_history = datetime.fromisoformat(str(joined_at_for_history).replace("Z", "+00:00"))
@@ -1893,7 +1919,9 @@ def chat(conversation_id):
 
         meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
         reply_source = html.escape(str(meta.get("reply_to_content") or ""))
-        reply_preview = f'<div class="reply-preview">↪ پاسخ به: {reply_source}</div>' if reply_source else ""
+        reply_target_id = html.escape(str(meta.get("reply_to_id") or ""), quote=True)
+        reply_preview = (f'<button type="button" class="reply-preview" data-reply-target="{reply_target_id}" onclick="cyrusJumpToMessage(event,this)">↪ پاسخ به: {reply_source}</button>' if reply_source else "")
+        message_created_iso = html.escape(str(msg.get("created_at") or ""), quote=True)
         forwarded_label = '<small class="forwarded-label">↗ پیام انتقال‌یافته</small>' if meta.get("forwarded_from_message_id") else ""
         pinned_label = '<small class="pinned-label">📌 سنجاق‌شده</small>' if meta.get("pinned") else ""
         controls = (
@@ -1903,6 +1931,10 @@ def chat(conversation_id):
             + '</div><div class="context-actions">'
             + f'<button type="button" onclick="cyrusReply(this)" data-id="{msg_id}" data-content="{raw_content}"><span>↶</span> پاسخ</button>'
             + f'<button type="button" onclick="cyrusCopy(this)" data-content="{raw_content}"><span>▢</span> کپی</button>'
+            + f'<button type="button" onclick="cyrusCopyTimestamp(this)" data-created="{message_created_iso}"><span>◷</span> کپی زمان</button>'
+            + f'<button type="button" onclick="cyrusCopyMessageLink(this)" data-id="{msg_id}"><span>🔗</span> پیوند پیام</button>'
+            + f'<button type="button" onclick="cyrusShareMessage(this)" data-content="{raw_content}" data-id="{msg_id}"><span>↗</span> اشتراک‌گذاری</button>'
+            + f'<button type="button" onclick="cyrusToggleMessageSelection(this)" data-id="{msg_id}"><span>☑</span> انتخاب پیام</button>'
             + '<button type="button" onclick="cyrusShowForward(this)"><span>↪</span> هدایت</button>'
             + f'<form class="forward-form" method="post" action="/chat/message/{msg_id}/forward" style="display:none">'
             + f'<select name="conversation_id" required>{forward_options}</select><button type="submit">ارسال</button></form>'
@@ -2058,12 +2090,24 @@ def chat(conversation_id):
       {room_more_html}
     </section>
     <script>
-      function cyrusToggleRoomMenu(e){{e.stopPropagation();const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=!m.hidden;}}
+      const cyrusRoomKey='cyrus-room-{conversation_id}';
+      function cyrusRoomToast(msg){{let t=document.getElementById('cyrusRoomToast');if(!t){{t=document.createElement('div');t.id='cyrusRoomToast';t.style.cssText='position:fixed;z-index:9999;bottom:90px;left:50%;transform:translateX(-50%);background:#14283b;border:1px solid #34516a;color:#e9f2fa;padding:11px 16px;border-radius:20px;font:13px Tahoma;box-shadow:0 8px 25px #0008';document.body.appendChild(t);}}t.textContent=msg;t.style.display='block';clearTimeout(t._timer);t._timer=setTimeout(()=>t.style.display='none',1800);}}
+      function cyrusToggleRoomMenu(e){{e.stopPropagation();const m=document.getElementById('cyrusRoomMenu');if(m){{m.hidden=!m.hidden;if(!m.hidden){{const b=m.querySelector('button');if(b)b.focus();cyrusUpdateRoomMenu();}}}}}}
+      function cyrusUpdateRoomMenu(){{const m=document.getElementById('cyrusRoomMenu');if(!m)return;const mute=localStorage.getItem(cyrusRoomKey+'-mute')==='1',pin=localStorage.getItem(cyrusRoomKey+'-pin')==='1';const bs=m.querySelectorAll('button');if(bs[0])bs[0].textContent=mute?'فعال‌کردن صدا':'بی‌صدا کردن';if(bs[1])bs[1].textContent=pin?'برداشتن سنجاق':'سنجاق گفتگو';}}
       document.addEventListener('click',function(e){{const m=document.getElementById('cyrusRoomMenu');if(m&&!e.target.closest('.tg-chat-menu-wrap'))m.hidden=true;}});
-      function cyrusCopyRoomInvite(){{const u="{room_invite_safe}";if(!u)return;const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;navigator.clipboard.writeText(u).then(()=>alert('لینک دعوت کپی شد')).catch(()=>prompt('لینک دعوت',u));}}
-      function cyrusToggleMute(){{const k='cyrus-mute-{conversation_id}',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');alert(v?'صدای گفتگو فعال شد':'گفتگو بی‌صدا شد');}}
-      function cyrusTogglePin(){{const k='cyrus-pin-{conversation_id}',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');alert(v?'سنجاق گفتگو برداشته شد':'گفتگو سنجاق شد');}}
-      function cyrusSearchInChat(){{const q=prompt('جستجو در پیام‌های این گفتگو');if(!q)return;const t=q.toLocaleLowerCase();let n=0;document.querySelectorAll('.message').forEach(x=>{{const ok=x.textContent.toLocaleLowerCase().includes(t);x.style.display=ok?'':'none';if(ok)n++;}});alert(n+' پیام پیدا شد');}}
+      document.addEventListener('keydown',function(e){{const m=document.getElementById('cyrusRoomMenu');if(e.key==='Escape'&&m&&!m.hidden){{m.hidden=true;const b=document.querySelector('.chat-header-more');if(b)b.focus();}}}});
+      function cyrusCopyRoomInvite(){{const u="{room_invite_safe}";if(!u)return;const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>cyrusRoomToast('لینک دعوت کپی شد')).catch(()=>cyrusRoomCopyFallback(u));else cyrusRoomCopyFallback(u);}}
+      function cyrusRoomCopyFallback(u){{const a=document.createElement('textarea');a.value=u;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();try{{const ok=document.execCommand('copy');cyrusRoomToast(ok?'لینک دعوت کپی شد':'لینک را دستی کپی کنید');if(!ok)prompt('لینک دعوت',u);}}catch(_e){{prompt('لینک دعوت',u);}}a.remove();}}
+      function cyrusToggleMute(){{const k=cyrusRoomKey+'-mute',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');cyrusUpdateRoomMenu();cyrusRoomToast(v?'صدای گفتگو فعال شد':'گفتگو بی‌صدا شد');}}
+      function cyrusTogglePin(){{const k=cyrusRoomKey+'-pin',v=localStorage.getItem(k)==='1';localStorage.setItem(k,v?'0':'1');cyrusUpdateRoomMenu();cyrusRoomToast(v?'سنجاق گفتگو برداشته شد':'گفتگو سنجاق شد');}}
+      let cyrusRoomSearchItems=[],cyrusRoomSearchIndex=-1,cyrusRoomSearchTerm='',cyrusRoomSearchLastFocus=null;
+      function cyrusSearchInChat(){{const m=document.getElementById('cyrusRoomMenu');if(m)m.hidden=true;let box=document.getElementById('cyrusRoomSearch');if(!box){{box=document.createElement('div');box.id='cyrusRoomSearch';box.style.cssText='position:fixed;z-index:1000;top:70px;left:10px;right:10px;max-width:560px;margin:auto;padding:12px;background:#0d1b2a;border:1px solid #34516a;border-radius:14px;display:flex;gap:6px;align-items:center;box-shadow:0 8px 30px #0009';box.innerHTML='<input id="cyrusRoomSearchInput" aria-label="عبارت جستجو" placeholder="جستجو در پیام‌ها…" style="flex:1;min-width:0;background:#07121e;color:#fff;border:1px solid #30485e;border-radius:9px;padding:10px;font:14px Tahoma"><span id="cyrusRoomSearchCount" aria-live="polite" style="white-space:nowrap;color:#a9bed0;font:12px Tahoma">۰/۰</span><button type="button" id="cyrusRoomSearchPrev" aria-label="نتیجه قبلی" style="width:auto;margin:0;padding:8px">↑</button><button type="button" id="cyrusRoomSearchNext" aria-label="نتیجه بعدی" style="width:auto;margin:0;padding:8px">↓</button><button type="button" id="cyrusRoomSearchClose" aria-label="بستن" style="width:auto;margin:0;padding:8px;background:#25394d;color:#fff">×</button>';document.body.appendChild(box);box.querySelector('#cyrusRoomSearchInput').addEventListener('input',cyrusRoomSearchUpdate);box.querySelector('#cyrusRoomSearchInput').addEventListener('keydown',e=>{{if(e.key==='Enter'){{e.preventDefault();cyrusRoomSearchMove(e.shiftKey?-1:1);}}}});box.querySelector('#cyrusRoomSearchPrev').addEventListener('click',()=>cyrusRoomSearchMove(-1));box.querySelector('#cyrusRoomSearchNext').addEventListener('click',()=>cyrusRoomSearchMove(1));box.querySelector('#cyrusRoomSearchClose').addEventListener('click',cyrusRoomSearchClose);}}cyrusRoomSearchLastFocus=document.activeElement;box.style.display='flex';const input=box.querySelector('input');input.focus();input.select();if(input.value)cyrusRoomSearchUpdate();}}
+      function cyrusRoomSearchUpdate(){{const input=document.getElementById('cyrusRoomSearchInput');cyrusRoomSearchTerm=(input.value||'').trim().toLocaleLowerCase();cyrusRoomSearchItems=Array.from(document.querySelectorAll('.message')).filter(x=>cyrusRoomSearchTerm&&x.textContent.toLocaleLowerCase().includes(cyrusRoomSearchTerm));cyrusRoomSearchIndex=cyrusRoomSearchItems.length?0:-1;const count=document.getElementById('cyrusRoomSearchCount');if(count)count.textContent=cyrusRoomSearchItems.length?('۱/'+cyrusRoomSearchItems.length):'۰/۰';const box=document.getElementById('cyrusRoomSearch');if(box)box.dataset.noResults=cyrusRoomSearchTerm&&!cyrusRoomSearchItems.length?'true':'false';cyrusRoomSearchShow();}}
+      function cyrusRoomSearchShow(){{document.querySelectorAll('.message').forEach(x=>{{x.style.outline='';x.style.outlineOffset='';x.removeAttribute('data-cyrus-search-active');}});if(cyrusRoomSearchIndex<0||!cyrusRoomSearchItems.length)return;const x=cyrusRoomSearchItems[cyrusRoomSearchIndex];x.style.outline='2px solid #e5bd69';x.style.outlineOffset='2px';x.setAttribute('data-cyrus-search-active','1');x.scrollIntoView({{behavior:'smooth',block:'center'}});const c=document.getElementById('cyrusRoomSearchCount');if(c)c.textContent=(cyrusRoomSearchIndex+1)+'/'+cyrusRoomSearchItems.length;}}
+      function cyrusRoomSearchMove(step){{if(!cyrusRoomSearchItems.length)return;cyrusRoomSearchIndex=(cyrusRoomSearchIndex+step+cyrusRoomSearchItems.length)%cyrusRoomSearchItems.length;cyrusRoomSearchShow();}}
+      function cyrusRoomSearchClose(){{const box=document.getElementById('cyrusRoomSearch');if(box){{box.style.display='none';box.dataset.noResults='false';}}document.querySelectorAll('.message').forEach(x=>{{x.style.outline='';x.style.outlineOffset='';x.removeAttribute('data-cyrus-search-active');}});cyrusRoomSearchItems=[];cyrusRoomSearchIndex=-1;cyrusRoomSearchTerm='';if(cyrusRoomSearchLastFocus&&cyrusRoomSearchLastFocus.focus)cyrusRoomSearchLastFocus.focus();}}
+      document.addEventListener('keydown',function(e){{const box=document.getElementById('cyrusRoomSearch');if(e.key==='Escape'&&box&&box.style.display!=='none'){{e.preventDefault();cyrusRoomSearchClose();}}}});
+      document.addEventListener('click',function(e){{const box=document.getElementById('cyrusRoomSearch');if(box&&box.style.display!=='none'&&!e.target.closest('#cyrusRoomSearch')&&!e.target.closest('#cyrusRoomMenu'))cyrusRoomSearchClose();}});
     </script>"""
 
     channel_can_post = True
@@ -2101,13 +2145,29 @@ def chat(conversation_id):
         '<div class="composer-attach-wrap"><button class="composer-attach" type="button" aria-label="پیوست" onclick="cyrusToggleAttach(event)">📎</button><div class="composer-attach-menu" id="cyrusAttachMenu" hidden>'
         '<button type="button" onclick="cyrusPickMedia(\'photo\')"><span>▧</span> عکس و ویدئو</button>'
         '<button type="button" onclick="cyrusPickMedia(\'music\')"><span>♫</span> موسیقی و صدا</button>'
-        '<button type="button" onclick="cyrusPickMedia(\'file\')"><span>▤</span> فایل</button></div></div>'
+        '<button type="button" onclick="cyrusPickMedia(\'file\')"><span>▤</span> فایل</button>'
+        '<button type="button" onclick="cyrusShareLocation()"><span>⌖</span> موقعیت مکانی</button>'
+        '<button type="button" onclick="cyrusShareContact()"><span>♙</span> مخاطب</button></div></div>'
         '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
-        '<button class="composer-send" type="submit" aria-label="ارسال پیام">➤</button></form>'
+        '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled>➤</button></form>'
         '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
         'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
+        'function cyrusShareLocation(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;if(!navigator.geolocation){alert("موقعیت مکانی پشتیبانی نمی‌شود");return;}navigator.geolocation.getCurrentPosition(p=>{const i=document.querySelector(".send-box input[name=content]");i.value="موقعیت مکانی: https://maps.google.com/?q="+p.coords.latitude+","+p.coords.longitude;i.focus();},()=>alert("اجازهٔ مکان را به مرورگر بدهید"),{timeout:12000});}function cyrusShareContact(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;const n=prompt("نام مخاطب");if(!n)return;const p=prompt("شماره تماس");if(!p)return;const i=document.querySelector(".send-box input[name=content]");i.value="مخاطب: "+n+" | شماره: "+p;i.focus();}'
+        'let cyrusRecorder=null,cyrusVoiceChunks=[];async function cyrusToggleVoiceRecord(b){if(cyrusRecorder&&cyrusRecorder.state==="recording"){cyrusRecorder.stop();b.textContent="🎙";b.classList.remove("recording");return;}try{const stream=await navigator.mediaDevices.getUserMedia({audio:true});cyrusVoiceChunks=[];cyrusRecorder=new MediaRecorder(stream);cyrusRecorder.ondataavailable=e=>{if(e.data&&e.data.size)cyrusVoiceChunks.push(e.data)};cyrusRecorder.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const blob=new Blob(cyrusVoiceChunks,{type:cyrusRecorder.mimeType||"audio/webm"});if(!blob.size){alert("ضبط صدا خالی بود");return;}const form=new FormData();form.append("media",blob,"voice.webm");b.disabled=true;b.textContent="…";try{const res=await fetch(document.getElementById("cyrusMediaUpload").action,{method:"POST",body:form,credentials:"same-origin"});if(res.ok)location.reload();else alert("ارسال پیام صوتی ناموفق بود ("+res.status+")");}catch(err){alert("ارتباط برای ارسال صدا برقرار نشد");}finally{b.disabled=false;b.textContent="🎙";}};cyrusRecorder.start();b.textContent="■";b.classList.add("recording");}catch(err){alert("برای ضبط صدا، اجازهٔ میکروفون را به مرورگر بدهید");}}'
         'document.addEventListener("change",function(e){if(e.target&&e.target.id==="cyrusMediaInput"&&e.target.files&&e.target.files.length)document.getElementById("cyrusMediaUpload").requestSubmit();});'
-        'document.addEventListener("click",function(e){const m=document.getElementById("cyrusAttachMenu");if(m&&!e.target.closest(".composer-attach-wrap"))m.hidden=true;});</script>'
+        """(function(){
+          const form=document.querySelector(".send-box"),input=form&&form.querySelector("input[name=content]"),send=form&&form.querySelector(".composer-send"),counter=document.getElementById("cyrusComposerCounter");
+          if(!form||!input||!send)return;
+          const match=form.action.match(/\\/chat\\/([^/]+)\\/send/),draftKey="cyrus-draft-"+(match?match[1]:"default");
+          try{if(!input.value)input.value=localStorage.getItem(draftKey)||"";}catch(e){}
+          function update(){const n=input.value.length;send.disabled=!input.value.trim();if(counter)counter.textContent=n.toLocaleString("fa-IR")+" / ۴۰۰۰";try{if(input.value)localStorage.setItem(draftKey,input.value);else localStorage.removeItem(draftKey);}catch(e){}}
+          update();input.addEventListener("input",update);
+          input.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!send.disabled)form.requestSubmit();}});
+          form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}form.dataset.sending="1";send.disabled=true;send.textContent="…";try{localStorage.removeItem(draftKey);}catch(err){}});
+          const picker=document.getElementById("cyrusFullEmojiPicker");if(picker)picker.addEventListener("emoji-click",function(e){const emoji=e.detail&&e.detail.unicode;if(!emoji)return;const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;input.setRangeText(emoji,start,end,"end");input.dispatchEvent(new Event("input",{bubbles:true}));input.focus();});
+          document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;const a=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(a)a.hidden=true;if(p)p.style.display="none";});
+        })();
+        document.addEventListener("click",function(e){const m=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(m&&!e.target.closest(".composer-attach-wrap"))m.hidden=true;if(p&&!e.target.closest(".composer-emoji")&&!e.target.closest(".composer-emoji-panel"))p.style.display="none";});</script>"""
         if (room_type != "channel" or channel_can_post) and not room_blocked else
         (
             ('<div class="cyrus-blocked-composer"><p>این کاربر را مسدود کرده‌اید.</p><form method="post" action="/user/' + html.escape(room_other_user_id, quote=True) + '/block?from_chat=' + html.escape(conversation_id, quote=True) + '"><button type="submit">رفع مسدودیت</button></form></div>' if room_blocked_by_me else
@@ -2137,6 +2197,8 @@ def chat(conversation_id):
         .message .message-body a.chat-inline-link{{color:#8acbff;text-decoration:underline;text-underline-offset:2px;}}
         .message small{{display:flex;align-items:center;justify-content:flex-end;gap:5px;direction:ltr}}
         .message.context-open{{z-index:12;border-color:#e2bd6b;box-shadow:0 4px 20px #0006}}
+        .message.cyrus-message-selected{{outline:2px solid #55a9e8!important;background:#18314a!important}}
+        .reply-preview{{display:block;width:100%;text-align:right;border:0;border-inline-start:3px solid #5ba8e8;background:#13283a;color:#9fd0f5;padding:6px 9px;margin:0 0 7px;border-radius:5px;font:inherit;font-size:11px;cursor:pointer;overflow-wrap:anywhere}}
         .send-box{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));flex:0 0 auto;margin:8px 0 0;min-height:54px;border-radius:27px;background:#172432;border:1px solid #2b4053;box-shadow:0 4px 18px #0006;}}
         .media-upload-box{{display:flex;gap:8px;align-items:center;padding:7px 10px;margin:5px 0;border-radius:16px;background:#172432;border:1px solid #2b4053;}}
         .media-upload-label{{display:flex;gap:7px;align-items:center;flex:1;font-size:13px;color:#b8cbdc;}}
@@ -2145,10 +2207,10 @@ def chat(conversation_id):
         .cyrus-chat-photo{{display:block;max-width:min(65vw,320px);max-height:360px;border-radius:12px;object-fit:contain;}}
         .cyrus-chat-video{{display:block;width:min(65vw,320px);max-height:360px;border-radius:12px;}}
         .cyrus-chat-file{{display:inline-block;color:#8acbff;padding:8px 10px;border-radius:10px;background:#142b3d;}}
-        .send-box input[name="content"]{{color:#edf4fa;line-height:1.5;}}
+        .send-box input[name="content"]{{color:#edf4fa;line-height:1.5;}}.cyrus-composer-counter{{position:absolute;bottom:-18px;right:16px;color:#8fa5b8;font-size:10px;pointer-events:none}}.composer-send:disabled{{opacity:.45;cursor:default}}
         .composer-emoji,.composer-send{{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;margin:0;padding:0;border-radius:50%;font-size:22px}}
         .composer-emoji{{background:transparent;color:#a9bdce;border:0}}
-        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}
+        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}}.composer-voice.recording{{background:#a83232;color:#fff;animation:cyrusVoicePulse 1s infinite}}@keyframes cyrusVoicePulse{{50%{{opacity:.55}}}}
         .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
         .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
         .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20;display:none}}
@@ -2201,6 +2263,7 @@ def chat(conversation_id):
         .context-actions form{{display:flex;flex-direction:column;gap:5px;margin:0}}
         .context-actions select{{width:calc(100% - 24px);margin:6px 12px;max-width:none;background:#0b1422;color:#fff;border:1px solid #526a7d;border-radius:7px;padding:9px}}
         .context-actions form>button{{justify-content:flex-start}}
+        .cyrus-inchat-search{{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#142231;border-bottom:1px solid #2b4054;position:sticky;top:0;z-index:35}}.cyrus-inchat-search input{{min-width:0;flex:1;background:#0a1521;color:#fff;border:1px solid #334b61;border-radius:10px;padding:9px;font-size:13px}}.cyrus-inchat-search button{{border:0;border-radius:8px;background:#24394b;color:#e5eef6;padding:7px 10px}}.cyrus-search-count{{font-size:11px;color:#a9bdce;white-space:nowrap}}.message.cyrus-search-hit{{outline:2px solid #caa65d;outline-offset:2px}}.message.cyrus-search-current{{outline:3px solid #42a5f5;outline-offset:3px}}.cyrus-scroll-latest{{position:fixed;right:16px;bottom:94px;z-index:30;width:42px;height:42px;border:1px solid #3b5368;border-radius:50%;background:#172a3b;color:#eaf4fc;font-size:22px;box-shadow:0 5px 18px #0006}}.cyrus-scroll-latest[hidden]{{display:none}}.cyrus-compose-counter{{position:absolute;left:54px;bottom:7px;color:#9db0c2;font-size:10px;pointer-events:none}}.cyrus-compose-counter[hidden]{{display:none}}
         .reply-preview{{padding:5px 8px;border-right:3px solid #d8b46a;color:#d8b46a;font-size:12px;margin-bottom:6px}}
         .forwarded-label,.pinned-label{{color:#d8b46a}}
         .message.mine{{align-self:flex-start;background:#173b59;border-color:#245b83;border-bottom-left-radius:5px}}
@@ -2234,6 +2297,22 @@ def chat(conversation_id):
       }}
       document.addEventListener('DOMContentLoaded',function(){{
         window.scrollTo(0,document.body.scrollHeight);
+        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
+        if(deepLinkedMessage) {{
+          requestAnimationFrame(()=>requestAnimationFrame(()=>{{
+            const target=document.getElementById('message-'+deepLinkedMessage);
+            if(target) {{
+              target.scrollIntoView({{behavior:'smooth',block:'center'}});
+              target.classList.add('search-jump-highlight');
+              target.setAttribute('tabindex','-1');
+              target.focus({{preventScroll:true}});
+              clearTimeout(target._cyrusHighlightTimer);
+              target._cyrusHighlightTimer=setTimeout(()=>target.classList.remove('search-jump-highlight'),3200);
+            }} else if(typeof cyrusToast==='function') {{
+              cyrusToast('پیام پیوندشده در این گفتگو پیدا نشد');
+            }}
+          }}));
+        }}
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker)picker.addEventListener("emoji-click",function(event){{
           const value=event.detail&&event.detail.unicode;
@@ -2295,23 +2374,70 @@ def chat(conversation_id):
           }});
         }}
       }});
+      function cyrusCloseMessageMenus(returnFocus=false) {{
+        document.querySelectorAll('.message.context-open').forEach(el=>{{
+          el.classList.remove('context-open');
+          const menu=el.querySelector('.message-context');
+          if(menu)menu.setAttribute('aria-hidden','true');
+          el.setAttribute('aria-expanded','false');
+          if(returnFocus)el.focus({{preventScroll:true}});
+        }});
+      }}
       function cyrusOpenMessageMenu(event,message) {{
         if(event.target.closest('.message-context')) return;
         if(event.target.closest('button,form,select,input,a')) return;
-        document.querySelectorAll('.message.context-open').forEach(el=>el.classList.remove('context-open'));
+        if(window.getSelection&&String(window.getSelection()).trim())return;
+        const clickedId=message&&message.dataset.messageId;
+        if(event.type==='click'&&clickedId&&cyrusSelectedMessages.size) {{
+          const rows=[...document.querySelectorAll('.message[data-message-id]')];
+          const anchorIndex=rows.findIndex(row=>row.dataset.messageId===cyrusSelectionAnchorId);
+          const targetIndex=rows.findIndex(row=>row.dataset.messageId===clickedId);
+          if(event.shiftKey&&anchorIndex>=0&&targetIndex>=0) {{
+            rows.slice(Math.min(anchorIndex,targetIndex),Math.max(anchorIndex,targetIndex)+1)
+              .forEach(row=>cyrusSelectedMessages.add(row.dataset.messageId));
+          }} else if(cyrusSelectedMessages.has(clickedId)) {{
+            cyrusSelectedMessages.delete(clickedId);
+          }} else {{
+            cyrusSelectedMessages.add(clickedId);
+          }}
+          cyrusSelectionAnchorId=clickedId;
+          cyrusUpdateMessageSelection();
+          event.preventDefault();event.stopPropagation();
+          return;
+        }}
+        cyrusCloseMessageMenus(false);
         message.classList.add('context-open');
+        message.setAttribute('aria-expanded','true');
         const menu=message.querySelector('.message-context');
-        if(menu)menu.setAttribute('aria-hidden','false');
+        if(menu){{menu.setAttribute('aria-hidden','false');const first=menu.querySelector('button');if(first&&event.type==='keydown')first.focus({{preventScroll:true}});}}
         event.stopPropagation();
       }}
-      document.addEventListener('click',function(event){{
-        if(!event.target.closest('.message.context-open')) {{
-          document.querySelectorAll('.message.context-open').forEach(el=>{{
-            el.classList.remove('context-open');
-            const menu=el.querySelector('.message-context');
-            if(menu)menu.setAttribute('aria-hidden','true');
+      (function(){{
+        let pressTimer=null,startX=0,startY=0,longPressed=false;
+        document.querySelectorAll('.message').forEach(message=>{{
+          message.setAttribute('aria-expanded','false');
+          message.addEventListener('pointerdown',event=>{{
+            if(event.pointerType==='mouse'||event.target.closest('.message-context,button,form,a,input,select'))return;
+            startX=event.clientX;startY=event.clientY;longPressed=false;
+            clearTimeout(pressTimer);
+            pressTimer=setTimeout(()=>{{longPressed=true;cyrusOpenMessageMenu(event,message);}},560);
           }});
-        }}
+          ['pointerup','pointercancel','pointerleave'].forEach(type=>message.addEventListener(type,()=>clearTimeout(pressTimer)));
+          message.addEventListener('pointermove',event=>{{if(Math.abs(event.clientX-startX)>12||Math.abs(event.clientY-startY)>12)clearTimeout(pressTimer);}});
+          message.addEventListener('click',event=>{{if(longPressed){{event.preventDefault();event.stopPropagation();longPressed=false;}}}});
+        }});
+        document.addEventListener('keydown',event=>{{
+          const opened=document.querySelector('.message.context-open');
+          if(!opened)return;
+          if(event.key==='Escape'){{event.preventDefault();cyrusCloseMessageMenus(true);return;}}
+          const actions=[...opened.querySelectorAll('.message-context button:not([disabled])')];
+          const at=actions.indexOf(document.activeElement);
+          if(event.key==='ArrowDown'&&actions.length){{event.preventDefault();actions[(at+1)%actions.length].focus();}}
+          if(event.key==='ArrowUp'&&actions.length){{event.preventDefault();actions[(at-1+actions.length)%actions.length].focus();}}
+        }});
+      }})();
+      document.addEventListener('click',function(event){{
+        if(!event.target.closest('.message.context-open'))cyrusCloseMessageMenus(false);
       }});
       async function cyrusReact(event,button) {{
         event.preventDefault();event.stopPropagation();
@@ -2339,27 +2465,190 @@ def chat(conversation_id):
           if(!badges.children.length)badges.remove();message.classList.remove('context-open');
         }}catch(e){{alert('ثبت واکنش انجام نشد؛ دوباره تلاش کنید.');}}
       }}
+      (function(){{ 
+        const msgs=[...document.querySelectorAll('.message')],input=document.querySelector('.send-box input[name="content"]'),form=input&&input.form,chatId="{conversation_id}";
+        let searchBox=null,searchInput=null,matches=[],matchAt=0;
+        function ensureSearch(){{
+          if(searchBox)return;
+          searchBox=document.createElement('div');searchBox.className='cyrus-inchat-search';
+          searchBox.innerHTML='<input type="search" placeholder="جستجو در پیام‌های این گفتگو" aria-label="جستجو در گفتگو"><span class="cyrus-search-count">۰/۰</span><button type="button" data-dir="-1" aria-label="نتیجهٔ قبلی">↑</button><button type="button" data-dir="1" aria-label="نتیجهٔ بعدی">↓</button><button type="button" data-close aria-label="بستن جستجو">×</button>';
+          const header=document.querySelector('.room-header');if(header)header.after(searchBox);
+          searchInput=searchBox.querySelector('input');
+          searchInput.addEventListener('input',runSearch);
+          searchBox.querySelectorAll('[data-dir]').forEach(b=>b.addEventListener('click',()=>moveMatch(Number(b.dataset.dir))));
+          searchBox.querySelector('[data-close]').addEventListener('click',closeSearch);
+        }}
+        function runSearch(){{
+          const q=(searchInput.value||'').trim().toLocaleLowerCase();matches=[];
+          msgs.forEach(m=>{{m.classList.remove('cyrus-search-hit','cyrus-search-current');if(q&&m.textContent.toLocaleLowerCase().includes(q))matches.push(m);}});
+          matchAt=0;updateSearch();if(matches.length)showMatch(0);
+        }}
+        function updateSearch(){{const n=searchBox.querySelector('.cyrus-search-count');if(n)n.textContent=(matches.length?matchAt+1:0)+'/'+matches.length;}}
+        function showMatch(i){{if(!matches.length)return;matchAt=(i+matches.length)%matches.length;matches.forEach((m,j)=>m.classList.toggle('cyrus-search-current',j===matchAt));matches.forEach(m=>m.classList.add('cyrus-search-hit'));matches[matchAt].scrollIntoView({{behavior:'smooth',block:'center'}});updateSearch();}}
+        function moveMatch(d){{if(matches.length)showMatch(matchAt+d);}}
+        function closeSearch(){{if(searchBox)searchBox.remove();searchBox=null;searchInput=null;msgs.forEach(m=>m.classList.remove('cyrus-search-hit','cyrus-search-current'));}}
+        window.cyrusSearchInChat=function(){{ensureSearch();searchBox.hidden=false;searchInput.focus();}};
+        document.addEventListener('keydown',e=>{{if(e.key==='Escape'&&searchBox)closeSearch();if(searchBox&&document.activeElement===searchInput&&e.key==='Enter'){{e.preventDefault();moveMatch(e.shiftKey?-1:1);}}}});
+        const down=document.createElement('button');down.type='button';down.className='cyrus-scroll-latest';down.textContent='↓';down.title='رفتن به آخر گفتگو';down.setAttribute('aria-label','آخرین پیام‌ها');document.body.appendChild(down);
+        function checkDown(){{down.hidden=window.scrollY+window.innerHeight>document.documentElement.scrollHeight-260;}}
+        down.addEventListener('click',()=>window.scrollTo({{top:document.documentElement.scrollHeight,behavior:'smooth'}}));window.addEventListener('scroll',checkDown,{{passive:true}});checkDown();
+        if(input){{const key='cyrus-draft-'+chatId;try{{const saved=localStorage.getItem(key);if(saved&&!input.value)input.value=saved;}}catch(e){{}}
+          let counter=document.createElement('small');counter.className='cyrus-compose-counter';input.parentElement.appendChild(counter);
+          function count(){{counter.textContent=input.value.length+'/4000';counter.hidden=input.value.length<3500;}}
+          input.addEventListener('input',()=>{{try{{localStorage.setItem(key,input.value);}}catch(e){{}}count();}});count();
+          if(form){{form.addEventListener('submit',()=>{{try{{localStorage.removeItem(key);}}catch(e){{}}}});input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){{e.preventDefault();form.requestSubmit();}}}});}}
+        }}
+      }})();
       function cyrusReply(button) {{
         document.getElementById("cyrusReplyId").value=button.dataset.id||"";
         document.getElementById("cyrusReplyText").textContent="پاسخ به: "+(button.dataset.content||"").slice(0,120);
         document.getElementById("cyrusReplyBar").style.display="block";
+        cyrusCloseMessageMenus(false);
         document.querySelector('.send-box input[name="content"]').focus();
       }}
       function cyrusCancelReply() {{
         document.getElementById("cyrusReplyId").value="";
         document.getElementById("cyrusReplyBar").style.display="none";
       }}
+      function cyrusToast(text) {{
+        let toast=document.getElementById('cyrus-message-toast');
+        if(!toast){{toast=document.createElement('div');toast.id='cyrus-message-toast';toast.setAttribute('role','status');toast.setAttribute('aria-live','polite');toast.style.cssText='position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:100;background:#13283a;border:1px solid #41617a;color:#eaf4fc;padding:10px 16px;border-radius:22px;font-size:12px;box-shadow:0 5px 20px #0007';document.body.appendChild(toast);}}
+        toast.textContent=text;toast.hidden=false;clearTimeout(toast._timer);toast._timer=setTimeout(()=>toast.hidden=true,2100);
+      }}
       async function cyrusCopy(button) {{
         const value=button.dataset.content||"";
-        try {{ await navigator.clipboard.writeText(value); button.textContent="کپی شد"; }}
-        catch(e) {{ window.prompt("متن پیام را کپی کنید:",value); }}
+        try {{
+          if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(value);
+          else{{const area=document.createElement('textarea');area.value=value;area.style.cssText='position:fixed;opacity:0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('copy unavailable');}}
+          cyrusToast('متن پیام کپی شد');cyrusCloseMessageMenus(false);
+        }}catch(e){{window.prompt('متن پیام را برای کپی انتخاب کنید:',value);}}
       }}
+      async function cyrusCopyValue(value,successText) {{
+        try {{
+          if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(value);
+          else{{const area=document.createElement('textarea');area.value=value;area.style.cssText='position:fixed;opacity:0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('copy unavailable');}}
+          cyrusToast(successText);return true;
+        }}catch(e){{window.prompt('متن را برای کپی انتخاب کنید:',value);return false;}}
+      }}
+      async function cyrusCopyTimestamp(button) {{
+        const value=button.dataset.created||'';
+        if(!value)return cyrusToast('زمان پیام در دسترس نیست');
+        const date=new Date(value);
+        const formatted=Number.isNaN(date.getTime())?value:date.toLocaleString('fa-IR');
+        await cyrusCopyValue(formatted,'زمان پیام کپی شد');
+        cyrusCloseMessageMenus(false);
+      }}
+      async function cyrusCopyMessageLink(button) {{
+        const id=button.dataset.id||'';
+        if(!id)return;
+        const link=location.origin+location.pathname+'?message='+encodeURIComponent(id);
+        await cyrusCopyValue(link,'پیوند پیام کپی شد');
+        cyrusCloseMessageMenus(false);
+      }}
+      async function cyrusShareMessage(button) {{
+        const id=button.dataset.id||'',text=button.dataset.content||'';
+        const url=location.origin+location.pathname+'?message='+encodeURIComponent(id);
+        try{{if(navigator.share){{await navigator.share({{title:'پیام در CYRUS',text:text,url:url}});cyrusCloseMessageMenus(false);return;}}}}
+        catch(e){{if(e&&e.name==='AbortError')return;}}
+        await cyrusCopyValue(url,'پیوند پیام برای اشتراک‌گذاری کپی شد');
+        cyrusCloseMessageMenus(false);
+      }}
+      function cyrusJumpToMessage(event,button) {{
+        event.preventDefault();event.stopPropagation();
+        const id=button.dataset.replyTarget||'';
+        const target=id&&document.getElementById('message-'+id);
+        if(!target){{cyrusToast('پیام اصلی در این گفتگو موجود نیست');return;}}
+        target.scrollIntoView({{behavior:'smooth',block:'center'}});
+        target.classList.add('search-jump-highlight');
+        clearTimeout(target._cyrusHighlightTimer);
+        target._cyrusHighlightTimer=setTimeout(()=>target.classList.remove('search-jump-highlight'),2600);
+        cyrusCloseMessageMenus(false);
+      }}
+      const cyrusSelectedMessages=new Set();
+      let cyrusSelectionAnchorId=null;
+      function cyrusSelectedMessageTexts() {{
+        return [...document.querySelectorAll('.message[data-message-id]')]
+          .filter(message=>cyrusSelectedMessages.has(message.dataset.messageId))
+          .map(message=>message.dataset.content||'');
+      }}
+      let cyrusSelectionBar=null;
+      function cyrusEnsureSelectionBar() {{
+        if(cyrusSelectionBar)return;
+        cyrusSelectionBar=document.createElement('div');
+        cyrusSelectionBar.className='cyrus-selection-bar';
+        cyrusSelectionBar.setAttribute('role','toolbar');
+        cyrusSelectionBar.innerHTML='<span class="cyrus-selection-count" aria-live="polite">۰ پیام انتخاب شد</span><button type="button" data-select-all>انتخاب همه</button><button type="button" data-copy>کپی متن‌ها</button><button type="button" data-delete>حذف پیام‌های من</button><button type="button" data-clear>لغو</button>';
+        cyrusSelectionBar.style.cssText='position:fixed;z-index:50;bottom:calc(84px + env(safe-area-inset-bottom));left:12px;right:12px;display:flex;gap:8px;align-items:center;justify-content:center;padding:10px;background:#102033;border:1px solid #42617a;border-radius:18px;box-shadow:0 8px 30px #0008;color:#eaf3fa';
+        cyrusSelectionBar.querySelector('[data-copy]').addEventListener('click',async()=>{{
+          const texts=cyrusSelectedMessageTexts();
+          if(texts.length)await cyrusCopyValue(texts.join('\n\n'),'متن پیام‌های انتخاب‌شده کپی شد');
+        }});
+        cyrusSelectionBar.querySelector('[data-select-all]').addEventListener('click',()=>{{
+          document.querySelectorAll('.message[data-message-id]').forEach(message=>cyrusSelectedMessages.add(message.dataset.messageId));
+          cyrusUpdateMessageSelection();
+          cyrusToast('همه پیام‌های بارگذاری‌شده انتخاب شدند');
+        }});
+        cyrusSelectionBar.querySelector('[data-delete]').addEventListener('click',()=>{{
+          const ids=[...cyrusSelectedMessages];
+          if(!ids.length||!confirm('پیام‌های انتخاب‌شده‌ای که متعلق به شما هستند حذف شوند؟ پیام‌های دیگران حذف نمی‌شوند.'))return;
+          const first=document.querySelector('.message[data-message-id]');
+          const conversationId=first&&first.dataset.conversationId;
+          if(!conversationId)return cyrusToast('شناسه گفتگو در دسترس نیست');
+          const form=document.createElement('form');form.method='post';form.action='/chat/'+encodeURIComponent(conversationId)+'/delete-selected';
+          const room=document.createElement('input');room.type='hidden';room.name='conversation_id';room.value=conversationId;form.appendChild(room);
+          ids.forEach(id=>{{const field=document.createElement('input');field.type='hidden';field.name='message_ids';field.value=id;form.appendChild(field);}});
+          document.body.appendChild(form);form.submit();
+        }});
+        cyrusSelectionBar.querySelector('[data-clear]').addEventListener('click',cyrusClearMessageSelection);
+        document.body.appendChild(cyrusSelectionBar);
+      }}
+      function cyrusUpdateMessageSelection() {{
+        const count=cyrusSelectedMessages.size;
+        document.querySelectorAll('.message[data-message-id]').forEach(m=>{{
+          const selected=cyrusSelectedMessages.has(m.dataset.messageId);
+          m.classList.toggle('cyrus-message-selected',selected);
+          m.setAttribute('aria-selected',String(selected));
+        }});
+        if(!count){{if(cyrusSelectionBar)cyrusSelectionBar.remove();cyrusSelectionBar=null;return;}}
+        cyrusEnsureSelectionBar();
+        cyrusSelectionBar.querySelector('.cyrus-selection-count').textContent=new Intl.NumberFormat('fa-IR').format(count)+' پیام انتخاب شد';
+      }}
+      function cyrusToggleMessageSelection(button) {{
+        const id=button.dataset.id||'';
+        if(!id)return;
+        if(cyrusSelectedMessages.has(id))cyrusSelectedMessages.delete(id);else cyrusSelectedMessages.add(id);
+        cyrusSelectionAnchorId=id;
+        cyrusUpdateMessageSelection();cyrusCloseMessageMenus(false);
+      }}
+      function cyrusClearMessageSelection() {{
+        cyrusSelectedMessages.clear();cyrusSelectionAnchorId=null;cyrusUpdateMessageSelection();
+      }}
+      document.addEventListener('keydown',event=>{{
+        if(event.key==='Escape'&&cyrusSelectedMessages.size)cyrusClearMessageSelection();
+        if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='c'&&cyrusSelectedMessages.size) {{
+          const active=document.activeElement;
+          if(active&&['INPUT','TEXTAREA'].includes(active.tagName))return;
+          event.preventDefault();
+          const texts=[...cyrusSelectedMessages].map(id=>document.getElementById('message-'+id)).filter(Boolean).map(m=>m.dataset.content||'');
+          if(texts.length)cyrusCopyValue(texts.join('\n\n'),'متن پیام‌های انتخاب‌شده کپی شد');
+        }}
+      }});
+      window.addEventListener('scroll',()=>cyrusCloseMessageMenus(false),{{passive:true}});
+      window.addEventListener('resize',()=>cyrusCloseMessageMenus(false));
+      document.addEventListener('contextmenu',event=>{{
+        const message=event.target.closest('.message');
+        if(message&&!event.target.closest('.message-context,button,form,a,input,select')){{event.preventDefault();cyrusOpenMessageMenu(event,message);}}
+      }});
+      document.addEventListener('keydown',event=>{{
+        if((event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10'))&&document.activeElement?.classList.contains('message')){{event.preventDefault();cyrusOpenMessageMenu(event,document.activeElement);}}
+      }});
       function cyrusShowForward(button) {{
         const form=button.parentElement.querySelector(".forward-form");
-        if(form)form.style.display=form.style.display==="none"?"flex":"none";
+        if(form){{form.style.display=form.style.display==="none"?"flex":"none";if(form.style.display!=="none")form.querySelector('select')?.focus();}}
       }}
       function cyrusEdit(button) {{
         const message = button.closest('.message');
+        cyrusCloseMessageMenus(false);
         const value = prompt('متن پیام را ویرایش کنید:', message.dataset.content);
         if (value === null || !value.trim()) return;
         const form = message.querySelector('.edit-form');
@@ -2760,6 +3049,53 @@ def send_message(conversation_id):
 
     return redirect(url_for("chat", conversation_id=conversation_id))
 
+
+
+@app.route("/chat/<conversation_id>/delete-selected", methods=["POST"])
+def delete_selected_messages(conversation_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return "شناسه گفتگو نامعتبر است", 400
+    posted_room = str(request.form.get("conversation_id") or "")
+    if posted_room != conversation_id:
+        return "گفتگوی انتخاب‌شده معتبر نیست", 400
+    message_ids = list(dict.fromkeys(str(value or "").strip() for value in request.form.getlist("message_ids")))
+    if not message_ids or len(message_ids) > 100:
+        return "تعداد پیام‌های انتخاب‌شده معتبر نیست", 400
+    valid_ids=[]
+    for message_id in message_ids:
+        try:
+            uuid.UUID(message_id)
+            valid_ids.append(message_id)
+        except ValueError:
+            continue
+    if not valid_ids:
+        return "شناسه پیام معتبر نیست", 400
+    uid=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session.get("access_token",""),"Prefer":"return=representation"}
+    try:
+        membership=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,"user_id":"eq."+uid,"limit":"1"},
+            headers=headers,timeout=15)
+        if not membership.ok or not membership.json():
+            return "عضو این گفتگو نیستید",403
+        deleted=0
+        for message_id in valid_ids:
+            response=requests.delete(URL+"/rest/v1/cyrus_messages",
+                params={"id":"eq."+message_id,"conversation_id":"eq."+conversation_id,"sender_id":"eq."+uid},
+                headers=headers,timeout=15)
+            if not response.ok:
+                return page('<div class="container card"><p>حذف گروهی کامل نشد؛ دوباره گفتگو را بررسی کنید.</p><a href="/chat/'+html.escape(conversation_id,quote=True)+'">بازگشت</a></div>'),400
+            try:
+                deleted+=len(response.json())
+            except Exception:
+                pass
+        return redirect(url_for("chat",conversation_id=conversation_id,deleted=deleted))
+    except Exception:
+        return "ارتباط با سرور برقرار نشد",502
 
 
 @app.route("/chat/message/<message_id>/pin", methods=["POST"])
@@ -3368,13 +3704,13 @@ def manage_room(conversation_id):
             if uid != str(room.get("created_by") or ""):
                 if owner and role == "member":
                     controls += (
-                        '<form method="post"><input type="hidden" name="action" value="promote">'
+                        '<form method="post" onsubmit="return confirm(&quot;این عضو مدیر شود؟&quot;)"><input type="hidden" name="action" value="promote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>تعیین مدیر</button></form>'
                     )
                 if owner and role == "admin":
                     controls += (
-                        '<form method="post"><input type="hidden" name="action" value="demote">'
+                        '<form method="post" onsubmit="return confirm(&quot;دسترسی مدیریت این عضو برداشته شود؟&quot;)"><input type="hidden" name="action" value="demote">'
                         '<input type="hidden" name="user_id" value="' + safe_uid + '">'
                         '<button>عزل مدیر</button></form>'
                     )
@@ -3387,7 +3723,7 @@ def manage_room(conversation_id):
                     )
 
             rows += (
-                '<div class="tg-member-row"><div class="tg-member-person">' + avatar_html
+                '<div class="tg-member-row" data-member-search="{html.escape((str(profile.get("display_name") or profile.get("username") or "") + " " + str(profile.get("username") or "")).lower(), quote=True)}" data-member-role="{html.escape(role, quote=True)}"><div class="tg-member-person">' + avatar_html
                 + '<span><b>' + display_name + '</b><small>' + ('@' + username_text if username_text else '') + '</small></span></div>'
                 + '<div class="tg-member-role">' + safe_role + '</div><div class="tg-member-actions">' + controls + '</div></div>'
             )
@@ -3420,7 +3756,7 @@ def manage_room(conversation_id):
 
           <style>
             .tg-room-settings{{margin:0 0 14px;padding:0;background:#101a25;border:0;border-radius:0;color:#e8edf2;overflow:hidden}}
-            .tg-member-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:#111e2b;border-bottom:1px solid #263442;color:#eaf1f6}}
+            .tg-member-row{{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px;background:#111e2b;border-bottom:1px solid #263442;color:#eaf1f6}}.cyrus-member-tools{{padding:12px;background:#0e1a26;border-radius:12px;margin:10px 0 14px}}.cyrus-member-tools input{{width:100%;box-sizing:border-box;padding:11px;border-radius:9px;border:1px solid #2b4256;background:#091521;color:#fff}}.cyrus-member-filters{{display:flex;gap:6px;flex-wrap:wrap;margin:9px 0}}.cyrus-member-filters button{{border:0;border-radius:16px;padding:7px 12px;background:#22384b;color:#b8c9d8;font-size:12px}}.cyrus-member-filters button.active{{background:#268bd0;color:#fff}}.cyrus-member-tools small{{color:#8ea5b8;font-size:11px}}.tg-member-row[hidden]{{display:none!important}}.cyrus-field-counter{{display:block;text-align:left;color:#8ea5b8;font-size:10px;margin-top:3px}}
             .tg-member-person{{display:flex;align-items:center;gap:11px;min-width:0;flex:1}}
             .tg-member-avatar{{width:42px;height:42px;flex:0 0 42px;border-radius:50%;object-fit:cover;background:#26394a;display:grid;place-items:center}}
             .tg-member-avatar-fallback{{color:#d8b46a;font-size:21px}}
@@ -3502,7 +3838,7 @@ def manage_room(conversation_id):
           <div class="card">
             <h3>لینک دعوت</h3>
             <input id="invite-link" readonly value="{invite_safe}">
-            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value).then(()=>alert('لینک کپی شد'))">کپی لینک</button>
+            <button type="button" onclick="cyrusCopyInvite()">کپی لینک</button><script>function cyrusCopyInvite(){{const v=document.getElementById("invite-link").value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert("لینک کپی شد")).catch(()=>prompt("لینک دعوت",v));else prompt("لینک دعوت",v);}}</script>
             <form method="post" onsubmit="return confirm('لینک قبلی از کار می‌افتد. ادامه می‌دهید؟')">
               <input type="hidden" name="action" value="rotate_invite">
               <button>ساخت لینک جدید</button>
@@ -3520,9 +3856,13 @@ def manage_room(conversation_id):
 
           {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if join_requests else ''}
 
-          <h3>اعضا ({len(members)})</h3>
-          {rows}
-
+          <h3>اعضا (<span id="cyrusMemberTotal">{len(members)}</span>)</h3>
+          <div class="cyrus-member-tools"><input id="cyrusMemberSearch" type="search" placeholder="جستجوی نام یا نام کاربری عضو"><div class="cyrus-member-filters"><button type="button" data-role="all" class="active">همه</button><button type="button" data-role="admin">مدیران</button><button type="button" data-role="member">اعضا</button><button type="button" id="cyrusMemberReset">پاک‌کردن</button></div><small id="cyrusMemberCount"></small></div>
+          <div id="cyrusMemberRows">{rows}</div>
+          <script>
+          (function(){{const s=document.getElementById('cyrusMemberSearch'),w=document.getElementById('cyrusMemberRows'),n=document.getElementById('cyrusMemberCount'),bs=[...document.querySelectorAll('.cyrus-member-filters [data-role]')],r=document.getElementById('cyrusMemberReset');if(!s||!w)return;let role='all';function apply(){{const q=s.value.trim().toLocaleLowerCase();let shown=0;w.querySelectorAll('.tg-member-row').forEach(x=>{{const ok=(!q||(x.dataset.memberSearch||'').includes(q))&&(role==='all'||x.dataset.memberRole===role);x.hidden=!ok;if(ok)shown++;}});if(n)n.textContent='نمایش '+shown+' از '+w.querySelectorAll('.tg-member-row').length+' عضو';}}s.addEventListener('input',apply);bs.forEach(b=>b.addEventListener('click',()=>{{role=b.dataset.role;bs.forEach(x=>x.classList.toggle('active',x===b));apply();}}));r.addEventListener('click',()=>{{s.value='';role='all';bs.forEach(x=>x.classList.toggle('active',x.dataset.role==='all'));apply();s.focus();}});apply();}})();
+          (function(){{const f=document.querySelector('.tg-room-settings'),save=f&&f.querySelector('.tg-save');if(!f)return;let dirty=false;function mark(){{dirty=true;if(save){{save.disabled=false;save.textContent='تأیید تغییرات';}}}}f.querySelectorAll('input,textarea,select').forEach(x=>{{x.addEventListener('input',mark);x.addEventListener('change',mark);}});f.addEventListener('submit',()=>{{dirty=false;if(save){{save.disabled=true;save.textContent='در حال ذخیره…';}}}});window.addEventListener('beforeunload',e=>{{if(dirty){{e.preventDefault();e.returnValue='';}}}});[[f.querySelector('[name=title]'),60],[f.querySelector('[name=description]'),500]].forEach(([x,m])=>{{if(!x)return;const b=document.createElement('small');b.className='cyrus-field-counter';b.textContent=x.value.length+'/'+m;x.after(b);x.addEventListener('input',()=>b.textContent=x.value.length+'/'+m);}});}})();
+          </script>
           <div class="card">
             <h3>خروج از مجموعه</h3>
             <form method="post" onsubmit="return confirm('خارج می‌شوید؟')">
