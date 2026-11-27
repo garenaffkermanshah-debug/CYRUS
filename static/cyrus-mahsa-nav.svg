@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#13283b"/><stop offset="1" stop-color="#050b14"/></linearGradient><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff0b2"/><stop offset=".45" stop-color="#d9ad52"/><stop offset="1" stop-color="#8a5b1f"/></linearGradient></defs>
+<circle cx="64" cy="64" r="61" fill="url(#bg)" stroke="url(#gold)" stroke-width="4"/>
+<circle cx="64" cy="64" r="53" fill="none" stroke="#d8b45f" stroke-opacity=".3" stroke-width="1.5"/>
+<!-- commemorative, stylized portrait -->
+<path d="M25 105c3-19 15-30 29-34h20c17 5 27 17 30 34v8H25z" fill="#0a1019" stroke="url(#gold)" stroke-width="2"/>
+<path d="M35 75c-7-24 1-48 29-50 29 1 38 24 30 51l-9 22H43z" fill="#05080e" stroke="#c99d4c" stroke-width="2"/>
+<path d="M43 50c0-17 9-26 21-26s21 9 21 26v19c-2 16-12 25-21 25S45 85 43 69z" fill="#d7a66d"/>
+<path d="M39 58c-4-26 8-40 25-40 24 0 33 19 25 43l-8-10-5-17c-11 8-22 10-34 9z" fill="#080b11"/>
+<path d="M41 48c-7 22-2 40 8 49l-7 8c-15-14-20-36-13-57 7-22 22-33 37-33 19 0 34 15 38 37 4 21-2 41-16 54l-8-9c11-12 15-28 10-47-3-13-12-23-23-26-10 9-17 15-26 24z" fill="#090d14" stroke="#d6ad5b" stroke-width="1.5"/>
+<path d="M48 62q6-4 12 0M69 62q6-4 12 0" fill="none" stroke="#3b2418" stroke-width="2" stroke-linecap="round"/>
+<path d="M63 64l-3 12 7 1" fill="none" stroke="#9b6842" stroke-width="2" stroke-linecap="round"/>
+<path d="M57 83q7 5 14 0" fill="none" stroke="#6f352b" stroke-width="2.5" stroke-linecap="round"/>
+<path d="M43 105q21-16 42 0" fill="none" stroke="url(#gold)" stroke-width="2"/>
+<path d="M64 8l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="url(#gold)" opacity=".85"/>
+</svg>
