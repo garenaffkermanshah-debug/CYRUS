@@ -8,7 +8,7 @@ CYRUS یک پیام‌رسان وب فارسی و راست‌چین است که 
 
 ## قابلیت‌ها
 
-- ثبت‌نام، ورود، خروج، پروفایل و بازیابی رمز عبور از مسیر Supabase Auth
+- ثبت‌نام و ورود با کد یک‌بارمصرف ایمیلی، خروج، پروفایل و تأیید دومرحله‌ای اختیاری از مسیر Supabase Auth
 - گفت‌وگوی خصوصی، گروه و کانال با نقش‌ها و سطح دسترسی
 - مدیریت اعضا، دعوت، درخواست عضویت و انتقال مالکیت
 - پیام متنی، پاسخ، ویرایش، حذف، واکنش، سنجاق و بازنشر
@@ -47,6 +47,7 @@ docker run --rm -p 8080:8080 \
   -e PORT=8080 \
   -e SUPABASE_URL="https://YOUR-PROJECT.supabase.co" \
   -e SUPABASE_KEY="YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY" \
+  -e SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVER_ONLY_SERVICE_ROLE_KEY" \
   -e SECRET_KEY="A_LONG_RANDOM_SECRET" \
   -e COOKIE_SECURE=0 \
   cyrus-messenger
@@ -59,7 +60,7 @@ docker run --rm -p 8080:8080 \
 ## سلامت سرویس
 
 - /healthz: بررسی زنده بودن پردازه وب
-- /readyz: بررسی پیکربندی و دسترسی به Supabase Auth
+- /readyz: بررسی وجود SUPABASE_URL، SUPABASE_KEY و SUPABASE_SERVICE_ROLE_KEY و دسترسی به Supabase Auth
 
 ## نکات امنیتی انتشار
 
