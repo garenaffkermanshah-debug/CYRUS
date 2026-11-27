@@ -2551,7 +2551,7 @@ def delete_message(message_id):
     return redirect(url_for("chat", conversation_id=conversation_id))
 
 
-def cyrus_channel_member_picker(title, error=""):
+def cyrus_channel_member_picker(title, room_type="channel", error=""):
     uid = str(session.get("user_id") or "")
     headers = {"apikey":KEY,"Authorization":"Bearer "+session.get("access_token","")}
     contacts = []
@@ -2574,6 +2574,9 @@ def cyrus_channel_member_picker(title, error=""):
         rows+='<label class="channel-contact"><input type="checkbox" name="member_ids" value="'+html.escape(cid,quote=True)+'"><span><b>'+html.escape(name)+'</b><small>@'+html.escape(username)+'</small></span></label>'
     if not rows: rows='<p class="muted">مخاطب ذخیره‌شده‌ای پیدا نشد؛ ابتدا افراد را به مخاطبان اضافه کن.</p>'
     safe_title=html.escape(title,quote=True)
+    safe_type=room_type if room_type in ("group","channel") else "channel"
+    kind="گروه" if safe_type=="group" else "کانال"
+    create_action="create_group" if safe_type=="group" else "create_channel"
     content=f"""
     <main class="container card channel-member-picker"><style>
     .channel-member-picker{{margin:12px;padding:14px;background:#101b28;border:1px solid #263b50;border-radius:16px}}
@@ -2583,10 +2586,10 @@ def cyrus_channel_member_picker(title, error=""):
     .channel-member-picker .channel-contact span{{display:flex;flex-direction:column;gap:4px}}
     .channel-member-picker .channel-contact small{{direction:ltr;text-align:right;color:#8ea5b9;font-size:11px}}
     .channel-member-picker .picker-list{{max-height:55vh;overflow:auto}}</style>
-    <h2>انتخاب اعضای کانال</h2><p class="muted">{safe_title} · در آغاز حداکثر ۱۰۰ مخاطب</p><p class="error">{html.escape(error)}</p>
+    <h2>انتخاب اعضای {kind}</h2><p class="muted">{safe_title} · در آغاز حداکثر ۱۰۰ مخاطب</p><p class="error">{html.escape(error)}</p>
     <form method="post" action="/rooms/create" id="channel-members-form">
-    <input type="hidden" name="title" value="{safe_title}"><input type="hidden" name="type" value="channel"><input type="hidden" name="action" value="create_channel">
-    <div class="picker-list">{rows}</div><p class="muted" id="channel-member-count">۰ نفر انتخاب شده‌اند</p><button type="submit">ساخت کانال و افزودن اعضا</button></form>
+    <input type="hidden" name="title" value="{safe_title}"><input type="hidden" name="type" value="{safe_type}"><input type="hidden" name="action" value="{create_action}">
+    <div class="picker-list">{rows}</div><p class="muted" id="channel-member-count">۰ نفر انتخاب شده‌اند</p><button type="submit">ساخت {kind} و افزودن اعضا</button></form>
     <script>(function(){{const f=document.getElementById('channel-members-form'),b=[...f.querySelectorAll('input[name="member_ids"]')],l=document.getElementById('channel-member-count');function u(){{const n=b.filter(x=>x.checked).length;l.textContent=n+' نفر انتخاب شده‌اند';b.forEach(x=>x.disabled=!x.checked&&n>=100)}}b.forEach(x=>x.addEventListener('change',u));f.addEventListener('submit',e=>{{if(b.filter(x=>x.checked).length>100){{e.preventDefault();alert('حداکثر ۱۰۰ مخاطب را انتخاب کن')}}}});u()}})();</script></main>"""
     return page(content)
 
@@ -2594,14 +2597,32 @@ def cyrus_channel_member_picker(title, error=""):
 def create_room_page(error=""):
     selected=request.args.get("type","group")
     if selected not in ("group","channel"): selected="group"
-    group_selected="selected" if selected=="group" else ""
-    channel_selected="selected" if selected=="channel" else ""
     content=f"""
-    <div class="container"><section class="welcome"><h2>ساخت قلمرو تازه</h2><p>یک گروه یا کانال جدید در CYRUS ایجاد کن</p></section>
-    <form class="card" method="post" action="/rooms/create"><h2>اطلاعات مجموعه</h2>
-    <input name="title" minlength="2" maxlength="60" placeholder="نام گروه یا کانال" required>
-    <select name="type" style="width:100%;padding:14px;margin:8px 0;background:#090f1b;border:1px solid #80643b;border-radius:9px;color:white"><option value="group" {group_selected}>گروه</option><option value="channel" {channel_selected}>کانال</option></select>
-    <p class="error">{html.escape(error)}</p><button type="submit">ادامه</button></form><p class="muted"><a class="form-link" href="/contacts">بازگشت به خویشان</a></p></div>"""
+    <main class="container cyrus-create-room">
+      <style>
+        .cyrus-create-room{{min-height:calc(100dvh - 76px);padding:0;background:#0d1722}}
+        .cyrus-create-top{{height:56px;display:flex;align-items:center;gap:14px;padding:0 16px;background:#172331;border-bottom:1px solid #263442;color:#eef4f8}}
+        .cyrus-create-top a{{font-size:27px;color:#eef4f8}}
+        .cyrus-create-top b{{font-size:16px;font-weight:600}}
+        .cyrus-create-body{{padding:24px 18px}}
+        .cyrus-create-body h2{{font-size:20px;margin:0 0 8px;color:#f1f5f8}}
+        .cyrus-create-body p{{font-size:13px;line-height:1.8;color:#91a8ba;margin:0 0 22px}}
+        .cyrus-create-body input[name=title]{{display:block;width:100%;box-sizing:border-box;padding:14px;margin:0 0 22px;background:#111e2b;border:1px solid #31475a;border-radius:10px;color:#f1f5f8;font:inherit}}
+        .cyrus-create-choice{{display:flex;align-items:center;gap:13px;padding:15px 13px;margin:10px 0;background:#111e2b;border:1px solid #263442;border-radius:12px;color:#eaf1f6;cursor:pointer}}
+        .cyrus-create-choice input{{width:20px;height:20px;accent-color:#248bd2}}
+        .cyrus-create-choice span{{display:flex;flex-direction:column;gap:5px}}
+        .cyrus-create-choice small{{color:#91a8ba;font-size:12px;line-height:1.6}}
+        .cyrus-create-body button{{width:100%;margin:18px 0 0;padding:14px;border:0;border-radius:10px;background:#248bd2;color:#fff;font:inherit}}
+      </style>
+      <div class="cyrus-create-top"><a href="/contacts" aria-label="بازگشت">‹</a><b>ساخت گروه یا کانال</b></div>
+      <form class="cyrus-create-body" method="post" action="/rooms/create">
+        <h2>نام و نوع مجموعه</h2><p>ابتدا نام و نوع را انتخاب کن؛ در مرحله بعد می‌توانی مخاطبان را اضافه کنی.</p>
+        <input name="title" minlength="2" maxlength="60" placeholder="نام گروه یا کانال" required>
+        <label class="cyrus-create-choice"><input type="radio" name="type" value="group" {"checked" if selected=="group" else ""}><span><b>گروه جدید</b><small>گفتگوی چندنفره با امکان ارسال پیام اعضا طبق مجوزها</small></span></label>
+        <label class="cyrus-create-choice"><input type="radio" name="type" value="channel" {"checked" if selected=="channel" else ""}><span><b>کانال جدید</b><small>انتشار پیام توسط مالک و مدیران؛ اعضا دنبال‌کننده هستند</small></span></label>
+        <p class="error">{html.escape(error)}</p><button type="submit">ادامه</button>
+      </form>
+    </main>"""
     return page(content)
 
 
@@ -2614,20 +2635,22 @@ def create_room():
     action=request.form.get("action","")
     if not 2<=len(title)<=60: return create_room_page("نام باید بین ۲ تا ۶۰ حرف باشد"),400
     if room_type not in ("group","channel"): return create_room_page("نوع مجموعه نامعتبر است"),400
-    if room_type=="channel" and action!="create_channel": return cyrus_channel_member_picker(title)
-    member_ids=request.form.getlist("member_ids") if room_type=="channel" else []
-    if len(member_ids)>100: return cyrus_channel_member_picker(title,"حداکثر ۱۰۰ مخاطب را انتخاب کن"),400
+    expected_action="create_channel" if room_type=="channel" else "create_group"
+    if action!=expected_action:
+        return cyrus_channel_member_picker(title,room_type)
+    member_ids=request.form.getlist("member_ids")
+    if len(member_ids)>100: return cyrus_channel_member_picker(title,room_type,"حداکثر ۱۰۰ مخاطب را انتخاب کن"),400
     uid=str(session.get("user_id") or "")
     headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json"}
-    if room_type=="channel" and member_ids:
+    if member_ids:
         try:
             cr=requests.get(URL+"/rest/v1/cyrus_contacts",params={"select":"contact_user_id","owner_id":"eq."+uid,"contact_user_id":"in.("+",".join(member_ids)+")"},headers=headers,timeout=20)
             valid={str(x.get("contact_user_id")) for x in cr.json()} if cr.ok else set()
-            if len(valid)!=len(set(member_ids)): return cyrus_channel_member_picker(title,"فقط مخاطبان ذخیره‌شده را می‌توان در شروع اضافه کرد"),400
-        except Exception: return cyrus_channel_member_picker(title,"بررسی مخاطبان انجام نشد؛ دوباره تلاش کن"),502
+            if len(valid)!=len(set(member_ids)): return cyrus_channel_member_picker(title,room_type,"فقط مخاطبان ذخیره‌شده را می‌توان در شروع اضافه کرد"),400
+        except Exception: return cyrus_channel_member_picker(title,room_type,"بررسی مخاطبان انجام نشد؛ دوباره تلاش کن"),502
     try:
         response=requests.post(URL+"/rest/v1/rpc/create_cyrus_room",json={"room_title":title,"room_type":room_type},headers=headers,timeout=20)
-        if not response.ok: return create_room_page("ساخت انجام نشد؛ دسترسی پایگاه داده را بررسی کنید"),502
+        if not response.ok: return cyrus_channel_member_picker(title,room_type,"ساخت انجام نشد؛ دسترسی پایگاه داده را بررسی کنید"),502
         result=response.json()
         if isinstance(result,list) and result: result=result[0]
         if isinstance(result,dict): result=result.get("create_cyrus_room") or result.get("id")
@@ -2638,7 +2661,7 @@ def create_room():
             if not added.ok: failed.append(member_id)
         if failed: return page('<div class="container card"><p>کانال ساخته شد، اما افزودن بعضی مخاطبان ناموفق بود.</p><a href="/rooms/'+room_id+'/manage">مدیریت اعضا</a><a href="/chat/'+room_id+'">باز کردن کانال</a></div>'),502
         return redirect(url_for("chat",conversation_id=room_id))
-    except Exception: return create_room_page("ارتباط با سرور برقرار نشد یا پاسخ نامعتبر بود"),502
+    except Exception: return cyrus_channel_member_picker(title,room_type,"ارتباط با سرور برقرار نشد یا پاسخ نامعتبر بود"),502
 
 
 @app.route("/rooms/<conversation_id>/manage", methods=["GET", "POST"])
