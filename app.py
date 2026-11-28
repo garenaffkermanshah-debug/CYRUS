@@ -572,27 +572,43 @@ window.addEventListener('pageshow',function(event){
  const navEntry=performance.getEntriesByType('navigation')[0];
  if((event.persisted||(navEntry&&navEntry.type==='back_forward'))&&(location.pathname==='/'||location.pathname==='/home'))location.reload();
 });
-/* CYRUS mobile back-stack: internal navigation should return to the nearest useful screen, not replay every visited tab. */
+/* CYRUS navigation history: preserve the actual screen that opened the current one. */
 (function(){
- const path=location.pathname;
- if(path==='/login'||path==='/register'||path==='/welcome'||path==='/')return;
- let target='/home';
- const chatMatch=path.match(/^\\/chat\\/([^/]+)$/);
- if(chatMatch)target='/home';
- else if(path.startsWith('/rooms/')||path.startsWith('/channels/'))target='/home';
- else if(path.startsWith('/user/'))target='/search';
- else if(path.startsWith('/settings')||path.startsWith('/profile')||path.startsWith('/privacy-security'))target='/home';
- else if(path==='/search'||path==='/contacts'||path==='/channels'||path==='/rooms/create')target='/home';
- // Put a guard entry on top of the browser history so Android's hardware
- // Back is caught on this screen instead of exposing an old visited tab/page.
- let handling=false;
- try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(e){}
- window.addEventListener('popstate',function(){
-  if(handling)return;handling=true;
-  // Replace the popped history slot with the intended parent screen.
-  try{history.replaceState({cyrusBackTarget:target},'',target);}catch(e){}
+ const key='cyrus_navigation_stack_v2';
+ const path=location.pathname+location.search;
+ const parentFallback=()=>{
+  const p=location.pathname;
+  if(/^\\/chat\\/[^/]+/.test(p)||p.startsWith('/rooms/')||p.startsWith('/channels/'))return '/home';
+  if(p.startsWith('/user/'))return '/search';
+  if(p.startsWith('/settings/')||p.startsWith('/privacy-security/'))return '/settings';
+  if(p==='/profile')return '/settings';
+  if(p==='/search'||p==='/contacts'||p==='/channels'||p==='/rooms/create')return '/home';
+  return '/home';
+ };
+ const read=()=>{try{const a=JSON.parse(sessionStorage.getItem(key)||'[]');return Array.isArray(a)?a:[];}catch(_e){return [];}};
+ const write=a=>{try{sessionStorage.setItem(key,JSON.stringify(a.slice(-80)));}catch(_e){}};
+ const remember=()=>{const a=read();if(a[a.length-1]!==path)a.push(path);write(a);};
+ window.cyrusGoBack=function(){
+  const overlay=document.querySelector('.setting-edit-overlay.open,.setting-avatar-editor.open,[role="dialog"].open');
+  if(overlay){overlay.classList.remove('open');return;}
+  const menus=[...document.querySelectorAll('.tg-chat-menu:not([hidden]),.composer-attach-menu:not([hidden]),.cyrus-message-menu:not([hidden]),.message-context.open')];
+  if(menus.length){menus.forEach(m=>{m.hidden=true;m.classList.remove('open');});return;}
+  const a=read();if(a[a.length-1]===path)a.pop();
+  let target=a.pop();write(a);
+  if(!target||target===path)target=parentFallback();
   location.replace(target);
- });
+ };
+ document.addEventListener('click',function(e){
+  const link=e.target.closest('a[href]');
+  if(!link||e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey||link.target==='_blank'||link.hasAttribute('download'))return;
+  try{const u=new URL(link.href,location.href);if(u.origin===location.origin&&u.pathname+u.search!==path)remember();}catch(_e){}
+ },true);
+ document.addEventListener('submit',function(e){if(e.target&&e.target.matches('form'))remember();},true);
+ if(location.pathname!=='/'&&location.pathname!=='/login'&&location.pathname!=='/register'&&location.pathname!=='/welcome'){
+  try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(_e){}
+  window.addEventListener('popstate',function(){window.cyrusGoBack();});
+ }
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'){const opened=document.querySelector('.setting-edit-overlay.open,.setting-avatar-editor.open');if(opened)opened.classList.remove('open');}});
 })();
 (function(){
  let deferred=null;
@@ -3280,7 +3296,7 @@ def chat(conversation_id):
     room_header = f"""
     <section class="room-header cyrus-chat-header">
       <style>.cyrus-verified-badge{{display:inline-block;width:auto;height:auto;margin-right:7px;border-radius:0;background:transparent;vertical-align:middle;box-shadow:none}}</style>
-      <a class="chat-back" href="/home" aria-label="بازگشت">➜</a>
+      <a class="chat-back" href="#" onclick="event.preventDefault();cyrusGoBack()" aria-label="بازگشت">➜</a>
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}{cyrus_verified_badge_html(18) if is_official_channel else ''}</h2>
