@@ -1,10 +1,11 @@
 import os, secrets, requests, html, uuid, time, hashlib, re, io, zipfile
+import json as json_module
 from urllib.parse import quote, urlsplit
 from pathlib import Path
 from datetime import timedelta, datetime, timezone
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
-from flask import Flask, request, session, redirect, url_for, render_template, render_template_string, Response
+from flask import Flask, request, session, redirect, url_for, render_template, render_template_string, Response, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
