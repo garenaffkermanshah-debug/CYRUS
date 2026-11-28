@@ -6242,7 +6242,7 @@ def manage_room(conversation_id):
                     )
 
             rows += (
-                '<div class="tg-member-row" data-member-search="{html.escape((str(profile.get("display_name") or profile.get("username") or "") + " " + str(profile.get("username") or "")).lower(), quote=True)}" data-member-role="{html.escape(role, quote=True)}"><div class="tg-member-person">' + avatar_html
+                '<div class="tg-member-row" data-member-search="' + html.escape((str(profile.get("display_name") or profile.get("username") or "") + " " + str(profile.get("username") or "")).lower(), quote=True) + '" data-member-role="' + html.escape(role, quote=True) + '"><div class="tg-member-person">' + avatar_html
                 + '<span><b>' + display_name + '</b><small>' + ('@' + username_text if username_text else '') + '</small></span></div>'
                 + '<div class="tg-member-role">' + safe_role + '</div><div class="tg-member-actions">' + controls + '</div></div>'
             )
