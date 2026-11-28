@@ -1247,12 +1247,13 @@ def welcome():
     <main class="cyrus-welcome">
       <div class="welcome-brand">
         <img src="/static/cyrus-app-icon.webp" alt="CYRUS">
-        <div><strong>CYRUS</strong><small>پیوند پارسیان</small></div>
+        <div><strong>CYRUS</strong></div>
       </div>
-      <div class="welcome-portrait"><img src="/static/cyrus-portrait-new.jpg" alt="چهره کوروش"></div>
-      <p class="welcome-kicker">پیام‌رسان پارسی</p>
+      <div class="welcome-signature" aria-label="امپراتوری پارس">
+        <span>امپراتوری پارس</span>
+        <i aria-hidden="true"></i>
+      </div>
       <h1>شکوهی ماندگار</h1>
-      <p class="welcome-caption">پیوند پارسیان · شکوه هخامنشی</p>
       <div class="welcome-actions">
         <a class="welcome-primary" href="/register">ثبت‌نام</a>
         <a class="welcome-secondary" href="/login">ورود به حساب قبلی</a>
