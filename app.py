@@ -1258,7 +1258,7 @@ def welcome():
         <a class="welcome-primary" href="/register">ثبت‌نام</a>
         <a class="welcome-secondary" href="/login">ورود به حساب قبلی</a>
       </div>
-      <footer class="welcome-footer">CYRUS <span>·</span> شکوهی ماندگار</footer>
+      <footer class="welcome-footer">CYRUS <span>·</span> شکوهی ماندگار<br><a class="welcome-photo-credit" href="https://commons.wikimedia.org/wiki/File:Taq_Bostan.jpg" target="_blank" rel="noopener">عکس طاق‌بستان: Wikimedia Commons</a></footer>
     </main>
     """
     return page(content)
