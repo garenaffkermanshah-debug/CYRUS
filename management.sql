@@ -12,7 +12,7 @@ BEGIN
 END; $$;
 
 CREATE OR REPLACE FUNCTION public.cyrus_manage_add_member(p_conversation_id uuid,p_user_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $cyrus_add_member$
 DECLARE
  v_role text;
  v_type text;
@@ -38,7 +38,7 @@ BEGIN
  IF NOT EXISTS(SELECT 1 FROM public.cyrus_members WHERE conversation_id=p_conversation_id AND user_id=p_user_id) THEN
   INSERT INTO public.cyrus_members(conversation_id,user_id,role) VALUES(p_conversation_id,p_user_id,'member');
  END IF;
-END; $;
+END; $cyrus_add_member$;
 
 CREATE OR REPLACE FUNCTION public.cyrus_manage_remove_member(p_conversation_id uuid,p_user_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
