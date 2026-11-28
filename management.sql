@@ -526,6 +526,9 @@ ALTER TABLE public.cyrus_account_security
     ADD COLUMN IF NOT EXISTS pending_expires_at timestamptz;
 ALTER TABLE public.cyrus_account_security
     ADD COLUMN IF NOT EXISTS password_login_enabled boolean NOT NULL DEFAULT false;
+ALTER TABLE public.cyrus_account_security
+    ADD COLUMN IF NOT EXISTS app_lock_pin_hash text,
+    ADD COLUMN IF NOT EXISTS app_lock_enabled boolean NOT NULL DEFAULT false;
 ALTER TABLE public.cyrus_account_security ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.cyrus_account_security FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cyrus_account_security TO service_role;
