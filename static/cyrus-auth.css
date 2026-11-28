@@ -89,3 +89,20 @@ body:has(.cyrus-welcome) .container{display:none!important}
 .cyrus-auth:has(.auth-main-title) .auth-hero-mark{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;outline:0!important}
 .cyrus-auth:has(.auth-main-title) .auth-hero-mark i,
 .cyrus-auth:has(.auth-main-title) .auth-hero-mark b{display:none!important}
+
+
+/* Welcome page: faint Taq-e Bostan relief as a background watermark */
+.cyrus-welcome{isolation:isolate;overflow:hidden}
+.cyrus-welcome:before{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(180deg,#07132155 0%,#07132135 36%,#07132165 68%,#071321b8 100%),
+    url("https://commons.wikimedia.org/wiki/Special:FilePath/Taq_Bostan.jpg?width=1000") center 48%/cover no-repeat;
+  opacity:.22;filter:grayscale(1) sepia(.12) hue-rotate(165deg) saturate(.7) contrast(.82);
+  mix-blend-mode:screen;
+}
+.cyrus-welcome:after{
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:linear-gradient(180deg,#06142640,#06142620 45%,#061426b0);
+}
+@media(max-width:760px){.cyrus-welcome:before{background-position:center 45%;opacity:.24}}
