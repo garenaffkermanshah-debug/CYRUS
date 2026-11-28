@@ -382,7 +382,7 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-taqbostan2">
+<link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-loginmark5">
 <link rel="stylesheet" href="/static/cyrus-rebuild.css?v=6">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
@@ -1462,7 +1462,6 @@ def login():
     <main class="cyrus-auth">
       <section class="auth-intro">
         <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
-        <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
         <h1 class="auth-main-title"><em>شکوهی ماندگار</em></h1>
       </section>
       <section class="auth-panel">
