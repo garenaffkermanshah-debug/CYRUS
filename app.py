@@ -1913,7 +1913,28 @@ def contacts():
         except Exception:
             directory_profiles = {}
 
-    def directory_presence(profile):
+    directory_privacy = {}
+    directory_contacts = set()
+    if directory_ids:
+        try:
+            pr=requests.get(URL+"/rest/v1/cyrus_privacy_settings",
+                params={"select":"user_id,last_seen_visibility,profile_photo_visibility","user_id":"in.("+",".join(directory_ids)+")"},
+                headers=cyrus_admin_api_headers(),timeout=15)
+            if pr.ok:
+                directory_privacy={str(x.get("user_id")):x for x in pr.json() if isinstance(x,dict)}
+        except Exception: pass
+        try:
+            cr=requests.get(URL+"/rest/v1/cyrus_contacts",
+                params={"select":"contact_user_id","owner_id":"eq."+str(session.get("user_id") or ""),"contact_user_id":"in.("+",".join(directory_ids)+")"},
+                headers=headers,timeout=15)
+            if cr.ok: directory_contacts={str(x.get("contact_user_id")) for x in cr.json()}
+        except Exception: pass
+
+    def directory_presence(profile, privacy=None, is_contact=False):
+        privacy=privacy or {}
+        visibility=str(privacy.get("last_seen_visibility") or "everyone")
+        if visibility=="nobody" or (visibility=="contacts" and not is_contact):
+            return "آخرین بازدید مخفی", False
         seen = str((profile or {}).get("last_seen_at") or "").strip()
         if not seen:
             return "آخرین بازدید نامشخص", False
@@ -1949,8 +1970,12 @@ def contacts():
 
         safe_id = html.escape(user_id, quote=True)
         profile = directory_profiles.get(user_id, {})
+        privacy = directory_privacy.get(user_id, {})
+        is_contact_for_privacy = user_id in directory_contacts
+        photo_visibility = str(privacy.get("profile_photo_visibility") or "everyone")
         avatar_url = str(profile.get("avatar_url") or "")
-        presence_text, is_online = directory_presence(profile)
+        if photo_visibility=="nobody" or (photo_visibility=="contacts" and not is_contact_for_privacy): avatar_url=""
+        presence_text, is_online = directory_presence(profile, privacy, is_contact_for_privacy)
         avatar_html = (
             '<img src="' + html.escape(avatar_url, quote=True) + '" alt="" loading="lazy" '
             'style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
