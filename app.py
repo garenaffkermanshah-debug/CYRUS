@@ -392,7 +392,7 @@ BASE = """
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-homepolish1">
-<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=6">
+<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=7">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
 <meta name="mobile-web-app-capable" content="yes">
@@ -659,6 +659,14 @@ window.addEventListener('pageshow',function(event){
 })();
 </script>
 <script src="/static/cyrus-rebuild.js?v=2" defer></script>
+{{ theme_toggle|safe }}
+<script>
+(function(){const root=document.documentElement,key="cyrus-theme";let theme="night";try{theme=localStorage.getItem(key)==="day"?"day":"night";}catch(e){}root.dataset.theme=theme;
+const btn=document.getElementById("cyrus-theme-toggle");if(!btn)return;
+function paint(){btn.textContent=root.dataset.theme==="day"?"☾":"☼";btn.setAttribute("aria-label",root.dataset.theme==="day"?"فعال‌کردن تم شب":"فعال‌کردن تم روز");btn.title=btn.getAttribute("aria-label");}
+paint();btn.addEventListener("click",function(){theme=root.dataset.theme==="day"?"night":"day";root.dataset.theme=theme;try{localStorage.setItem(key,theme);}catch(e){}paint();});
+})();
+</script>
 </body>
 </html>
 """
@@ -703,7 +711,8 @@ def page(content):
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}" aria-label="{label}"><span class="nav-icon" aria-hidden="true">{icon}</span><span>{label}</span></a>'
         nav = f'<style>.bottom{{height:58px;padding:4px 3px calc(4px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:3px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a>span:not(.nav-icon){{font-size:10px;line-height:1.15}}.bottom a .nav-icon{{font-size:20px;line-height:1;font-family:serif;display:grid;place-items:center}}.bottom a .nav-icon svg{{width:20px;height:20px;display:block;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
-    return render_template_string(BASE, content=content, nav=nav, header=header)
+    theme_toggle = '<button type="button" class="cyrus-theme-toggle" id="cyrus-theme-toggle" style="position:fixed;right:14px;bottom:calc(68px + env(safe-area-inset-bottom));z-index:40" aria-label="تغییر تم">☼</button>' if session.get("access_token") else ""
+    return render_template_string(BASE, content=content, nav=nav, header=header, theme_toggle=theme_toggle)
 
 def auth_request(path, data):
     try:
