@@ -6529,7 +6529,7 @@ def leave_room_from_chat(conversation_id):
         return "ارتباط با سرور برقرار نشد",502
 
 
-@app.route("/channels/join/<conversation_id>", methods=["POST"])
+@app.route("/channels/join/<conversation_id>", methods=["GET", "POST"])
 def join_public_channel(conversation_id):
     if not session.get("access_token"):
         return redirect("/login")
