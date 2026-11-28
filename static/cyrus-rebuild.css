@@ -38,3 +38,45 @@ input,textarea,select{background:#101c29!important;border-color:#2b4155!importan
 .bottom a .nav-icon svg{width:20px!important;height:20px!important;max-width:20px!important;max-height:20px!important}
 .bottom a>span:not(.nav-icon){font-size:10px!important;line-height:1.15!important}
 @media(max-width:600px){.bottom{height:56px!important}.bottom a .nav-icon svg{width:20px!important;height:20px!important}}
+
+/* CYRUS classic-blue visual pass: keeps all existing routes and backend features. */
+:root{--tg-bg:#06152a;--tg-panel:#0c2038;--tg-panel2:#122b47;--tg-line:#1d4167;--tg-blue:#1688f5;--tg-text:#edf5ff;--tg-muted:#93b3d2}
+html,body{background-color:#06152a!important;color:#edf5ff!important}
+body{background-image:linear-gradient(180deg,rgba(2,10,25,.90),rgba(3,18,40,.90)),url('/static/cyrus-tomb.jpg')!important;background-position:center center!important;background-size:cover!important;background-attachment:fixed!important}
+body:before{background:linear-gradient(180deg,rgba(1,9,24,.25),rgba(2,14,32,.48))!important}
+.top{background:rgba(4,17,37,.97)!important;border-bottom:1px solid #174b7b!important}
+.logo{color:#e7f3ff!important;letter-spacing:2px!important}
+.emblem{border-color:#1688f5!important;box-shadow:0 0 16px #1688f522!important}
+.top-actions{color:#79c0ff!important}
+.container{max-width:680px!important}
+.card,.empty{background:rgba(10,29,51,.96)!important;border:1px solid #1d4167!important;border-radius:17px!important;box-shadow:0 12px 32px #0003!important}
+.chat-row{background:rgba(5,20,38,.96)!important;border-bottom:1px solid #142f4b!important;min-height:74px!important}
+.chat-row:active{background:#102b48!important}
+.avatar{background:#123a60!important;color:#9bd2ff!important;border:1px solid #1b5b91!important}
+.chat-name{color:#eff7ff!important;font-weight:600!important}
+.chat-preview{color:#91abc4!important}
+.searchbar{background:#102b47!important;border:1px solid #1e4265!important;border-radius:24px!important;color:#afc9e2!important}
+.searchbar span{color:#65baff!important}
+.tab{color:#a7bfd8!important}
+.tab.active{color:#72c2ff!important;border-color:#1688f5!important}
+.section-title{background:#071a30!important;color:#8dcaff!important;border-color:#1b4168!important}
+.bottom{background:rgba(4,16,34,.98)!important;border-top:1px solid #1b4168!important}
+.bottom a{color:#92acc7!important}
+.bottom a.current{color:#69bdff!important;background:linear-gradient(0deg,#1688f51b,transparent)!important}
+.bottom a.current:after{background:#1688f5!important}
+button,.action{background:linear-gradient(135deg,#0879df,#2399ff)!important;color:#fff!important;border-radius:14px!important;box-shadow:0 5px 16px #006ed522!important}
+input,textarea,select{background:#081a2e!important;border-color:#234767!important;color:#f2f8ff!important}
+.form-link{color:#75c2ff!important}
+.error{color:#ff8585!important}
+.container:has(.cyrus-chat-header){background:rgba(5,18,36,.88)!important;border-inline-color:#1a3e61!important}
+.cyrus-chat-header{background:rgba(7,24,44,.98)!important;border-bottom-color:#1d4167!important}
+.messages-area{background-image:linear-gradient(rgba(2,13,31,.70),rgba(2,13,31,.78)),url('/static/cyrus-tomb.jpg')!important;background-position:center!important;background-size:cover!important}
+.message.mine{background:linear-gradient(135deg,#086dc8,#1256a8)!important;border:1px solid #238de8!important;color:#fff!important;border-radius:18px 18px 5px 18px!important}
+.message.theirs{background:#102640!important;border:1px solid #1c3b5a!important;color:#eef6ff!important;border-radius:18px 18px 18px 5px!important}
+.message small,.message-time{color:#a9c5e0!important}
+.message-read-status{color:#69c0ff!important}
+.message-context,.message .message-context{background:#102741!important;border-color:#254766!important}
+.chat-date-divider span{background:#10243a!important;color:#a8c6e4!important;border:1px solid #1c3d5d!important}
+.send-box{background:rgba(5,20,39,.98)!important;border-color:#1c4166!important}
+.send-box button{background:#087ff0!important}
+@media(max-width:600px){.top{height:56px!important}.chat-row{padding:10px 12px!important}.bottom{height:58px!important}}
