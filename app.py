@@ -3355,8 +3355,11 @@ def chat(conversation_id):
                             age_seconds = max(0, (now_dt - seen_dt.astimezone(timezone.utc)).total_seconds())
                             if age_seconds <= 300:
                                 room_last_seen = "آنلاین"
+                            elif age_seconds >= 30 * 24 * 60 * 60:
+                                room_last_seen = "آخرین بازدید مدت‌ها پیش"
+                            elif age_seconds >= 7 * 24 * 60 * 60:
+                                room_last_seen = "آخرین بازدید یک هفته پیش"
                             else:
-                                # در سربرگ گفتگوی خصوصی فقط ساعت آخرین بازدید نشان داده شود؛ بدون تاریخ.
                                 room_last_seen = "آخرین بازدید " + seen_local.strftime("%H:%M")
                         except (TypeError, ValueError, OverflowError):
                             room_last_seen = "آخرین بازدید نامشخص"
@@ -3773,7 +3776,7 @@ async function cyrusToggleVoiceRecord(b){
           }}));
         }}
         document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const raw=el.dataset.createdAt;const dt=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(raw)?raw:raw+"Z");if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}catch(e){{}}}});
-        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seenRaw=presence.dataset.seen;const seen=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(seenRaw)?seenRaw:seenRaw+"Z");if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}}}catch(e){{}}}}
+        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seenRaw=presence.dataset.seen;const seen=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(seenRaw)?seenRaw:seenRaw+"Z");if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":age>=2592000000?"آخرین بازدید مدت‌ها پیش":age>=604800000?"آخرین بازدید یک هفته پیش":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}}}catch(e){{}}}}
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker){{
           const insertPickedEmoji=function(event){{
