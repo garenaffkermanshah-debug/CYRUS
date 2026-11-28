@@ -3524,8 +3524,11 @@ def chat(conversation_id):
                 if created_for_receipt and cyrus_read_time(row.get("last_read_at"))
                 and cyrus_read_time(row.get("last_read_at")) >= created_for_receipt
             )
-            if str(room_data_for_history.get("type") or "") == "private":
+            message_room_kind_for_receipt = str(room_data_for_history.get("type") or "")
+            if message_room_kind_for_receipt == "private":
                 read_status_html = '<span class="message-read-status" title="'+("خوانده‌شده" if readers else "ارسال‌شده")+'">'+("✓✓" if readers else "✓")+'</span>'
+            elif message_room_kind_for_receipt == "channel":
+                read_status_html = '<span class="cyrus-channel-view-count" data-channel-view-count="'+str(readers)+'" title="بازدیدکنندگان پیام"><span aria-hidden="true">◉</span> <b>'+str(readers)+'</b></span>'
             elif readers:
                 read_status_html = '<span class="message-read-status" title="تعداد اعضای خواننده">✓✓ '+str(readers)+'</span>'
 
@@ -3987,19 +3990,25 @@ async function cyrusToggleVoiceRecord(b){
         .send-box .composer-attach-menu{{background:#142333!important;border:1px solid #2a4054!important;}}
         .cyrus-inchat-search button[data-close],#cyrusRoomSearch button[aria-label*="بستن"]{{background:transparent!important;border:0!important;box-shadow:none!important;color:#c3d0dc!important;}}
         .cyrus-older-messages{{border-color:#b9954b55;background:#172838;color:#d9c18c;}}
+        .cyrus-channel-view-count{{display:inline-flex;align-items:center;gap:3px;color:#91a9bb;font-size:9px;direction:ltr;line-height:1;}}
+        .cyrus-channel-view-count b{{font-weight:500;font-size:9px;color:#91a9bb;}}
+        .tg-chat-menu a:active,.tg-chat-menu button:active{{background:#243647!important;}}
+        .cyrus-blocked-composer{{flex-shrink:0;width:100%;}}
+        .container:has(.cyrus-chat-header) .messages-area{{min-height:0;}}
+        .container:has(.cyrus-chat-header){{padding-bottom:calc(8px + env(safe-area-inset-bottom));}}
         @media(max-width:520px){{.room-header{{margin-inline:-8px;padding-inline:10px;}}}}
 
-        .cyrus-blocked-composer{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));margin:8px 0 0;padding:13px 16px;background:#172432;border:1px solid #2b4053;border-radius:24px;text-align:center;color:#a9bac8;font-size:13px}}
-        .cyrus-blocked-composer p{{margin:0 0 8px;line-height:1.7}}
+        .cyrus-blocked-composer{{position:sticky;bottom:env(safe-area-inset-bottom);margin:auto 0 0;padding:7px 10px;background:#172432;border:1px solid #2b4053;border-radius:13px;text-align:center;color:#a9bac8;font-size:11px;line-height:1.45;max-width:100%;box-sizing:border-box}}
+        .cyrus-blocked-composer p{{margin:0;line-height:1.45}}
         .cyrus-blocked-composer form{{margin:0}}
         .cyrus-blocked-composer button{{width:auto;margin:0;padding:8px 18px;background:transparent;color:#69b9f7;border:0;border-radius:18px;font-size:14px}}
 
         .cyrus-chat-header .chat-back{{font-size:27px;color:#e9f0f5;padding:4px 7px;flex:0 0 auto}}
         .tg-chat-menu-wrap{{position:relative;flex:0 0 auto}}
         .tg-chat-menu-wrap .chat-header-more{{width:40px;height:40px;display:grid;place-items:center;background:transparent;border:0;border-radius:50%;color:#e9f0f5;font-size:25px;text-decoration:none;cursor:pointer}}
-        .tg-chat-menu{{position:absolute;top:46px;left:0;min-width:190px;padding:6px;background:#1b2b3a;border:1px solid #31475a;border-radius:12px;box-shadow:0 8px 28px #0008;z-index:30}}
+        .tg-chat-menu{{position:absolute;top:42px;left:0;min-width:172px;width:max-content;max-width:min(230px,calc(100vw - 28px));padding:4px;background:#1b2b3a;border:1px solid #31475a;border-radius:10px;box-shadow:0 8px 28px #0008;z-index:30}}
         .tg-chat-menu[hidden]{{display:none}}
-        .tg-chat-menu a,.tg-chat-menu button{{display:block;width:100%;padding:12px 13px;background:transparent;border:0;border-radius:7px;text-align:right;color:#eaf1f6;text-decoration:none;font-size:14px;white-space:nowrap}}
+        .tg-chat-menu a,.tg-chat-menu button{{display:block;width:100%;min-height:0;margin:0;padding:7px 9px!important;background:transparent!important;border:0!important;border-radius:6px!important;box-shadow:none!important;text-align:right;color:#dce6ee;text-decoration:none;font-size:12px!important;line-height:1.45;white-space:normal}}
         .tg-chat-menu a:active,.tg-chat-menu button:active{{background:#2b4053}}
         .tg-chat-menu form{{margin:0;border-top:1px solid #304252}}
         .tg-chat-menu form button{{color:#f28b82}}
