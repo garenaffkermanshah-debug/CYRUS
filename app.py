@@ -1304,8 +1304,11 @@ def register():
     if request.method == "POST":
         email = str(request.form.get("email") or "").strip().lower()
         username = str(request.form.get("username") or "").strip().lower()
-        if not email or not username:
-            error = "ایمیل و نام کاربری را تکمیل کنید"
+        display_name = str(request.form.get("display_name") or "").strip()
+        if not email or not username or not display_name:
+            error = "نام نمایشی، نام کاربری و ایمیل را تکمیل کنید"
+        elif len(display_name) > 40:
+            error = "نام نمایشی باید حداکثر ۴۰ نویسه باشد"
         elif len(email) > 254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
             error = "نشانی ایمیل معتبر وارد کنید"
         elif not (3 <= len(username) <= 24 and all(ch.isalnum() or ch in "_-" for ch in username)):
@@ -1322,6 +1325,7 @@ def register():
                     session.clear()
                     session["cyrus_pending_email"] = email
                     session["cyrus_pending_username"] = username
+                    session["cyrus_pending_display_name"] = display_name
                     session["cyrus_pending_flow"] = "register"
                     session["cyrus_otp_sent_at"] = time.time()
                     return redirect(url_for("verify_email"))
@@ -1338,9 +1342,11 @@ def register():
         <div class="auth-feature"><span>✦</span><div><b>شروعی ساده و امن</b><small>ثبت‌نام با ایمیل و کد تأیید</small></div></div>
       </section>
       <section class="auth-panel">
-        <div class="auth-panel-head"><span class="auth-step">ایجاد حساب</span><h2>عضویت در CYRUS</h2><p>نام کاربری و ایمیل خود را وارد کنید.</p></div>
+        <div class="auth-panel-head"><span class="auth-step">ایجاد حساب</span><h2>عضویت در CYRUS</h2><p>نام نمایشی، نام کاربری و ایمیل خود را وارد کنید.</p></div>
         <p class="error">{html.escape(str(error))}</p>
         <form method="post" class="auth-form">
+          <label for="auth-display-name">نام نمایشی</label>
+          <input id="auth-display-name" name="display_name" placeholder="نامی که دیگران می‌بینند" required maxlength="40" autocomplete="name">
           <label for="auth-username">نام کاربری</label>
           <input id="auth-username" name="username" placeholder="نام دلخواه شما" required minlength="3" maxlength="24" autocomplete="username">
           <label for="auth-email">نشانی ایمیل</label>
@@ -1395,6 +1401,7 @@ def verify_email():
                 code, data = auth_request("/auth/v1/verify", {"type": "signup" if flow == "register" else "email", "email": email, "token": token})
                 if code == 200 and data.get("access_token") and data.get("user"):
                     username = str(session.get("cyrus_pending_username") or "")
+                    display_name = str(session.get("cyrus_pending_display_name") or username)
                     session.clear()
                     session["access_token"] = data["access_token"]
                     session["refresh_token"] = data.get("refresh_token", "")
@@ -1407,7 +1414,7 @@ def verify_email():
                         try:
                             profile_response = requests.post(
                                 URL + "/rest/v1/cyrus_profiles",
-                                json={"id": data["user"]["id"], "username": username, "display_name": username},
+                                json={"id": data["user"]["id"], "username": username, "display_name": display_name},
                                 headers={"apikey": KEY, "Authorization": "Bearer " + data["access_token"],
                                          "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"},
                                 timeout=20
@@ -1426,9 +1433,9 @@ def verify_email():
                         return redirect(url_for("home"))
                 else:
                     if str(data.get("error_code") or "") == "otp_expired":
-                        error = "کد نادرست، منقضی یا قبلاً مصرف شده است؛ فقط آخرین کد ایمیل را وارد کنید. مدت اعتبار OTP ایمیل در Supabase باید ۶۰۰ ثانیه باشد."
+                        error = "کد منقضی شده است؛ پس از پایان شمارش معکوس، کد جدید درخواست کنید."
                     else:
-                        error = "کد نادرست است؛ مطمئن شوید کد را برای همین ایمیل و از آخرین پیام CYRUS وارد می‌کنید."
+                        error = "کد واردشده صحیح نیست"
 
     content = f"""
     <main class="cyrus-auth cyrus-auth-verify">
@@ -1444,7 +1451,19 @@ def verify_email():
           <input id="auth-token" class="auth-code" name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="000000" required autocomplete="one-time-code" dir="ltr">
           <button class="auth-submit">تأیید و ورود <span>←</span></button>
         </form>
-        <form method="post" class="auth-resend"><input type="hidden" name="resend" value="1"><button type="submit">ارسال دوباره کد</button></form>
+        <form method="post" class="auth-resend"><input type="hidden" name="resend" value="1"><button id="cyrus-resend-button" type="submit" disabled>ارسال دوباره کد (۶۰)</button></form>
+        <script>
+        (function(){
+          const button=document.getElementById('cyrus-resend-button');
+          if(!button)return;
+          let seconds=Math.max(0,Math.floor(60-({time.time()}-Number({float(session.get("cyrus_otp_sent_at", 0) or 0)}))));
+          const update=function(){
+            if(seconds>0){button.disabled=true;button.textContent='ارسال دوباره کد ('+seconds+')';seconds-=1;window.setTimeout(update,1000);}
+            else{button.disabled=false;button.textContent='ارسال دوباره کد';}
+          };
+          update();
+        })();
+        </script>
         <a class="auth-secondary" href="/login">تغییر ایمیل / بازگشت <span>←</span></a>
       </section>
       <footer class="auth-footer">CYRUS <span>·</span> پیوند پارسیان · شکوه هخامنشی</footer>
@@ -1466,7 +1485,7 @@ def login():
             if lookup_error:
                 error = "بررسی حساب انجام نشد؛ کلید امن Supabase را در تنظیمات محیطی سرور قرار دهید."
             elif not existing:
-                error = "ایمیل ناموجود است؛ لطفاً از بخش ثبت‌نام حساب CYRUS بسازید."
+                error = "ایمیل ناموجود است؛ ابتدا ثبت‌نام کنید"
             elif not existing.get("email_confirmed_at"):
                 error = "ایمیل این حساب هنوز تأیید نشده؛ از بخش ثبت‌نام کد تأیید دریافت کنید."
             else:
