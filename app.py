@@ -572,6 +572,24 @@ window.addEventListener('pageshow',function(event){
  const navEntry=performance.getEntriesByType('navigation')[0];
  if((event.persisted||(navEntry&&navEntry.type==='back_forward'))&&(location.pathname==='/'||location.pathname==='/home'))location.reload();
 });
+/* CYRUS mobile back-stack: internal navigation should return to the nearest useful screen, not replay every visited tab. */
+(function(){
+ const path=location.pathname;
+ if(path==='/login'||path==='/register'||path==='/welcome'||path==='/')return;
+ let target='/home';
+ const chatMatch=path.match(/^\\/chat\\/([^/]+)$/);
+ if(chatMatch)target='/home';
+ else if(path.startsWith('/rooms/')||path.startsWith('/channels/'))target='/home';
+ else if(path.startsWith('/user/'))target='/search';
+ else if(path.startsWith('/settings')||path.startsWith('/profile')||path.startsWith('/privacy-security'))target='/home';
+ else if(path==='/search'||path==='/contacts'||path==='/channels'||path==='/rooms/create')target='/home';
+ let handling=false;
+ window.addEventListener('popstate',function(){
+  if(handling)return;handling=true;
+  try{history.replaceState({cyrusBackTarget:target},'',target);}catch(e){}
+  location.replace(target);
+ });
+})();
 (function(){
  let deferred=null;
  const bar=document.getElementById('cyrusInstallBar'),btn=document.getElementById('cyrusInstallBtn'),close=document.getElementById('cyrusInstallClose');
