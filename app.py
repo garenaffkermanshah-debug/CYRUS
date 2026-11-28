@@ -6352,7 +6352,7 @@ def manage_room(conversation_id):
               <label class="tg-field">توضیحات
                 <textarea name="description" maxlength="500" rows="3">{description}</textarea>
               </label>
-old avatar input              <label class="tg-switch-row"><span>فعال بودن واکنش‌ها</span><span class="tg-switch"><input type="checkbox" name="reactions_enabled" {reactions_checked}><i></i></span></label>
+              <label class="tg-switch-row"><span>فعال بودن واکنش‌ها</span><span class="tg-switch"><input type="checkbox" name="reactions_enabled" {reactions_checked}><i></i></span></label>
             </div>
             <div class="tg-section">
               <div class="tg-section-title">نوع و دسترسی</div>
@@ -6377,9 +6377,9 @@ old avatar input              <label class="tg-switch-row"><span>فعال بود
             const form=document.querySelector('.tg-room-settings'),save=document.querySelector('.tg-top-save');
             if(!form||!save)return;
             let changed=false;
-            function mark(){{changed=true;save.disabled=false;save.textContent='تأیید تغییرات';}}
+            function mark(){{changed=true;save.disabled=false;save.textContent='✓';}}
             form.querySelectorAll('input,textarea,select').forEach(el=>{{el.addEventListener('input',mark);el.addEventListener('change',mark);}});
-            form.addEventListener('submit',function(){{if(!changed)return;save.disabled=true;save.textContent='در حال ذخیره…';}});
+            form.addEventListener('submit',function(){{if(!changed)return;save.disabled=true;save.textContent='…';}});
           }})();
           </script>
 
@@ -6395,7 +6395,7 @@ old avatar input              <label class="tg-switch-row"><span>فعال بود
           <div id="cyrusMemberRows">{rows}</div>
           <script>
           (function(){{const s=document.getElementById('cyrusMemberSearch'),w=document.getElementById('cyrusMemberRows'),n=document.getElementById('cyrusMemberCount'),bs=[...document.querySelectorAll('.cyrus-member-filters [data-role]')],r=document.getElementById('cyrusMemberReset');if(!s||!w)return;let role='all';function apply(){{const q=s.value.trim().toLocaleLowerCase();let shown=0;w.querySelectorAll('.tg-member-row').forEach(x=>{{const ok=(!q||(x.dataset.memberSearch||'').includes(q))&&(role==='all'||x.dataset.memberRole===role);x.hidden=!ok;if(ok)shown++;}});if(n)n.textContent='نمایش '+shown+' از '+w.querySelectorAll('.tg-member-row').length+' عضو';}}s.addEventListener('input',apply);bs.forEach(b=>b.addEventListener('click',()=>{{role=b.dataset.role;bs.forEach(x=>x.classList.toggle('active',x===b));apply();}}));r.addEventListener('click',()=>{{s.value='';role='all';bs.forEach(x=>x.classList.toggle('active',x.dataset.role==='all'));apply();s.focus();}});apply();}})();
-          (function(){{const f=document.querySelector('.tg-room-settings'),save=document.querySelector('.tg-top-save');if(!f)return;let dirty=false;function mark(){{dirty=true;if(save){{save.disabled=false;save.textContent='تأیید تغییرات';}}}}f.querySelectorAll('input,textarea,select').forEach(x=>{{x.addEventListener('input',mark);x.addEventListener('change',mark);}});f.addEventListener('submit',()=>{{dirty=false;if(save){{save.disabled=true;save.textContent='در حال ذخیره…';}}}});window.addEventListener('beforeunload',e=>{{if(dirty){{e.preventDefault();e.returnValue='';}}}});[[f.querySelector('[name=title]'),60],[f.querySelector('[name=description]'),500]].forEach(([x,m])=>{{if(!x)return;const b=document.createElement('small');b.className='cyrus-field-counter';b.textContent=x.value.length+'/'+m;x.after(b);x.addEventListener('input',()=>b.textContent=x.value.length+'/'+m);}});}})();
+          (function(){{const f=document.querySelector('.tg-room-settings'),save=document.querySelector('.tg-top-save');if(!f)return;let dirty=false;function mark(){{dirty=true;if(save){{save.disabled=false;save.textContent='✓';}}}}f.querySelectorAll('input,textarea,select').forEach(x=>{{x.addEventListener('input',mark);x.addEventListener('change',mark);}});f.addEventListener('submit',()=>{{dirty=false;if(save){{save.disabled=true;save.textContent='…';}}}});window.addEventListener('beforeunload',e=>{{if(dirty){{e.preventDefault();e.returnValue='';}}}});[[f.querySelector('[name=title]'),60],[f.querySelector('[name=description]'),500]].forEach(([x,m])=>{{if(!x)return;const b=document.createElement('small');b.className='cyrus-field-counter';b.textContent=x.value.length+'/'+m;x.after(b);x.addEventListener('input',()=>b.textContent=x.value.length+'/'+m);}});}})();
           </script>
           <section class="tg-danger-card"><h3>ترک گروه</h3><form method="post" onsubmit="return confirm('از گروه خارج می‌شوید؟')"><input type="hidden" name="action" value="leave"><button>ترک گروه</button></form></section>
         """
