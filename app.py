@@ -6172,6 +6172,7 @@ def manage_room(conversation_id):
         title = html.escape(str(room.get("title") or ""))
         description = html.escape(str(room.get("description") or ""))
         avatar_url = html.escape(str(room.get("avatar_url") or ""), quote=True)
+        avatar_preview = ('<img class="tg-room-avatar-preview" src="' + avatar_url + '" alt="تصویر گروه">') if avatar_url else '<span class="tg-room-avatar-preview tg-room-avatar-fallback">♙</span>'
         invite_code = str(room.get("invite_code") or "")
         invite_url = request.host_url.rstrip("/") + "/invite/" + invite_code if invite_code else ""
         invite_safe = html.escape(invite_url, quote=True)
@@ -6306,25 +6307,52 @@ def manage_room(conversation_id):
             .tg-room-settings .tg-permissions summary .tg-chevron{{color:#7f94a7;transition:transform .18s}}
             .tg-room-settings .tg-permissions[open] summary .tg-chevron{{transform:rotate(180deg)}}
             .tg-room-settings .tg-permissions-body{{padding:0 16px 10px}}
-            .tg-room-settings .tg-save{{position:fixed;left:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:25;width:auto;min-width:150px;margin:0;padding:13px 20px;border:0;border-radius:24px;background:#248bd2;color:white;font-size:14px;font-weight:600;box-shadow:0 5px 18px #0006}}\n            .tg-room-settings .tg-save:disabled{{background:#253747;color:#8193a2;box-shadow:none;opacity:.75}}\n            .tg-manage-topbar{{height:58px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#172331;border-bottom:1px solid #263442}}\n            .tg-manage-topbar a{{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;font-size:25px;background:#203243}}\n            .tg-manage-topbar span{{flex:1;text-align:right;color:#eef4f8;font-size:16px;font-weight:600}}
+            .tg-room-settings .tg-save{{display:none}}
+            .tg-room-settings .tg-save:disabled{{opacity:.55}}
+            .tg-manage-topbar{{height:54px;display:flex;align-items:center;gap:10px;padding:0 12px;background:#172331;border-bottom:1px solid #263442;direction:ltr;position:sticky;top:0;z-index:30}}
+            .tg-manage-topbar .tg-top-save{{width:34px;height:34px;flex:0 0 34px;border:0;border-radius:11px;background:#268bd2;color:#fff;font-size:20px;font-weight:700;display:grid;place-items:center;padding:0}}
+            .tg-manage-topbar .tg-top-save:disabled{{background:#263746;color:#8193a2}}
+            .tg-manage-topbar a{{width:32px;height:32px;flex:0 0 32px;display:grid;place-items:center;border-radius:50%;color:#eaf2f8;font-size:22px;background:#203243}}
+            .tg-manage-topbar span{{flex:1;text-align:right;direction:rtl;color:#eef4f8;font-size:15px;font-weight:600}}
+            .tg-room-settings .tg-section{{padding:0 12px 10px;border-bottom:6px solid #0b1520}}
+            .tg-room-settings .tg-section-title{{padding:13px 4px 8px}}
+            .tg-room-avatar-line{{display:flex;align-items:center;gap:12px;padding:8px 0 12px}}
+            .tg-room-avatar-preview{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;object-fit:cover;background:#20364a;border:2px solid #31516b;display:grid;place-items:center;color:#e0bb70;font-size:25px}}
+            .tg-avatar-picker{{display:flex;align-items:center;gap:9px;min-width:0;flex:1;padding:10px 12px;border:1px solid #2a4358;border-radius:12px;background:#142332;color:#9bd3fb;font-size:13px;cursor:pointer}}
+            .tg-avatar-picker input{{display:none}}
+            .tg-avatar-picker small{{display:block;color:#8099ad;font-size:10px;margin-top:3px}}
+            .tg-room-id-card{{margin:8px 12px 12px;padding:10px 12px;border:1px solid #263c50;border-radius:13px;background:#101d2a}}
+            .tg-room-id-title{{font-size:12px;color:#8fbfe4;margin-bottom:7px}}
+            .tg-room-id-row{{display:flex;gap:7px;align-items:center}}
+            .tg-room-id-row input{{min-width:0;flex:1;height:34px;padding:0 9px;border-radius:8px;border:1px solid #2a4054;background:#091521;color:#b9c9d8;font-size:10px;direction:ltr}}
+            .tg-room-id-row button,.tg-room-id-card form button{{padding:7px 10px;margin:0;border:0;border-radius:8px;background:#20394f;color:#9bd3fb;font-size:11px;white-space:nowrap}}
+            .tg-room-id-card form{{margin-top:7px}}
+            .tg-room-id-card form button{{background:transparent;color:#7e9db6;padding:5px 2px}}
+            .tg-add-member-card{{margin:10px 12px;padding:12px;border-radius:13px;background:#101d2a;border:1px solid #263c50}}
+            .tg-add-member-card h3,.tg-danger-card h3{{font-size:13px;margin:0 0 10px;color:#c5d6e5}}
+            .tg-add-member-card form{{display:flex;gap:7px;align-items:center}}
+            .tg-add-member-card input{{min-width:0;flex:1;height:38px;padding:0 10px;border:1px solid #2a4358;border-radius:9px;background:#091521;color:#fff;font-size:12px}}
+            .tg-add-member-card button{{height:38px;padding:0 12px;border:0;border-radius:9px;background:#268bd2;color:#fff;font-size:12px;white-space:nowrap}}
+            .tg-permissions-save{{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin:10px 0 2px;padding:9px;border:1px solid #2c5a79;border-radius:10px;background:#173b55;color:#9bd3fb;font-size:12px;font-weight:600}}
+            .tg-danger-card{{margin:10px 12px;padding:12px;border-radius:13px;background:#101d2a;border:1px solid #263746}}
+            .tg-danger-card form{{margin:0}}
+            .tg-danger-card button{{padding:8px 12px;border:0;border-radius:9px;background:#263849;color:#b8cbdc;font-size:12px}}
+            .tg-danger-card.delete button{{background:#482a32;color:#e6a8b2}}
             .tg-room-settings hr{{display:none}}
           </style>
-          <header class="tg-manage-topbar"><a href="/conversation/{conversation_id}/profile" aria-label="بازگشت به اطلاعات مجموعه">➜</a><span>مدیریت {kind}</span></header>
-          <form class="tg-room-settings" method="post" enctype="multipart/form-data">
+          <header class="tg-manage-topbar"><button class="tg-top-save" type="submit" form="cyrusRoomSettingsForm" aria-label="ذخیره تنظیمات" disabled>✓</button><span>تنظیمات {kind}</span><a href="/conversation/{conversation_id}/profile" aria-label="بازگشت به اطلاعات مجموعه">‹</a></header>
+          <form id="cyrusRoomSettingsForm" class="tg-room-settings" method="post" enctype="multipart/form-data">
             <input type="hidden" name="action" value="save_settings">
             <div class="tg-section">
               <div class="tg-section-title">اطلاعات {kind}</div>
+              <div class="tg-room-avatar-line"><div id="cyrusRoomAvatarPreview">{avatar_preview}</div><label class="tg-avatar-picker"><span>انتخاب تصویر گروه<small>تصویر پروفایل · از گالری</small></span><input id="cyrusRoomAvatarFile" type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp"></label></div>
               <label class="tg-field">نام
                 <input name="title" minlength="2" maxlength="60" value="{title}" required>
               </label>
               <label class="tg-field">توضیحات
                 <textarea name="description" maxlength="500" rows="3">{description}</textarea>
               </label>
-              <label class="tg-field">تصویر گروه یا کانال
-                <input type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp">
-                <small>برای تغییر تصویر، از گالری انتخاب کن؛ حداکثر ۵ مگابایت.</small>
-              </label>
-              <label class="tg-switch-row"><span>فعال بودن واکنش‌ها</span><span class="tg-switch"><input type="checkbox" name="reactions_enabled" {reactions_checked}><i></i></span></label>
+old avatar input              <label class="tg-switch-row"><span>فعال بودن واکنش‌ها</span><span class="tg-switch"><input type="checkbox" name="reactions_enabled" {reactions_checked}><i></i></span></label>
             </div>
             <div class="tg-section">
               <div class="tg-section-title">نوع و دسترسی</div>
@@ -6332,20 +6360,21 @@ def manage_room(conversation_id):
               <label class="tg-switch-row"><span>درخواست عضویت نیازمند تأیید مدیر</span><span class="tg-switch"><input type="checkbox" name="join_approval" {approval_checked}><i></i></span></label>
               <label class="tg-switch-row"><span>نمایش پیام‌های قبلی به اعضای جدید</span><span class="tg-switch"><input type="checkbox" name="history_visible" {history_checked}><i></i></span></label>
             </div>
-            {('<div class="tg-section"><details class="tg-permissions"><summary><span>مجوزهای اعضا</span><span class="tg-chevron">⌄</span></summary><div class="tg-permissions-body">' + 
+            {('<div class="tg-section"><details class="tg-permissions"><summary><span>دسترسی اعضا</span><span class="tg-chevron">⌄</span></summary><div class="tg-permissions-body">' + 
               '<label class="tg-switch-row"><span>ارسال پیام</span><span class="tg-switch"><input type="checkbox" name="perm_send_messages" ' + perm_checks["send_messages"] + '><i></i></span></label>' +
               '<label class="tg-switch-row"><span>ارسال رسانه</span><span class="tg-switch"><input type="checkbox" name="perm_send_media" ' + perm_checks["send_media"] + '><i></i></span></label>' +
               '<label class="tg-switch-row"><span>افزودن اعضا</span><span class="tg-switch"><input type="checkbox" name="perm_add_members" ' + perm_checks["add_members"] + '><i></i></span></label>' +
               '<label class="tg-switch-row"><span>سنجاق پیام</span><span class="tg-switch"><input type="checkbox" name="perm_pin_messages" ' + perm_checks["pin_messages"] + '><i></i></span></label>' +
               '<label class="tg-switch-row"><span>تغییر اطلاعات گروه</span><span class="tg-switch"><input type="checkbox" name="perm_change_info" ' + perm_checks["change_info"] + '><i></i></span></label>' +
+              '<button class="tg-permissions-save" type="submit">✓ تأیید تغییرات دسترسی اعضا</button>' +
               '</div></details></div><div class="tg-section">' +
               '<label class="tg-switch-row"><span>فعال‌سازی موضوعات گروه</span><span class="tg-switch"><input type="checkbox" name="topics_enabled" ' + topics_checked + '><i></i></span></label>' +
               '<label class="tg-field">حالت آهسته ارسال پیام<select name="slow_mode_seconds">' + slow_options + '</select></label></div>') if room_type == "group" else ('<div class="tg-section"><div class="tg-section-title">تنظیمات کانال</div><label class="tg-switch-row"><span>نمایش امضای مدیر در پست‌ها</span><span class="tg-switch"><input type="checkbox" name="sign_messages" ' + sign_checked + '><i></i></span></label><p class="muted">در کانال فقط مالک و مدیران مجاز به انتشار هستند.</p></div>')}
-            <button class="tg-save" type="submit" disabled>تأیید تغییرات</button>
           </form>
           <script>
+          (function(){{const input=document.getElementById('cyrusRoomAvatarFile'),box=document.getElementById('cyrusRoomAvatarPreview');if(!input||!box)return;input.addEventListener('change',()=>{{const file=input.files&&input.files[0];if(!file)return;if(!/^image\/(jpeg|png|webp)$/.test(file.type)){{alert('فقط تصویر JPG، PNG یا WebP انتخاب کن.');input.value='';return;}}if(file.size>5*1024*1024){{alert('حجم تصویر باید حداکثر ۵ مگابایت باشد.');input.value='';return;}}const reader=new FileReader();reader.onload=()=>{{box.innerHTML='<img class="tg-room-avatar-preview" alt="پیش‌نمایش تصویر گروه" src="'+String(reader.result).replace(/"/g,'&quot;')+'">';}};reader.readAsDataURL(file);}});}})();
           (function(){{
-            const form=document.querySelector('.tg-room-settings'),save=form&&form.querySelector('.tg-save');
+            const form=document.querySelector('.tg-room-settings'),save=document.querySelector('.tg-top-save');
             if(!form||!save)return;
             let changed=false;
             function mark(){{changed=true;save.disabled=false;save.textContent='تأیید تغییرات';}}
@@ -6355,23 +6384,9 @@ def manage_room(conversation_id):
           </script>
 
 
-          <div class="card">
-            <h3>لینک دعوت</h3>
-            <input id="invite-link" readonly value="{invite_safe}">
-            <button type="button" onclick="cyrusCopyInvite()">کپی لینک</button><script>function cyrusCopyInvite(){{const v=document.getElementById("invite-link").value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert("لینک کپی شد")).catch(()=>prompt("لینک دعوت",v));else prompt("لینک دعوت",v);}}</script>
-            <form method="post" onsubmit="return confirm('لینک قبلی از کار می‌افتد. ادامه می‌دهید؟')">
-              <input type="hidden" name="action" value="rotate_invite">
-              <button>ساخت لینک جدید</button>
-            </form>
-          </div>
+          <section class="tg-room-id-card"><div class="tg-room-id-title">شناسه گروه</div><div class="tg-room-id-row"><input id="invite-link" readonly value="{invite_safe}" aria-label="شناسه و لینک دعوت"><button type="button" onclick="cyrusCopyInvite()">کپی</button></div><form method="post" onsubmit="return confirm('لینک دعوت قبلی از کار می‌افتد. ادامه می‌دهید؟')"><input type="hidden" name="action" value="rotate_invite"><button>ساخت لینک تازه</button></form><script>function cyrusCopyInvite(){{const v=document.getElementById("invite-link").value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert("لینک کپی شد")).catch(()=>prompt("شناسه گروه",v));else prompt("شناسه گروه",v);}}</script></section>
 
-          <div class="card">
-            <h3>افزودن عضو</h3>
-            <form method="post" action="/rooms/{conversation_id}/add-member">
-              <input name="username" placeholder="نام کاربری عضو" required>
-              <button>افزودن عضو</button>
-            </form>
-          </div>
+          <section class="tg-add-member-card"><h3>افزودن عضو</h3><form method="post" action="/rooms/{conversation_id}/add-member"><input name="username" placeholder="نام کاربری" required><button>افزودن</button></form></section>
 
           {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if join_requests else ''}
 
@@ -6380,26 +6395,14 @@ def manage_room(conversation_id):
           <div id="cyrusMemberRows">{rows}</div>
           <script>
           (function(){{const s=document.getElementById('cyrusMemberSearch'),w=document.getElementById('cyrusMemberRows'),n=document.getElementById('cyrusMemberCount'),bs=[...document.querySelectorAll('.cyrus-member-filters [data-role]')],r=document.getElementById('cyrusMemberReset');if(!s||!w)return;let role='all';function apply(){{const q=s.value.trim().toLocaleLowerCase();let shown=0;w.querySelectorAll('.tg-member-row').forEach(x=>{{const ok=(!q||(x.dataset.memberSearch||'').includes(q))&&(role==='all'||x.dataset.memberRole===role);x.hidden=!ok;if(ok)shown++;}});if(n)n.textContent='نمایش '+shown+' از '+w.querySelectorAll('.tg-member-row').length+' عضو';}}s.addEventListener('input',apply);bs.forEach(b=>b.addEventListener('click',()=>{{role=b.dataset.role;bs.forEach(x=>x.classList.toggle('active',x===b));apply();}}));r.addEventListener('click',()=>{{s.value='';role='all';bs.forEach(x=>x.classList.toggle('active',x.dataset.role==='all'));apply();s.focus();}});apply();}})();
-          (function(){{const f=document.querySelector('.tg-room-settings'),save=f&&f.querySelector('.tg-save');if(!f)return;let dirty=false;function mark(){{dirty=true;if(save){{save.disabled=false;save.textContent='تأیید تغییرات';}}}}f.querySelectorAll('input,textarea,select').forEach(x=>{{x.addEventListener('input',mark);x.addEventListener('change',mark);}});f.addEventListener('submit',()=>{{dirty=false;if(save){{save.disabled=true;save.textContent='در حال ذخیره…';}}}});window.addEventListener('beforeunload',e=>{{if(dirty){{e.preventDefault();e.returnValue='';}}}});[[f.querySelector('[name=title]'),60],[f.querySelector('[name=description]'),500]].forEach(([x,m])=>{{if(!x)return;const b=document.createElement('small');b.className='cyrus-field-counter';b.textContent=x.value.length+'/'+m;x.after(b);x.addEventListener('input',()=>b.textContent=x.value.length+'/'+m);}});}})();
+          (function(){{const f=document.querySelector('.tg-room-settings'),save=document.querySelector('.tg-top-save');if(!f)return;let dirty=false;function mark(){{dirty=true;if(save){{save.disabled=false;save.textContent='تأیید تغییرات';}}}}f.querySelectorAll('input,textarea,select').forEach(x=>{{x.addEventListener('input',mark);x.addEventListener('change',mark);}});f.addEventListener('submit',()=>{{dirty=false;if(save){{save.disabled=true;save.textContent='در حال ذخیره…';}}}});window.addEventListener('beforeunload',e=>{{if(dirty){{e.preventDefault();e.returnValue='';}}}});[[f.querySelector('[name=title]'),60],[f.querySelector('[name=description]'),500]].forEach(([x,m])=>{{if(!x)return;const b=document.createElement('small');b.className='cyrus-field-counter';b.textContent=x.value.length+'/'+m;x.after(b);x.addEventListener('input',()=>b.textContent=x.value.length+'/'+m);}});}})();
           </script>
-          <div class="card">
-            <h3>خروج از مجموعه</h3>
-            <form method="post" onsubmit="return confirm('خارج می‌شوید؟')">
-              <input type="hidden" name="action" value="leave">
-              <button>خروج از مجموعه</button>
-            </form>
-          </div>
+          <section class="tg-danger-card"><h3>ترک گروه</h3><form method="post" onsubmit="return confirm('از گروه خارج می‌شوید؟')"><input type="hidden" name="action" value="leave"><button>ترک گروه</button></form></section>
         """
 
         if owner:
             content += """
-            <div class="card">
-              <h3>حذف کامل مجموعه</h3>
-              <form method="post" onsubmit="return confirm('تمام پیام‌ها و اعضا حذف می‌شوند. مطمئن هستید؟')">
-                <input type="hidden" name="action" value="delete">
-                <button>حذف گروه یا کانال</button>
-              </form>
-            </div>
+            <section class="tg-danger-card delete"><h3>حذف گروه</h3><form method="post" onsubmit="return confirm('تمام پیام‌ها و اعضا حذف می‌شوند. مطمئن هستید؟')"><input type="hidden" name="action" value="delete"><button>حذف گروه</button></form></section>
             """
 
         content += (
