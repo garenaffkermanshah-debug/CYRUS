@@ -2072,19 +2072,24 @@ def contacts():
     <main class="container cyrus-contacts">
       <style>
         .cyrus-contacts{{padding-bottom:90px}}
-        .contacts-add{{margin:12px 16px;padding:14px;background:#111e2b;border:1px solid #263b50;border-radius:14px}}
-        .contacts-add h3{{margin:0 0 9px;font-size:15px}}
-        .contacts-add form{{display:flex;gap:8px}}
-        .contacts-add input{{min-width:0;flex:1;padding:12px;border-radius:9px;border:1px solid #344b60;background:#0a1521;color:#fff}}
-        .contacts-add button,.contact-actions button,.contact-actions .action{{border:0;border-radius:9px;background:#248bd0;color:#fff;padding:10px 12px;text-decoration:none;font-size:12px;white-space:nowrap}}
-        .contact-actions{{display:flex;gap:5px;align-items:center}}
-        .contact-actions form{{margin:0}}
+        .contacts-add{{margin:8px 12px;padding:10px 11px;background:#111e2b;border:1px solid #263b50;border-radius:12px}}
+        .contacts-add h3{{margin:0 0 7px;font-size:12px;font-weight:500;color:#c5d5e2}}
+        .contacts-add form{{display:flex;align-items:stretch;gap:6px;min-width:0}}
+        .contacts-add input{{box-sizing:border-box;min-width:0;flex:1;width:100%;height:36px;margin:0;padding:7px 10px;border-radius:8px;border:1px solid #344b60;background:#0a1521;color:#fff;font-size:12px}}
+        .contacts-add button,.contact-actions button,.contact-actions .action{{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:auto!important;min-width:0;min-height:32px;margin:0;padding:6px 10px;border:0;border-radius:8px;background:#248bd0;color:#fff;text-decoration:none;font-size:11px;line-height:1.2;white-space:nowrap}}
+        .contacts-add button{{flex:0 0 auto}}
+        .contact-actions{{display:flex;gap:4px;align-items:center;flex:0 0 auto}}
+        .contact-actions form{{margin:0;display:flex}}
         .contact-actions .contact-remove{{background:#59323a;color:#ffdce0}}
-        .contact-entry{{gap:9px}}
-        .contact-entry .chat-info{{min-width:0}}
-        .contact-entry .chat-preview{{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
-        .contacts-search{{margin:12px 16px;display:flex;gap:8px}}
-        .contacts-search input{{min-width:0;flex:1}}
+        .contact-entry{{gap:8px;padding-block:9px}}
+        .contact-entry .chat-info{{min-width:0;flex:1}}
+        .contact-entry .chat-name{{font-size:13px}}
+        .contact-entry .chat-preview{{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}}
+        .contacts-search{{box-sizing:border-box;margin:8px 12px;display:flex;align-items:stretch;gap:6px;min-width:0}}
+        .contacts-search input{{box-sizing:border-box;min-width:0;flex:1;width:100%;height:36px;margin:0;padding:7px 10px;border:1px solid #344b60;border-radius:8px;background:#0a1521;color:#fff;font-size:12px}}
+        .contacts-search button{{box-sizing:border-box;flex:0 0 auto;width:auto!important;min-width:56px;height:36px;margin:0;padding:6px 10px;border-radius:8px;font-size:11px}}
+        .contacts-tools{{display:flex;gap:5px;margin:8px 12px}}
+        .contacts-tools a{{box-sizing:border-box;flex:1;min-width:0;display:flex;align-items:center;justify-content:center;min-height:34px;padding:6px 4px;border-radius:8px;font-size:10px;line-height:1.25;text-align:center;white-space:nowrap}}
       </style>
       <section class="welcome"><h2>خویشان پارسی</h2><p>فهرست مخاطبان و همراهان CYRUS</p></section>
       <div class="contacts-add"><h3>افزودن با نام کاربری</h3>
@@ -2093,10 +2098,10 @@ def contacts():
           <button type="submit">افزودن</button>
         </form>
       </div>
-      <div style="display:flex;gap:8px;margin:12px 16px">
-        <a class="action" style="flex:1;text-align:center" href="/rooms/create?type=group">ساخت گروه</a>
-        <a class="action" style="flex:1;text-align:center" href="/rooms/create?type=channel">ساخت کانال</a>
-        <a class="action" style="flex:1;text-align:center" href="/channels">کانال‌ها</a>
+      <div class="contacts-tools">
+        <a class="action" href="/rooms/create?type=group">ساخت گروه</a>
+        <a class="action" href="/rooms/create?type=channel">ساخت کانال</a>
+        <a class="action" href="/channels">کانال‌ها</a>
       </div>
       <form class="contacts-search" method="get">
         <input name="q" value="{html.escape(query,quote=True)}" placeholder="جستجوی نام یا @username">
@@ -2219,26 +2224,26 @@ def public_user_profile(user_id):
     content = f"""<main class="container cyrus-user-profile" data-profile-user="{safe_id}">
       <style>
         .cyrus-user-profile{{padding:0 0 88px;max-width:560px;background:#0d1722;min-height:calc(100dvh - 76px)}}
-        .user-profile-card{{position:relative;background:#111e2b;border:0;border-radius:0;padding:15px 16px 20px;overflow:visible}}
-        .user-profile-top{{display:flex;align-items:center;justify-content:space-between;min-height:58px;direction:rtl}}
-        .user-profile-photo{{width:58px;height:58px;flex:0 0 58px;border-radius:50%;overflow:hidden;border:2px solid #2d8ecb;background:#172a3a;display:grid;place-items:center}}
+        .user-profile-card{{position:relative;background:#111e2b;border:0;border-radius:0;padding:10px 12px 12px;overflow:visible}}
+        .user-profile-top{{display:flex;align-items:center;justify-content:space-between;min-height:48px;direction:rtl}}
+        .user-profile-photo{{width:48px;height:48px;flex:0 0 48px;border-radius:50%;overflow:hidden;border:2px solid #2d8ecb;background:#172a3a;display:grid;place-items:center}}
         .user-profile-photo img{{width:100%;height:100%;object-fit:cover}}
         .profile-user-symbol{{font-size:28px;color:#d8b46a}}
         .profile-more{{position:absolute;left:12px;top:12px;z-index:15}}
         .profile-back{{position:absolute;left:52px;top:12px;z-index:15;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:23px;text-decoration:none;background:#172838}}
         .profile-more summary{{list-style:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:25px;cursor:pointer}}
         .profile-more summary::-webkit-details-marker{{display:none}}
-        .profile-more-menu{{position:absolute;left:0;top:39px;width:205px;padding:5px;background:#223344;border:1px solid #3a5267;border-radius:12px;box-shadow:0 8px 28px #0008;z-index:20}}
+        .profile-more-menu{{position:absolute;left:0;top:37px;width:178px;padding:4px;background:#223344;border:1px solid #3a5267;border-radius:10px;box-shadow:0 8px 24px #0008;z-index:20}}
         .profile-more-menu form{{margin:0}}
-        .profile-more-menu button,.profile-more-menu a{{display:block;width:100%;margin:0;padding:12px 13px;border:0;border-radius:8px;background:transparent;color:#e8eff5;text-align:right;font-size:13px;text-decoration:none}}
+        .profile-more-menu button,.profile-more-menu a{{display:block;width:100%;box-sizing:border-box;margin:0;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#e8eff5;text-align:right;font-size:11px;line-height:1.35;text-decoration:none}}
         .profile-more-menu button:active,.profile-more-menu a:active{{background:#344b5e}}
         .profile-more-menu .danger{{color:#f1aeb4}}
-        .user-profile-name{{margin:13px 0 3px;text-align:right;color:#f0f4f7;font-size:20px;font-weight:500}}
-        .user-profile-username{{text-align:right;color:#78b8e6;font-size:13px;direction:ltr;unicode-bidi:plaintext}}
-        .user-profile-bio{{text-align:right;color:#c3cfda;font-size:14px;line-height:1.9;margin:11px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
-        .profile-primary-action{{display:grid;place-items:center;margin:14px auto 18px;width:54px;height:54px;border-radius:50%;background:#248bd0;color:#fff;text-decoration:none;font-size:23px}}
-        .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:12px}}
-        .profile-media-tabs button{{flex:1;margin:0;padding:12px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:11px}}
+        .user-profile-name{{margin:8px 0 2px;text-align:right;color:#f0f4f7;font-size:16px;font-weight:500}}
+        .user-profile-username{{text-align:right;color:#78b8e6;font-size:11px;direction:ltr;unicode-bidi:plaintext}}
+        .user-profile-bio{{text-align:right;color:#c3cfda;font-size:12px;line-height:1.55;margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
+        .profile-primary-action{{display:grid;place-items:center;margin:9px auto 12px;width:44px;height:44px;border-radius:50%;background:#248bd0;color:#fff;text-decoration:none;font-size:20px}}
+        .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:8px}}
+        .profile-media-tabs button{{flex:1;min-width:0;margin:0;padding:9px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:10px}}
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
         .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
@@ -2270,7 +2275,7 @@ def public_user_profile(user_id):
       </section>
       {send_link}
       {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><small class="profile-history-count" id="profileHistoryCount" aria-live="polite"></small><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
-      {('<details class="profile-contact-edit" id="cyrusEditContact"><summary>ویرایش مخاطب</summary><form method="post" action="/user/'+safe_id+'/contact/edit"><label>نام مخاطب</label><input name="contact_name" maxlength="60" value="'+html.escape(contact_name,quote=True)+'" placeholder="'+html.escape(name,quote=True)+'"><button type="submit">ذخیره نام مخاطب</button></form></details>') if is_contact else ""}
+      <!-- contact name editing is available in the profile overflow menu -->
     </main>
     <script>
     function cyrusCopyUsername(el){{const u="@"+(el.dataset.username||"");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>{{el.title="نام کاربری کپی شد";}}).catch(()=>prompt("نام کاربری",u));else prompt("نام کاربری",u);}}
