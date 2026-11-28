@@ -120,3 +120,15 @@ body:has(.cyrus-welcome) .container{display:none!important}
 .auth-brand img{display:none!important}
 .cyrus-auth-register .auth-hero-mark{display:none!important}
 .cyrus-auth .auth-brand{margin-bottom:28px}
+
+/* CYRUS unified compact invite/member input pattern */
+/* Make invite-code and add-by-username controls use the same balanced RTL row */
+body .tg-room-id-card .tg-room-id-row,
+body .tg-add-member-card form{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;direction:rtl!important;align-items:center!important;gap:8px!important;width:100%!important;}
+body .tg-room-id-card .tg-room-id-row input,
+body .tg-add-member-card form input{display:block!important;box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;flex:none!important;height:40px!important;margin:0!important;padding:0 11px!important;border:1px solid #2a4358!important;border-radius:10px!important;background:#091521!important;color:#d7e5f1!important;font-size:12px!important;direction:rtl!important;text-align:right!important;}
+body .tg-room-id-card .tg-room-id-row input{direction:ltr!important;text-align:left!important;font-size:11px!important;}
+body .tg-room-id-card .tg-room-id-row button,
+body .tg-add-member-card form button{display:inline-flex!important;box-sizing:border-box!important;width:auto!important;min-width:68px!important;max-width:none!important;flex:none!important;height:40px!important;margin:0!important;padding:0 13px!important;align-items:center!important;justify-content:center!important;border:0!important;border-radius:10px!important;white-space:nowrap!important;font-size:12px!important;}
+body .tg-room-id-card .tg-room-id-row button{background:#20394f!important;color:#9bd3fb!important;}
+body .tg-add-member-card form button{background:#268bd2!important;color:#fff!important;}
