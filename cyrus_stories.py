@@ -162,8 +162,10 @@ def register_story_routes(app, URL, KEY, ADMIN_KEY, page):
             cr=requests.post(URL+"/rest/v1/rpc/create_direct_conversation",json={"other_user":owner},headers=user_headers(),timeout=20)
             if not cr.ok:return "ساخت گفتگوی خصوصی ناموفق بود",400
             val=cr.json();cid=str(val.get("id") if isinstance(val,dict) else val);cid=str(uuid.UUID(cid))
-            meta={"story_reply":{"story_id":story_id,"story_caption":str(st.get("caption") or "")[:250],"story_media_type":st.get("media_type")}}
-            ins=requests.post(URL+"/rest/v1/cyrus_messages",json={"conversation_id":cid,"sender_id":me,"content":msg,"metadata":meta},headers=user_headers({"Prefer":"return=minimal"}),timeout=20)
+            story_caption=str(st.get("caption") or "")[:250]
+            meta={"story_reply":{"story_id":story_id,"story_caption":story_caption,"story_media_type":st.get("media_type")}}
+            display_msg=("↪ پاسخ به داستان: "+story_caption+"\n" if story_caption else "↪ پاسخ به داستان\n")+msg
+            ins=requests.post(URL+"/rest/v1/cyrus_messages",json={"conversation_id":cid,"sender_id":me,"content":display_msg,"metadata":meta},headers=user_headers({"Prefer":"return=minimal"}),timeout=20)
             if not ins.ok:return "ارسال پاسخ به گفتگو ناموفق بود",400
             return redirect("/chat/"+cid+"?story_reply=1")
         except Exception:return "ارتباط با سرور برقرار نشد",502
