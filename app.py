@@ -1190,7 +1190,7 @@ def home():
       <p class="error">{html.escape(error)}</p>
     </div>
     """
-    content = content.replace('<div class="tabs">', '<div class="tabs"><a class="tab" href="/stories">داستان‌ها</a>')
+
     return page(content)
 
 
