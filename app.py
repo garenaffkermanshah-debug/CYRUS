@@ -3181,7 +3181,10 @@ def chat(conversation_id):
                 body = '<a class="cyrus-chat-file" href="' + safe_attachment + '" target="_blank" rel="noopener" download="' + safe_file_label + '">📎 ' + safe_file_label + ' · دریافت فایل</a>' + (('<div>' + body + '</div>') if body and body != safe_file_label else "")
         stamp_raw = str(msg.get("created_at") or "")
         try:
-            stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00")).astimezone()
+            stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00"))
+            if stamp_dt.tzinfo is None:
+                stamp_dt = stamp_dt.replace(tzinfo=timezone.utc)
+            stamp_dt = stamp_dt.astimezone()
             stamp = html.escape(stamp_dt.strftime("%H:%M"))
             message_date = stamp_dt.date().isoformat()
             if message_date != previous_message_date:
@@ -3346,6 +3349,7 @@ def chat(conversation_id):
                             seen_dt = datetime.fromisoformat(seen_raw.replace("Z", "+00:00"))
                             if seen_dt.tzinfo is None:
                                 seen_dt = seen_dt.replace(tzinfo=timezone.utc)
+                            room_last_seen_raw = seen_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
                             seen_local = seen_dt.astimezone()
                             now_dt = datetime.now(timezone.utc)
                             age_seconds = max(0, (now_dt - seen_dt.astimezone(timezone.utc)).total_seconds())
@@ -3718,14 +3722,21 @@ async function cyrusToggleVoiceRecord(b){
       <script>
       (function(){{try{{const p=JSON.parse(localStorage.getItem("cyrus-chat-preferences-v1")||"{{}}");const size=Math.min(22,Math.max(12,Number(p.size)||14));document.documentElement.style.setProperty("--cyrus-chat-font-size",size+"px");}}catch(e){{}}}})();
       function cyrusToggleEmoji(event) {{
-        event.preventDefault();event.stopPropagation();
+        if(event){{event.preventDefault();event.stopPropagation();}}
         const panel=document.getElementById("cyrusEmojiPanel");
         const input=document.querySelector('.send-box input[name="content"]');
         if(!panel)return;
         const opening=panel.style.display==="none"||!panel.style.display;
-        panel.style.display=opening?"block":"none";
-        panel.style.position="absolute";panel.style.zIndex="1500";
-        if(opening&&input)input.focus({{preventScroll:true}});
+        if(!opening){{panel.style.display="none";return;}}
+        panel.style.display="block";panel.style.position="fixed";
+        panel.style.left="12px";panel.style.right="12px";
+        panel.style.bottom="calc(88px + env(safe-area-inset-bottom))";
+        panel.style.width="auto";panel.style.maxWidth="520px";
+        panel.style.maxHeight="55vh";panel.style.overflow="auto";
+        panel.style.zIndex="9999";panel.style.background="#102235";
+        panel.style.border="1px solid #34516a";panel.style.borderRadius="16px";
+        panel.style.boxShadow="0 12px 32px #0009";
+        if(input)input.focus({{preventScroll:true}});
       }}
       function cyrusInsertEmoji(emoji,closePanel=true) {{
         const input=document.querySelector('.send-box input[name="content"]');
@@ -3742,9 +3753,9 @@ async function cyrusToggleVoiceRecord(b){
         function cyrusPresencePing(){{if(document.visibilityState==="hidden")return;fetch("/presence/ping",{{method:"POST",credentials:"same-origin",headers:{{"X-Requested-With":"XMLHttpRequest"}}}}).catch(()=>{{}});}}
         cyrusPresencePing();setInterval(cyrusPresencePing,60000);document.addEventListener("visibilitychange",()=>{{if(document.visibilityState==="visible")cyrusPresencePing();}});
         const jumpParams=new URLSearchParams(location.search);const preserveHistory=jumpParams.has("before")||jumpParams.has("message");
-        function cyrusScrollToLatest(){{if(preserveHistory)return;const area=document.querySelector(".messages-area");const rows=area?[...area.querySelectorAll(".message[data-message-id]")]:[];const last=rows[rows.length-1];if(last)last.scrollIntoView({{behavior:"auto",block:"end"}});window.scrollTo({{top:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),behavior:"auto"}});if(area)area.scrollTop=area.scrollHeight;}}
+        function cyrusScrollToLatest(){{if(preserveHistory)return;const area=document.querySelector(".messages-area");if(!area)return;area.scrollTop=area.scrollHeight;const last=area.querySelector(".message[data-message-id]:last-of-type");if(last)last.scrollIntoView({{behavior:"auto",block:"end"}});area.scrollTo({{top:area.scrollHeight,behavior:"auto"}});}}
         cyrusScrollToLatest();window.addEventListener("load",()=>{{cyrusScrollToLatest();}},{{once:true}});[120,350,800].forEach(ms=>setTimeout(cyrusScrollToLatest,ms));
-       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>55&&Math.abs(dx)>Math.abs(dy)*1.15){{e.preventDefault();const replyButton=node.querySelector('.context-actions button[onclick^="cyrusReply"]');if(replyButton)cyrusReply(replyButton);else cyrusReply({{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}});return;}}if(Math.abs(dx)<12&&Math.abs(dy)<12){{const now=Date.now();if(node._cyrusTapAt&&now-node._cyrusTapAt<360){{node._cyrusTapAt=0;e.preventDefault();cyrusCloseMessageMenus(false);cyrusSaveReaction(node,"❤️");}}else{{node._cyrusTapAt=now;cyrusOpenMessageMenu(e,node);}}}}}},{{passive:false}});}});
+       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{node.addEventListener("click",event=>{{if(event.target.closest(".message-context,button,form,a,input,select"))return;const now=Date.now();if(node._cyrusTapAt&&now-node._cyrusTapAt<360){{node._cyrusTapAt=0;event.preventDefault();event.stopPropagation();cyrusCloseMessageMenus(false);cyrusSaveReaction(node,"❤️");}}else{{node._cyrusTapAt=now;cyrusOpenMessageMenu(event,node);}}}});let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>55&&Math.abs(dx)>Math.abs(dy)*1.15){{e.preventDefault();const replyButton=node.querySelector('.context-actions button[onclick^="cyrusReply"]');if(replyButton)cyrusReply(replyButton);else cyrusReply({{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}});return;}}if(Math.abs(dx)<12&&Math.abs(dy)<12){{/* tap handled by click for reliable mobile activation */}}}},{{passive:false}});}});
        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
         if(deepLinkedMessage) {{
           requestAnimationFrame(()=>requestAnimationFrame(()=>{{
@@ -3761,8 +3772,8 @@ async function cyrusToggleVoiceRecord(b){
             }}
           }}));
         }}
-        document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const dt=new Date(el.dataset.createdAt);if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}catch(e){{}}}});
-        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seen=new Date(presence.dataset.seen);if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}}}catch(e){{}}}}
+        document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const raw=el.dataset.createdAt;const dt=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(raw)?raw:raw+"Z");if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}catch(e){{}}}});
+        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seenRaw=presence.dataset.seen;const seen=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(seenRaw)?seenRaw:seenRaw+"Z");if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}}}catch(e){{}}}}
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker){{
           const insertPickedEmoji=function(event){{
