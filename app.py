@@ -2076,6 +2076,11 @@ def public_user_profile(user_id):
     except Exception:
         pass
 
+    profile_privacy = cyrus_get_privacy_settings(user_id) or {}
+    photo_visibility = str(profile_privacy.get("profile_photo_visibility") or "everyone")
+    if photo_visibility=="nobody" or (photo_visibility=="contacts" and not is_contact):
+        avatar = ""
+        avatar_html = '<div class="profile-user-symbol">𓅃</div>'
     display_name = contact_name or name
     block_label = "رفع مسدودیت" if blocked_by_me else "مسدود کردن کاربر"
     contact_action = (
