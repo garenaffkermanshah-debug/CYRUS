@@ -3696,6 +3696,26 @@ async function cyrusToggleVoiceRecord(b){
         .send-box .composer-send:disabled{{opacity:.55;cursor:wait}}
         @media(max-width:520px){{.container:has(.cyrus-chat-header){{padding-inline:8px}}.message{{max-width:88%}}.messages-area{{gap:7px}}}}
         .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
+        /* CYRUS classic royal-blue and Achaemenid-gold chat polish */
+        .container:has(.cyrus-chat-header){{border-inline:1px solid #c69b4b22;}}
+        .room-header{{background:linear-gradient(115deg,#101f31 0%,#172b40 72%,#1d2b37 100%);border-bottom:1px solid #c9a45b55;}}
+        .cyrus-chat-header .chat-back{{color:#d7b56e;transform:scaleX(-1);}}
+        .room-avatar{{outline:1px solid #c9a45b88;outline-offset:2px;}}
+        .room-info h2{{color:#f3dfb2;letter-spacing:.1px;}}
+        .room-type{{color:#9db4c7;}}
+        .messages-area{{padding-top:12px;}}
+        .message.theirs{{background:linear-gradient(145deg,#172b3e,#132536);border-color:#284158;border-bottom-right-radius:5px;}}
+        .message.mine{{background:linear-gradient(145deg,#123b5a,#0d2e49);border-color:#2b6288;border-bottom-left-radius:5px;}}
+        .message.mine .message-body{{color:#eaf5ff;}}
+        .message.mine small{{color:#a7cde8;}}
+        .chat-date-divider span{{border:1px solid #b9964c33;background:#172838e8;color:#d9c18c;}}
+        .send-box{{background:linear-gradient(145deg,#15283a,#101f2e);border-color:#b9954b66;}}
+        .composer-send{{background:linear-gradient(145deg,#2c91d2,#176da9);box-shadow:0 2px 8px #0004;}}
+        .composer-attach{{color:#d8b46a!important;}}
+        .composer-emoji{{color:#d0b170;}}
+        .cyrus-older-messages{{border-color:#b9954b55;background:#172838;color:#d9c18c;}}
+        @media(max-width:520px){{.room-header{{margin-inline:-8px;padding-inline:10px;}}}}
+
         .cyrus-blocked-composer{{position:sticky;bottom:calc(8px + env(safe-area-inset-bottom));margin:8px 0 0;padding:13px 16px;background:#172432;border:1px solid #2b4053;border-radius:24px;text-align:center;color:#a9bac8;font-size:13px}}
         .cyrus-blocked-composer p{{margin:0 0 8px;line-height:1.7}}
         .cyrus-blocked-composer form{{margin:0}}
