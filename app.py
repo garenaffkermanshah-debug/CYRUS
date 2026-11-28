@@ -1797,7 +1797,11 @@ def search():
             if is_joined:
                 action = f'<a class="action" href="/chat/{rid}">باز کردن</a>'
             else:
-                invite_code = str(room.get("invite_code") or "").strip()\n                if invite_code:\n                    action = '<a class="action cyrus-join-action" href="/invite/' + quote(invite_code) + '">پیوستن</a>'\n                else:\n                    action = '<span class="muted">پیوستن در دسترس نیست</span>'
+                invite_code = str(room.get("invite_code") or "").strip()
+                if invite_code:
+                    action = '<a class="action cyrus-join-action" href="/invite/' + quote(invite_code) + '">پیوستن</a>'
+                else:
+                    action = '<span class="muted">پیوستن در دسترس نیست</span>'
 
         room_rows += f"""
         <div class="chat-row search-result" data-kind="{room_kind}">
