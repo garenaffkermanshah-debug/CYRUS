@@ -3278,7 +3278,7 @@ def chat(conversation_id):
             )
 
         message_rows += f"""
-        <div id="message-{msg_id}" class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" data-conversation-id="{conversation_id}" onclick="cyrusOpenMessageMenu(event,this)" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
+        <div id="message-{msg_id}" class="message {css_class}" data-content="{raw_content}" data-message-id="{msg_id}" data-conversation-id="{conversation_id}" role="button tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();cyrusOpenMessageMenu(event,this)}}">
           {sender_label_html}{reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           {reaction_badges_html}
@@ -3480,16 +3480,14 @@ def chat(conversation_id):
         f'<form class="send-box" method="post" action="/chat/{conversation_id}/send">'
         '<div id="cyrusReplyBar" class="cyrus-reply-composer" style="display:none"><span id="cyrusReplyText"></span><button type="button" onclick="cyrusCancelReply()">×</button></div>'
         '<input type="hidden" name="reply_to_id" id="cyrusReplyId" value="">'
-        '<button class="composer-emoji" type="button" aria-label="ایموجی" onclick="cyrusToggleEmoji(event)">☺</button>'
-        '<div class="composer-emoji-panel" id="cyrusEmojiPanel" style="display:none"><emoji-picker id="cyrusFullEmojiPicker" locale="en"></emoji-picker><div class="cyrus-emoji-fallback" id="cyrusEmojiFallback" style="display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;padding:8px"><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😀&quot;)" aria-label="ایموجی 😀">😀</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😂&quot;)" aria-label="ایموجی 😂">😂</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🥰&quot;)" aria-label="ایموجی 🥰">🥰</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😍&quot;)" aria-label="ایموجی 😍">😍</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😘&quot;)" aria-label="ایموجی 😘">😘</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😊&quot;)" aria-label="ایموجی 😊">😊</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😭&quot;)" aria-label="ایموجی 😭">😭</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😎&quot;)" aria-label="ایموجی 😎">😎</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🤔&quot;)" aria-label="ایموجی 🤔">🤔</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🙃&quot;)" aria-label="ایموجی 🙃">🙃</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😴&quot;)" aria-label="ایموجی 😴">😴</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;😡&quot;)" aria-label="ایموجی 😡">😡</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;👍&quot;)" aria-label="ایموجی 👍">👍</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;👎&quot;)" aria-label="ایموجی 👎">👎</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;👏&quot;)" aria-label="ایموجی 👏">👏</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🙏&quot;)" aria-label="ایموجی 🙏">🙏</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🔥&quot;)" aria-label="ایموجی 🔥">🔥</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;❤️&quot;)" aria-label="ایموجی ❤️">❤️</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;💙&quot;)" aria-label="ایموجی 💙">💙</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;💯&quot;)" aria-label="ایموجی 💯">💯</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🎉&quot;)" aria-label="ایموجی 🎉">🎉</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;✨&quot;)" aria-label="ایموجی ✨">✨</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🌹&quot;)" aria-label="ایموجی 🌹">🌹</button><button type="button" style="border:0;background:#183047;border-radius:8px;padding:6px 0;font-size:21px" onclick="event.stopPropagation();cyrusInsertEmoji(&quot;🇮🇷&quot;)" aria-label="ایموجی 🇮🇷">🇮🇷</button></div></div>'
-        '<script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.29.1/index.js"></script>'
+        '<button class="composer-emoji" type="button" aria-label="باز کردن صفحه‌کلید ایموجی" title="ایموجی را از صفحه‌کلید گوشی انتخاب کنید" onclick="cyrusFocusNativeEmojiKeyboard(event)">☺</button>'
         '<div class="composer-attach-wrap"><button class="composer-attach" type="button" aria-label="پیوست" onclick="cyrusToggleAttach(event)">📎</button><div class="composer-attach-menu" id="cyrusAttachMenu" hidden>'
         '<button type="button" onclick="cyrusPickMedia(\'photo\')"><span>▧</span> عکس و ویدئو</button>'
         '<button type="button" onclick="cyrusPickMedia(\'music\')"><span>♫</span> موسیقی و صدا</button>'
         '<button type="button" onclick="cyrusPickMedia(\'file\')"><span>▤</span> فایل</button>'
         '<button type="button" onclick="cyrusShareLocation()"><span>⌖</span> موقعیت مکانی</button>'
         '<button type="button" onclick="cyrusShareContact()"><span>♙</span> مخاطب</button></div></div>'
-        '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
+        '<input type="hidden" name="client_nonce" value=""><input name="content" type="text" inputmode="text" enterkeyhint="send" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off" autocapitalize="sentences" spellcheck="false">'
         '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><span id="cyrusVoiceStatus" class="cyrus-voice-status" aria-live="polite"></span><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button type="button" id="cyrusVoiceCancel" class="composer-voice-cancel" hidden onclick="cyrusCancelVoiceRecord()">لغو ضبط</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled hidden>➤</button></form>'
         '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
         'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.multiple=true;i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
@@ -3591,19 +3589,7 @@ async function cyrusToggleVoiceRecord(b){
           update();input.addEventListener("input",update);
           input.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!send.disabled)form.requestSubmit();}});
           form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}if(nonceField){const body=input.value.trim();let saved=null;try{saved=JSON.parse(sessionStorage.getItem(nonceKey)||"null");}catch(err){}let nonce=saved&&saved.body===body&&saved.nonce?saved.nonce:"";if(!nonce){nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2));try{sessionStorage.setItem(nonceKey,JSON.stringify({body:body,nonce:nonce}));}catch(err){}}nonceField.value=nonce;}form.dataset.sending="1";send.disabled=true;send.textContent="…";});
-          // Delegated event survives delayed custom-element upgrade in mobile WebViews.
-          let emojiStart=input.value.length,emojiEnd=input.value.length;
-          const rememberEmojiCaret=()=>{emojiStart=input.selectionStart??input.value.length;emojiEnd=input.selectionEnd??emojiStart;};
-          input.addEventListener("select",rememberEmojiCaret);input.addEventListener("keyup",rememberEmojiCaret);input.addEventListener("click",rememberEmojiCaret);
-          document.addEventListener("emoji-click",function(e){
-            const emoji=e.detail&&e.detail.unicode;if(!emoji)return;
-            const start=Math.min(emojiStart,input.value.length),end=Math.min(Math.max(start,emojiEnd),input.value.length);
-            input.setRangeText(emoji,start,end,"end");
-            emojiStart=emojiEnd=start+emoji.length;
-            input.dispatchEvent(new Event("input",{bubbles:true}));
-            const panel=document.getElementById("cyrusEmojiPanel");if(panel)panel.style.display="block";
-            requestAnimationFrame(()=>{input.focus({preventScroll:true});input.setSelectionRange(emojiStart,emojiEnd);});
-          });
+          // The emoji button focuses the device keyboard; emoji selection is handled by Android/iOS.
           document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;const a=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(a)a.hidden=true;if(p)p.style.display="none";});
         })();
         document.addEventListener("click",function(e){const m=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(m&&!e.target.closest(".composer-attach-wrap"))m.hidden=true;if(p&&!e.target.closest(".composer-emoji")&&!e.target.closest(".composer-emoji-panel"))p.style.display="none";});</script>"""
@@ -3659,8 +3645,6 @@ async function cyrusToggleVoiceRecord(b){
         .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-send[hidden]{{display:none!important}}.composer-voice[hidden]{{display:none!important}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}}.cyrus-voice-status{{font-size:10px;color:#8fc8f1;white-space:nowrap}}.composer-voice-cancel{{width:auto;padding:7px 9px;margin:0;border:1px solid #754d4d;border-radius:12px;background:#321e25;color:#ffb5a8;font-size:10px}}.composer-voice-cancel[hidden]{{display:none}}.composer-voice.recording{{background:#9d3434;color:#fff;animation:cyrusVoicePulse 1s infinite alternate}}@keyframes cyrusVoicePulse{{to{{opacity:.55}}}}
         .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
         .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
-        .composer-emoji-panel{{position:fixed;bottom:calc(78px + env(safe-area-inset-bottom));right:10px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow-y:auto;overflow-x:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:1000;display:none}}
-        .composer-emoji-panel emoji-picker{{display:block;width:100%;height:220px;max-height:40vh;--background:#203243;--border-color:#3a5268;--input-border-color:#435b70;--input-font-color:#edf4fa;--button-hover-background:#334b60}}
         .send-box .composer-send:disabled{{opacity:.55;cursor:wait}}
         @media(max-width:520px){{.container:has(.cyrus-chat-header){{padding-inline:8px}}.message{{max-width:88%}}.messages-area{{gap:7px}}}}
         .room-header{{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 -12px 10px;border:0;border-radius:0;background:#172331;min-height:70px}}
@@ -3727,32 +3711,20 @@ async function cyrusToggleVoiceRecord(b){
       <div class="messages-area">{message_rows}</div>
       <script>
       (function(){{try{{const p=JSON.parse(localStorage.getItem("cyrus-chat-preferences-v1")||"{{}}");const size=Math.min(22,Math.max(12,Number(p.size)||14));document.documentElement.style.setProperty("--cyrus-chat-font-size",size+"px");}}catch(e){{}}}})();
-      function cyrusToggleEmoji(event) {{
+      function cyrusFocusNativeEmojiKeyboard(event) {{
         if(event){{event.preventDefault();event.stopPropagation();}}
-        const panel=document.getElementById("cyrusEmojiPanel");
-        if(!panel)return;
-        const opening=panel.style.display==="none"||!panel.style.display;
-        if(!opening){{panel.style.display="none";return;}}
-        panel.hidden=false;panel.style.display="block";panel.style.position="fixed";
-        panel.style.left="12px";panel.style.right="12px";
-        panel.style.bottom="calc(88px + env(safe-area-inset-bottom))";
-        panel.style.width="auto";panel.style.maxWidth="520px";
-        panel.style.maxHeight="55vh";panel.style.overflow="auto";
-        panel.style.zIndex="9999";panel.style.background="#102235";
-        panel.style.border="1px solid #34516a";panel.style.borderRadius="16px";
-        panel.style.boxShadow="0 12px 32px #0009";
-        // Keep the keyboard closed while the emoji tray is opening.
-      }}
-      function cyrusInsertEmoji(emoji,closePanel=true) {{
         const input=document.querySelector('.send-box input[name="content"]');
-        const panel=document.getElementById("cyrusEmojiPanel");
         if(!input)return;
-        const start=input.selectionStart===null?input.value.length:input.selectionStart;
-        const end=input.selectionEnd===null?start:input.selectionEnd;
-        input.value=input.value.slice(0,start)+emoji+input.value.slice(end);
-        input.focus({{preventScroll:true}});input.setSelectionRange(start+emoji.length,start+emoji.length);
-        input.dispatchEvent(new Event("input",{{bubbles:true}}));
-        if(panel&&closePanel)panel.style.display="none";
+        const attach=document.getElementById("cyrusAttachMenu");
+        if(attach)attach.hidden=true;
+        input.setAttribute("inputmode","text");
+        input.setAttribute("enterkeyhint","send");
+        const restoreCaret=()=>{{
+          try{{input.focus({{preventScroll:true}});const end=input.value.length;input.setSelectionRange(end,end);}}
+          catch(e){{try{{input.focus();}}catch(ignore){{}}}}
+        }};
+        restoreCaret();
+        window.setTimeout(restoreCaret,80);
       }}
       document.addEventListener('DOMContentLoaded',function(){{
         function cyrusPresencePing(){{if(document.visibilityState==="hidden")return;fetch("/presence/ping",{{method:"POST",credentials:"same-origin",headers:{{"X-Requested-With":"XMLHttpRequest"}}}}).catch(()=>{{}});}}
@@ -3760,7 +3732,46 @@ async function cyrusToggleVoiceRecord(b){
         const jumpParams=new URLSearchParams(location.search);const preserveHistory=jumpParams.has("before")||jumpParams.has("message");
         function cyrusScrollToLatest(){{if(preserveHistory)return;const area=document.querySelector(".messages-area");if(!area)return;area.scrollTop=area.scrollHeight;const last=area.querySelector(".message[data-message-id]:last-of-type");if(last)last.scrollIntoView({{behavior:"auto",block:"end"}});area.scrollTo({{top:area.scrollHeight,behavior:"auto"}});}}
         cyrusScrollToLatest();window.addEventListener("load",()=>{{cyrusScrollToLatest();}},{{once:true}});[120,350,800].forEach(ms=>setTimeout(cyrusScrollToLatest,ms));
-       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{node.addEventListener("click",event=>{{if(event.target.closest(".message-context,button,form,a,input,select"))return;const now=Date.now();if(node._cyrusTapAt&&now-node._cyrusTapAt<360){{node._cyrusTapAt=0;event.preventDefault();event.stopPropagation();cyrusCloseMessageMenus(false);cyrusSaveReaction(node,"❤️");}}else{{node._cyrusTapAt=now;cyrusOpenMessageMenu(event,node);}}}});let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>55&&Math.abs(dx)>Math.abs(dy)*1.15){{e.preventDefault();const replyButton=node.querySelector('.context-actions button[onclick^="cyrusReply"]');if(replyButton)cyrusReply(replyButton);else cyrusReply({{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}});return;}}if(Math.abs(dx)<12&&Math.abs(dy)<12){{/* tap handled by click for reliable mobile activation */}}}},{{passive:false}});}});
+       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{
+         let sx=0,sy=0;
+         node.addEventListener("touchstart",e=>{{
+           const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}
+         }},{{passive:true}});
+         node.addEventListener("touchend",e=>{{
+           const t=e.changedTouches&&e.changedTouches[0];if(!t)return;
+           const dx=t.clientX-sx,dy=t.clientY-sy;
+           if(dx>55&&Math.abs(dx)>Math.abs(dy)*1.15){{
+             e.preventDefault();node._cyrusTouchHandledAt=Date.now();
+             const replyButton=node.querySelector('.context-actions button[onclick^="cyrusReply"]');
+             if(replyButton)cyrusReply(replyButton);
+             else cyrusReply({{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}});
+             return;
+           }}
+           if(Math.abs(dx)<14&&Math.abs(dy)<14){{
+             e.preventDefault();
+             const now=Date.now();node._cyrusTouchHandledAt=now;
+             if(node._cyrusTapAt&&now-node._cyrusTapAt<360){{
+               node._cyrusTapAt=0;cyrusCloseMessageMenus(false);cyrusSaveReaction(node,"❤️");
+             }}else{{
+               node._cyrusTapAt=now;cyrusOpenMessageMenu(e,node);
+             }}
+           }}
+         }},{{passive:false}});
+         node.addEventListener("click",event=>{{
+           if(node._cyrusTouchHandledAt&&Date.now()-node._cyrusTouchHandledAt<700){{
+             event.preventDefault();event.stopPropagation();return;
+           }}
+           if(event.target.closest(".message-context,button,form,a,input,select"))return;
+           const now=Date.now();
+           if(node._cyrusTapAt&&now-node._cyrusTapAt<360){{
+             node._cyrusTapAt=0;event.preventDefault();event.stopPropagation();
+             cyrusCloseMessageMenus(false);cyrusSaveReaction(node,"❤️");
+           }}else{{
+             node._cyrusTapAt=now;cyrusOpenMessageMenu(event,node);
+           }}
+         }});
+       }});
+
        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
         if(deepLinkedMessage) {{
           requestAnimationFrame(()=>requestAnimationFrame(()=>{{
@@ -3779,18 +3790,6 @@ async function cyrusToggleVoiceRecord(b){
         }}
         document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const raw=el.dataset.createdAt;const dt=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(raw)?raw:raw+"Z");if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tehran",hourCycle:"h23"}});}}catch(e){{}}}});
         const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seenRaw=presence.dataset.seen;const seen=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(seenRaw)?seenRaw:seenRaw+"Z");if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":age>=2592000000?"آخرین بازدید مدت‌ها پیش":age>=604800000?"آخرین بازدید یک هفته پیش":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tehran",hourCycle:"h23"}});}}}}catch(e){{}}}}
-        const picker=document.getElementById("cyrusFullEmojiPicker");
-        if(picker){{
-          const insertPickedEmoji=function(event){{
-            const value=event.detail&&event.detail.unicode;
-            if(value){{event.stopPropagation();cyrusInsertEmoji(value,false);}}
-          }};
-          picker.addEventListener("emoji-click",insertPickedEmoji);
-          picker.addEventListener("pointerdown",function(){{
-            const input=document.querySelector('.send-box input[name="content"]');
-            if(input)input.focus({{preventScroll:true}});
-          }},{{capture:true}});
-        }}}}
         const form=document.querySelector(".send-box");
         if(form){{
           const input=form.querySelector('input[name="content"]');
@@ -3860,7 +3859,6 @@ async function cyrusToggleVoiceRecord(b){
         if(event.target.closest('.message-context')) return;
         if(event.target.closest('button,form,select,input,a')) return;
         // انتخاب متن باقی‌مانده از لمس قبلی نباید منوی پیام را در موبایل مسدود کند.
-        if(event.type!=='click'&&window.getSelection&&String(window.getSelection()).trim())return;
         const clickedId=message&&message.dataset.messageId;
         if(event.type==='click'&&clickedId&&cyrusSelectedMessages.size&&event.shiftKey) {{
           const rows=[...document.querySelectorAll('.message[data-message-id]')];
@@ -3887,19 +3885,7 @@ async function cyrusToggleVoiceRecord(b){
         event.stopPropagation();
       }}
       (function(){{
-        let pressTimer=null,startX=0,startY=0,longPressed=false;
-        document.querySelectorAll('.message').forEach(message=>{{
-          message.setAttribute('aria-expanded','false');
-          message.addEventListener('pointerdown',event=>{{
-            if(event.pointerType==='mouse'||event.target.closest('.message-context,button,form,a,input,select'))return;
-            startX=event.clientX;startY=event.clientY;longPressed=false;
-            clearTimeout(pressTimer);
-            pressTimer=setTimeout(()=>{{longPressed=true;cyrusOpenMessageMenu(event,message);}},560);
-          }});
-          ['pointerup','pointercancel','pointerleave'].forEach(type=>message.addEventListener(type,()=>clearTimeout(pressTimer)));
-          message.addEventListener('pointermove',event=>{{if(Math.abs(event.clientX-startX)>12||Math.abs(event.clientY-startY)>12)clearTimeout(pressTimer);}});
-          message.addEventListener('click',event=>{{if(longPressed){{event.preventDefault();event.stopPropagation();longPressed=false;}}}});
-        }});
+        document.querySelectorAll('.message').forEach(message=>message.setAttribute('aria-expanded','false'));
         document.addEventListener('keydown',event=>{{
           const opened=document.querySelector('.message.context-open');
           if(!opened)return;
