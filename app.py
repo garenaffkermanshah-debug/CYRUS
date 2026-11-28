@@ -2207,7 +2207,7 @@ def public_user_profile(user_id):
     display_name = contact_name or name
     block_label = "رفع مسدودیت" if blocked_by_me else "مسدود کردن کاربر"
     contact_action = (
-        '<button type="button" onclick="document.getElementById(&quot;cyrusEditContact&quot;).open=true">ویرایش مخاطب</button>'
+        f'<details class="profile-menu-edit"><summary>ویرایش مخاطب</summary><form method="post" action="/user/{safe_id}/contact/edit"><input name="contact_name" maxlength="60" value="{html.escape(contact_name,quote=True)}" placeholder="{html.escape(name,quote=True)}"><button type="submit">ذخیره</button></form></details>'
         if is_contact else
         f'<form method="post" action="/user/{safe_id}/contact"><button type="submit">افزودن مخاطب</button></form>'
     )
@@ -2238,6 +2238,13 @@ def public_user_profile(user_id):
         .profile-more-menu button,.profile-more-menu a{{display:block;width:100%;box-sizing:border-box;margin:0;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#e8eff5;text-align:right;font-size:11px;line-height:1.35;text-decoration:none}}
         .profile-more-menu button:active,.profile-more-menu a:active{{background:#344b5e}}
         .profile-more-menu .danger{{color:#f1aeb4}}
+        .profile-menu-edit{{margin:0}}
+        .profile-menu-edit summary{{display:block;box-sizing:border-box;padding:9px 10px;border-radius:7px;color:#e8eff5;font-size:11px;line-height:1.35;cursor:pointer;list-style:none;text-align:right}}
+        .profile-menu-edit summary::-webkit-details-marker{{display:none}}
+        .profile-menu-edit[open] summary{{background:#344b5e}}
+        .profile-menu-edit form{{display:flex;gap:5px;padding:4px 5px 6px}}
+        .profile-menu-edit input{{box-sizing:border-box;min-width:0;width:100%;flex:1;padding:6px;border:1px solid #40566b;border-radius:6px;background:#0d1925;color:#fff;font-size:11px}}
+        .profile-menu-edit form button{{width:auto;flex:0 0 auto;padding:6px 8px;background:#248bd0;color:#fff;font-size:10px}}
         .user-profile-name{{margin:8px 0 2px;text-align:right;color:#f0f4f7;font-size:16px;font-weight:500}}
         .user-profile-username{{text-align:right;color:#78b8e6;font-size:11px;direction:ltr;unicode-bidi:plaintext}}
         .user-profile-bio{{text-align:right;color:#c3cfda;font-size:12px;line-height:1.55;margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
