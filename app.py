@@ -382,7 +382,7 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-loginmark5">
+<link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-verifyclean1">
 <link rel="stylesheet" href="/static/cyrus-rebuild.css?v=6">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
@@ -1399,8 +1399,6 @@ def verify_email():
     <main class="cyrus-auth cyrus-auth-verify">
       <section class="auth-intro">
         <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
-        <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
-        <p class="auth-kicker">یک گام تا ورود</p><h1>ایمیل شما،<br><em>کلید پیوندها</em></h1>
         <p class="auth-description">کد یک‌بارمصرف را از پیام ارسالی CYRUS بردارید و در کادر روبه‌رو وارد کنید.</p>
       </section>
       <section class="auth-panel">
