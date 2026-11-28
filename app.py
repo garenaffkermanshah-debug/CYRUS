@@ -2456,11 +2456,7 @@ def privacy_security():
       <section class="cps-account"><strong>حریم خصوصی حساب CYRUS</strong><p>تنظیم کن چه کسانی بتوانند اطلاعات و راه‌های ارتباطی تو را ببینند. گزینه‌های این صفحه در همین مرورگر ذخیره می‌شوند.</p></section>
       <section class="cps-section">
         <h2 class="cps-title">حریم خصوصی</h2>
-        <div class="cps-row" data-pref="lastseen" data-title="آخرین بازدید و آنلاین بودن" data-desc="نمایش وضعیت حضور در رابط فعلی هنوز به این گزینه متصل نیست؛ این مقدار ترجیح ذخیره‌شده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">◷</span><span class="cps-main"><span class="cps-name">آخرین بازدید</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
-        <div class="cps-row" data-pref="photo" data-title="تصویر پروفایل" data-desc="این انتخاب فعلاً ذخیره می‌شود؛ دسترسی تصاویر پروفایل در سرور هنوز بر اساس آن محدود نشده است." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">▣</span><span class="cps-main"><span class="cps-name">تصویر پروفایل</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
-        <div class="cps-row" data-pref="calls" data-title="تماس‌ها" data-desc="قابلیت تماس صوتی و تصویری هنوز در CYRUS فعال نیست." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">☎</span><span class="cps-main"><span class="cps-name">تماس‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
-        <div class="cps-row" data-pref="groups" data-title="گروه‌ها و کانال‌ها" data-desc="دعوت‌پذیری گروه‌ها و کانال‌ها هنوز به این ترجیح متصل نشده است." data-options="همه|مخاطبان من"><span class="cps-icon">♧</span><span class="cps-main"><span class="cps-name">گروه‌ها و کانال‌ها</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
-        <div class="cps-row" data-pref="forward" data-title="پیام‌های فورواردشده" data-desc="کنترل نمایش پیوند به حساب در پیام‌های فورواردشده در نسخه فعلی هنوز پشتیبانی نمی‌شود." data-options="همه|مخاطبان من|هیچ‌کس"><span class="cps-icon">➦</span><span class="cps-main"><span class="cps-name">پیام‌های فورواردی</span><span class="cps-value" data-value>همه</span></span><span class="cps-chevron">›</span></div>
+        <p class="cps-note">تنظیمات محدودسازی نمایش آخرین بازدید، تصویر پروفایل و دعوت‌پذیری هنوز به کنترل‌های سرور متصل نیستند؛ برای جلوگیری از نمایش گزینه‌های غیرواقعی، این کنترل‌ها در نسخهٔ اول فعال نشده‌اند.</p>
       </section>
       <section class="cps-section">
         <h2 class="cps-title">امنیت</h2>
@@ -2473,34 +2469,9 @@ def privacy_security():
       <div class="cps-sheet-bg" id="cps-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="cps-sheet-title"><section class="cps-sheet"><h2 id="cps-sheet-title"></h2><p id="cps-sheet-desc"></p><div id="cps-sheet-options"></div><button type="button" id="cps-sheet-save">ذخیره</button></section></div>
       <script>
       (function(){
-        const key='cyrus-privacy-preferences-v1';
-        let prefs={};
-        try{prefs=JSON.parse(localStorage.getItem(key)||'{}')||{};}catch(_e){prefs={};}
-        const rows=[...document.querySelectorAll('[data-pref]')];
-        function paint(){rows.forEach(row=>{const k=row.dataset.pref;const value=prefs[k]||row.querySelector('[data-value]').textContent;row.querySelector('[data-value]').textContent=value;});}
-        paint();
-        const bg=document.getElementById('cps-sheet-bg'),title=document.getElementById('cps-sheet-title'),desc=document.getElementById('cps-sheet-desc'),opts=document.getElementById('cps-sheet-options');
-        let active=null,chosen='';
-        rows.forEach(row=>row.addEventListener('click',()=>{
-          active=row;chosen=prefs[row.dataset.pref]||row.querySelector('[data-value]').textContent;
-          title.textContent=row.dataset.title;desc.textContent=row.dataset.desc;opts.replaceChildren();
-          (row.dataset.options||'').split('|').filter(Boolean).forEach(value=>{
-            const label=document.createElement('label');label.className='cps-choice';
-            const radio=document.createElement('input');radio.type='radio';radio.name='cps-choice';radio.value=value;radio.checked=value===chosen;
-            radio.addEventListener('change',()=>chosen=value);label.append(radio,document.createTextNode(value));opts.append(label);
-          });bg.classList.add('open');
-        }));
-        document.getElementById('cps-sheet-save').addEventListener('click',()=>{
-          if(!active)return;prefs[active.dataset.pref]=chosen;
-          try{localStorage.setItem(key,JSON.stringify(prefs));}catch(_e){}
-          paint();bg.classList.remove('open');active=null;
-        });
-        bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
-        document.addEventListener('keydown',e=>{if(e.key==='Escape')bg.classList.remove('open');});
-        document.getElementById('cps-sessions').addEventListener('click',async()=>{if(!confirm('نشست‌های دیگر حساب از سیستم خارج شوند؟'))return;try{const r=await fetch('/privacy-security/sessions/logout-others',{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'fetch'}});const j=await r.json();alert(j.ok?'نشست‌های دیگر خارج شدند.':'خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.');}catch(e){alert('ارتباط با سرور برقرار نشد.');}});
+        document.getElementById("cps-sessions").addEventListener("click",async()=>{if(!confirm("نشست‌های دیگر حساب از سیستم خارج شوند؟"))return;try{const r=await fetch("/privacy-security/sessions/logout-others",{method:"POST",credentials:"same-origin",headers:{"X-Requested-With":"fetch"}});const j=await r.json();alert(j.ok?"نشست‌های دیگر خارج شدند.":"خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.");}catch(e){alert("ارتباط با سرور برقرار نشد.");}});
       })();
-      </script>
-    </main>
+      </script>   </main>
     """
     content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
     return page(content)
