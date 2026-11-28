@@ -39,3 +39,8 @@ revoke all on public.cyrus_story_likes from anon, authenticated;
 grant all on public.cyrus_stories to service_role;
 grant all on public.cyrus_story_views to service_role;
 grant all on public.cyrus_story_likes to service_role;
+
+-- Private media bucket; uploads and signed URLs are created only by the Flask server.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('cyrus-stories', 'cyrus-stories', false, 20971520, array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','video/quicktime'])
+on conflict (id) do update set public=false, file_size_limit=20971520, allowed_mime_types=excluded.allowed_mime_types;
