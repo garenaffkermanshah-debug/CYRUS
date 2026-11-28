@@ -3930,6 +3930,29 @@ async function cyrusToggleVoiceRecord(b){
         older_url = url_for("chat",conversation_id=conversation_id,before=oldest_stamp)
         older_messages_link = '<a class="cyrus-older-messages" href="' + html.escape(older_url,quote=True) + '">↑ پیام‌های قدیمی‌تر</a>'
     newer_messages_link = '<a class="cyrus-older-messages" href="' + html.escape(url_for("chat",conversation_id=conversation_id),quote=True) + '">↓ بازگشت به پیام‌های جدیدتر</a>' if message_before_valid else ""
+    channel_views_script = ""
+    if room_type == "channel":
+        channel_views_script = f"""
+        <script>
+        (()=>{{
+          const cid="{conversation_id}";
+          async function refreshChannelViews(){{
+            try{{
+              await fetch("/chat/mark-read",{{method:"POST",credentials:"same-origin",headers:{{"Content-Type":"application/json"}},body:JSON.stringify({{conversation_id:cid}})}});
+              const response=await fetch("/chat/"+cid+"/channel-views",{{credentials:"same-origin",cache:"no-store"}});
+              if(!response.ok)return;
+              const data=await response.json(),readers=(data.read_at||[]).map(Date.parse).filter(Number.isFinite);
+              document.querySelectorAll(".message.mine .message-time[data-created-at]").forEach(timeNode=>{{
+                const created=Date.parse(timeNode.dataset.createdAt||"");if(!Number.isFinite(created))return;
+                const count=readers.filter(value=>value>=created).length;
+                const badge=timeNode.parentElement.querySelector("[data-channel-view-count]");
+                if(badge){{badge.dataset.channelViewCount=String(count);const value=badge.querySelector("b");if(value)value.textContent=String(count);}}
+              }});
+            }}catch(_e){{}}
+          }}
+          refreshChannelViews();setInterval(refreshChannelViews,4000);
+        }})();
+        </script>"""
     content = f"""
     <div class="container">
       {room_header}
@@ -4568,6 +4591,7 @@ async function cyrusToggleVoiceRecord(b){
         schedule();
       }})();
       </script>
+      {channel_views_script}
       {send_box}
     </div>"""
     jump_id = request.args.get("message", "").strip()
@@ -4631,6 +4655,40 @@ async function cyrusToggleVoiceRecord(b){
     </script>
     """
     return page(content)
+
+
+@app.route("/chat/<conversation_id>/channel-views")
+def cyrus_channel_view_counts(conversation_id):
+    if not session.get("access_token"):
+        return app.response_class('{"error":"unauthorized"}',status=401,mimetype="application/json")
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return app.response_class('{"error":"invalid_conversation"}',status=400,mimetype="application/json")
+    uid=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session.get("access_token","")}
+    try:
+        room=requests.get(URL+"/rest/v1/cyrus_conversations",
+            params={"select":"type","id":"eq."+conversation_id,"limit":"1"},
+            headers=headers,timeout=10)
+        if not room.ok or not room.json() or str(room.json()[0].get("type") or "")!="channel":
+            return app.response_class('{"error":"not_channel"}',status=403,mimetype="application/json")
+        member=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id","conversation_id":"eq."+conversation_id,"user_id":"eq."+uid,"limit":"1"},
+            headers=headers,timeout=10)
+        if not member.ok or not member.json():
+            return app.response_class('{"error":"forbidden"}',status=403,mimetype="application/json")
+        rows=requests.get(URL+"/rest/v1/cyrus_members",
+            params={"select":"user_id,last_read_at","conversation_id":"eq."+conversation_id,"limit":"1000"},
+            headers=headers,timeout=12)
+        if not rows.ok:
+            return app.response_class('{"error":"readers_unavailable"}',status=502,mimetype="application/json")
+        read_at=[str(row.get("last_read_at")) for row in rows.json()
+                 if str(row.get("user_id") or "")!=uid and row.get("last_read_at")]
+        payload=__import__("json").dumps({"read_at":read_at},ensure_ascii=False)
+        return app.response_class(payload,mimetype="application/json",headers={"Cache-Control":"no-store"})
+    except Exception:
+        return app.response_class('{"error":"server_error"}',status=502,mimetype="application/json")
 
 
 @app.route("/chat/<conversation_id>/updates")
