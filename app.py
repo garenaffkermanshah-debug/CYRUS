@@ -393,7 +393,7 @@ BASE = """
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-homepolish1">
-<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=8">
+<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=9">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1705,7 +1705,7 @@ def search():
             room_response = requests.get(
                 URL + "/rest/v1/cyrus_conversations",
                 params={
-                    "select": "id,title,type,created_by,is_public",
+                    "select": "id,title,type,created_by,is_public,invite_code",
                     "type": "in.(group,channel)",
                     "title": "ilike.*" + query + "*",
                     "order": "created_at.desc",
@@ -1790,14 +1790,14 @@ def search():
             if is_joined:
                 action = f'<a class="action" href="/chat/{rid}">باز کردن</a>'
             else:
-                action = f'<a class="action" href="/channels/join/{rid}">پیوستن</a>'
+                action = f'<a class="action cyrus-join-action" href="/channels/join/{rid}">پیوستن</a>'
         else:
             icon = "𓅃"
             label = "گروه"
             if is_joined:
                 action = f'<a class="action" href="/chat/{rid}">باز کردن</a>'
             else:
-                action = '<span class="muted">گروه</span>'
+                invite_code = str(room.get("invite_code") or "").strip()\n                if invite_code:\n                    action = '<a class="action cyrus-join-action" href="/invite/' + quote(invite_code) + '">پیوستن</a>'\n                else:\n                    action = '<span class="muted">پیوستن در دسترس نیست</span>'
 
         room_rows += f"""
         <div class="chat-row search-result" data-kind="{room_kind}">
@@ -1897,12 +1897,12 @@ def search():
         .search-result .avatar{{outline:1px solid #b9954b55;outline-offset:1px}}
 
       </style>
+      <section id="cyrus-search-recent" style="display:none;padding:6px 15px 10px">
+        <div class="section-title">سابقه جستجو</div><div id="cyrus-search-recent-list"></div>
+      </section>
+
       <div class="chat-list">{people_rows}</div>
       <div class="chat-list">{room_rows}</div>
-
-      <section id="cyrus-search-recent" style="display:none;padding:12px 15px 18px">
-        <div class="section-title">جستجوهای اخیر</div><div id="cyrus-search-recent-list"></div>
-      </section>
       {empty}
       <script>
       (function(){{
