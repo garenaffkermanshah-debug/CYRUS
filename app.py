@@ -14,22 +14,33 @@ app.config["MAX_CONTENT_LENGTH"] = 205 * 1024 * 1024  # up to 10 files × 20 MiB
 # CYRUS_PERSISTENT_SESSION_FIX
 _session_key = os.getenv("SECRET_KEY")
 if not _session_key:
-    _key_file = Path.home() / ".cyrus_session_secret"
-    if not _key_file.exists():
-        _key_file.write_text(secrets.token_hex(32))
-        try:
-            _key_file.chmod(0o600)
-        except OSError:
-            pass
-    _session_key = _key_file.read_text().strip()
+    # Stable across ephemeral deployments: derive a signing key from the server-only
+    # Supabase service-role/secret key. Never derive it from the public anon key.
+    _stable_supabase_secret = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if _stable_supabase_secret:
+        _session_key = hashlib.sha256(
+            ("CYRUS-Flask-session-v1:" + _stable_supabase_secret).encode("utf-8")
+        ).hexdigest()
+    else:
+        # Local development fallback only; platforms with ephemeral disks should set
+        # SECRET_KEY or a Supabase server-only secret key in deployment variables.
+        _key_file = Path.home() / ".cyrus_session_secret"
+        if not _key_file.exists():
+            _key_file.write_text(secrets.token_hex(32))
+            try:
+                _key_file.chmod(0o600)
+            except OSError:
+                pass
+        _session_key = _key_file.read_text().strip()
 
 app.secret_key = _session_key
-# نشست‌ها کوتاه‌تر و کوکی در استقرار HTTPS فقط از مسیر امن ارسال می‌شود.
+# Long-lived persistent cookie; refresh token renews the Supabase access token.
 app.permanent_session_lifetime = timedelta(days=365)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.getenv("COOKIE_SECURE", "1").strip().lower() not in ("0", "false", "no", "off")
 app.config["SESSION_COOKIE_NAME"] = "cyrus_session"
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 
 @app.route("/manifest.webmanifest")
 def cyrus_manifest():
@@ -242,7 +253,14 @@ def cyrus_set_room_avatar(room_id, avatar_url, access_token):
             "p_topics_enabled":room.get("topics_enabled",False),"p_sign_messages":room.get("sign_messages",False),
             "p_member_permissions":room.get("member_permissions") or {}}
         saved=requests.post(URL+"/rest/v1/rpc/cyrus_manage_update_room_settings",json=payload,headers=h,timeout=20)
-        return saved.ok
+        if saved.ok:
+            return True
+        # Some deployed databases have an older settings RPC signature. Fall back
+        # to a narrowly scoped avatar-only update; Supabase RLS still enforces role.
+        patched=requests.patch(URL+"/rest/v1/cyrus_conversations",
+            params={"id":"eq."+str(room_id)},json={"avatar_url":avatar_url},
+            headers={**h,"Prefer":"return=minimal"},timeout=20)
+        return patched.ok
     except Exception:
         return False
 
@@ -6352,7 +6370,7 @@ def manage_room(conversation_id):
           <form id="cyrusRoomSettingsForm" class="tg-room-settings" method="post" enctype="multipart/form-data">
             <div class="tg-section">
               <div class="tg-section-title">اطلاعات {kind}</div>
-              <div class="tg-room-avatar-line"><div id="cyrusRoomAvatarPreview">{avatar_preview}</div><label class="tg-avatar-picker"><span>انتخاب تصویر گروه<small>تصویر پروفایل · از گالری</small></span><input id="cyrusRoomAvatarFile" type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp"></label></div><button id="cyrusRoomAvatarConfirm" class="tg-avatar-confirm" type="submit" name="action" value="save_avatar" disabled>✓ تأیید و ثبت تصویر گروه</button>
+              <div class="tg-room-avatar-line"><div id="cyrusRoomAvatarPreview">{avatar_preview}</div><label class="tg-avatar-picker"><span>انتخاب تصویر گروه<small>تصویر پروفایل · از گالری</small></span><input id="cyrusRoomAvatarFile" type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp"></label></div><button id="cyrusRoomAvatarConfirm" class="tg-avatar-confirm" type="submit" name="action" value="save_avatar" formnovalidate disabled>✓ تأیید و ارسال تصویر</button>
               <label class="tg-field">نام
                 <input name="title" minlength="2" maxlength="60" value="{title}" required>
               </label>
