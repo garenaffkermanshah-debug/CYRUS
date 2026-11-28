@@ -1244,20 +1244,25 @@ def welcome():
     if session.get("access_token"):
         return redirect(url_for("home"))
     content = """
-    <main class="container">
-      <div class="card" style="text-align:center">
-        <h2>به CYRUS خوش آمدید</h2>
-        <p class="muted">پیوند پارسیان · شکوه هخامنشی</p>
-        <a class="button" href="/register" style="display:block;text-decoration:none;margin:22px 0">
-          ثبت‌نام
-        </a>
-        <p class="muted">
-          <a class="form-link" href="/login">ورود به حساب قبلی</a>
-        </p>
+    <main class="cyrus-welcome">
+      <div class="welcome-brand">
+        <img src="/static/cyrus-app-icon.webp" alt="CYRUS">
+        <div><strong>CYRUS</strong><small>پیوند پارسیان</small></div>
       </div>
+      <div class="welcome-portrait"><img src="/static/cyrus-portrait-new.jpg" alt="چهره کوروش"></div>
+      <p class="welcome-kicker">پیام‌رسان پارسی</p>
+      <h1>شکوهی ماندگار</h1>
+      <p class="welcome-caption">پیوند پارسیان · شکوه هخامنشی</p>
+      <div class="welcome-actions">
+        <a class="welcome-primary" href="/register">ثبت‌نام</a>
+        <a class="welcome-secondary" href="/login">ورود به حساب قبلی</a>
+      </div>
+      <footer class="welcome-footer">CYRUS <span>·</span> شکوهی ماندگار</footer>
     </main>
     """
     return page(content)
+
+@app.route("/register", methods=["GET", "POST"])
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -1459,10 +1464,7 @@ def login():
       <section class="auth-intro">
         <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
         <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
-        <p class="auth-kicker">پیام‌رسان پارسی</p>
-        <h1>گفت‌وگو،<br><em>با شکوهی ماندگار</em></h1>
-        <p class="auth-description">با همراهان خود پیوندی امن و ساده بسازید؛ هر گفت‌وگو، نزدیک‌تر از همیشه.</p>
-        <div class="auth-feature"><span>✦</span><div><b>ورود امن با کد یک‌بارمصرف</b><small>بدون نیاز به گذرواژه</small></div></div>
+        <h1 class="auth-main-title"><em>شکوهی ماندگار</em></h1>
       </section>
       <section class="auth-panel">
         <div class="auth-panel-head"><span class="auth-step">خوش بازگشتید</span><h2>ورود به حساب</h2><p>برای دریافت کد ورود، ایمیل حساب خود را وارد کنید.</p></div>
