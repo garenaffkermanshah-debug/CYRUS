@@ -638,3 +638,6 @@ DROP POLICY IF EXISTS cyrus_chat_preferences_delete_own ON public.cyrus_chat_pre
 CREATE POLICY cyrus_chat_preferences_delete_own
   ON public.cyrus_chat_preferences FOR DELETE TO authenticated
   USING (user_id = (SELECT auth.uid()));
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cyrus_chat_preferences TO authenticated;
+REVOKE ALL ON TABLE public.cyrus_chat_preferences FROM anon;
