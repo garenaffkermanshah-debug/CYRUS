@@ -215,7 +215,7 @@ class CyrusSecurityTests(unittest.TestCase):
                 data={"csrf_token": "test-csrf-token", "token": "123456"},
             )
         self.assertEqual(response.status_code, 200)
-        self.assertIn("۶۰۰ ثانیه", response.get_data(as_text=True))
+        self.assertIn("۳۰۰ ثانیه", response.get_data(as_text=True))
         self.assertIn("آخرین کد ایمیل", response.get_data(as_text=True))
 
     def test_pwa_manifest_points_to_existing_app_icon(self):
@@ -233,7 +233,7 @@ class CyrusSecurityTests(unittest.TestCase):
         self.assertIn("no-cache", response.headers.get("Cache-Control", ""))
         self.assertEqual(response.headers.get("Service-Worker-Allowed"), "/")
         worker = response.get_data(as_text=True)
-        self.assertIn("const CACHE='cyrus-static-v2'", worker)
+        self.assertIn("const CACHE='cyrus-static-v3'", worker)
         for asset in (
             "/static/cyrus-app-icon.webp",
             "/static/cyrus-app-icon.svg",
