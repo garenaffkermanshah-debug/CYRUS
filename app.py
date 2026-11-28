@@ -3528,7 +3528,7 @@ def chat(conversation_id):
             if message_room_kind_for_receipt == "private":
                 read_status_html = '<span class="message-read-status" title="'+("خوانده‌شده" if readers else "ارسال‌شده")+'">'+("✓✓" if readers else "✓")+'</span>'
             elif message_room_kind_for_receipt == "channel":
-                read_status_html = '<span class="cyrus-channel-view-count" data-channel-view-count="'+str(readers)+'" title="بازدیدکنندگان پیام"><span aria-hidden="true">◉</span> <b>'+str(readers)+'</b></span>'
+                read_status_html = '<span class="cyrus-channel-view-count" data-channel-view-count="'+str(readers)+'" title="بازدیدکنندگان پیام"><svg aria-hidden="true" viewBox="0 0 20 12" width="11" height="7"><path d="M1 6s3.2-5 9-5 9 5 9 5-3.2 5-9 5S1 6 1 6Z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="6" r="2.3" fill="currentColor"/></svg> <b>'+str(readers)+'</b></span>'
             elif readers:
                 read_status_html = '<span class="message-read-status" title="تعداد اعضای خواننده">✓✓ '+str(readers)+'</span>'
 
