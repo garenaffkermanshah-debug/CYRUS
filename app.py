@@ -3719,8 +3719,10 @@ async function cyrusToggleVoiceRecord(b){
         if(attach)attach.hidden=true;
         input.setAttribute("inputmode","text");
         input.setAttribute("enterkeyhint","send");
+        const start=input.selectionStart===null?input.value.length:input.selectionStart;
+        const end=input.selectionEnd===null?start:input.selectionEnd;
         const restoreCaret=()=>{{
-          try{{input.focus({{preventScroll:true}});const end=input.value.length;input.setSelectionRange(end,end);}}
+          try{{input.focus({{preventScroll:true}});input.setSelectionRange(start,end);}}
           catch(e){{try{{input.focus();}}catch(ignore){{}}}}
         }};
         restoreCaret();
