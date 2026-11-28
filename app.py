@@ -2,6 +2,7 @@ import os, secrets, requests, html, uuid, time, hashlib, re, io, zipfile
 from urllib.parse import quote, urlsplit
 from pathlib import Path
 from datetime import timedelta, datetime, timezone
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from flask import Flask, request, session, redirect, url_for, render_template, render_template_string, Response
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -3184,11 +3185,11 @@ def chat(conversation_id):
             stamp_dt = datetime.fromisoformat(stamp_raw.replace("Z", "+00:00"))
             if stamp_dt.tzinfo is None:
                 stamp_dt = stamp_dt.replace(tzinfo=timezone.utc)
-            stamp_dt = stamp_dt.astimezone()
+            stamp_dt = stamp_dt.astimezone(ZoneInfo("Asia/Tehran"))
             stamp = html.escape(stamp_dt.strftime("%H:%M"))
             message_date = stamp_dt.date().isoformat()
             if message_date != previous_message_date:
-                date_label = "امروز" if stamp_dt.date() == datetime.now().astimezone().date() else stamp_dt.strftime("%Y/%m/%d")
+                date_label = "امروز" if stamp_dt.date() == datetime.now(ZoneInfo("Asia/Tehran")).date() else stamp_dt.strftime("%Y/%m/%d")
                 message_rows += '<div class="chat-date-divider"><span>' + html.escape(date_label) + '</span></div>'
                 previous_message_date = message_date
         except Exception:
@@ -3350,7 +3351,7 @@ def chat(conversation_id):
                             if seen_dt.tzinfo is None:
                                 seen_dt = seen_dt.replace(tzinfo=timezone.utc)
                             room_last_seen_raw = seen_dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-                            seen_local = seen_dt.astimezone()
+                            seen_local = seen_dt.astimezone(ZoneInfo("Asia/Tehran"))
                             now_dt = datetime.now(timezone.utc)
                             age_seconds = max(0, (now_dt - seen_dt.astimezone(timezone.utc)).total_seconds())
                             if age_seconds <= 300:
@@ -3775,8 +3776,8 @@ async function cyrusToggleVoiceRecord(b){
             }}
           }}));
         }}
-        document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const raw=el.dataset.createdAt;const dt=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(raw)?raw:raw+"Z");if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}catch(e){{}}}});
-        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seenRaw=presence.dataset.seen;const seen=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(seenRaw)?seenRaw:seenRaw+"Z");if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":age>=2592000000?"آخرین بازدید مدت‌ها پیش":age>=604800000?"آخرین بازدید یک هفته پیش":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}}}catch(e){{}}}}
+        document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const raw=el.dataset.createdAt;const dt=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(raw)?raw:raw+"Z");if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tehran",hourCycle:"h23"}});}}catch(e){{}}}});
+        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seenRaw=presence.dataset.seen;const seen=new Date(/(?:Z|[+-]\\d{{2}}:\\d{{2}})$/i.test(seenRaw)?seenRaw:seenRaw+"Z");if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":age>=2592000000?"آخرین بازدید مدت‌ها پیش":age>=604800000?"آخرین بازدید یک هفته پیش":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit",timeZone:"Asia/Tehran",hourCycle:"h23"}});}}}}catch(e){{}}}}
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker){{
           const insertPickedEmoji=function(event){{
