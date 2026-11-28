@@ -439,7 +439,7 @@ body {
 }
 
 
-/* CYRUS Rubika-like compact messenger layout */
+/* CYRUS compact messenger layout */
 .top {
   height: 60px;
   padding: 8px 14px;
@@ -2255,7 +2255,7 @@ def privacy_security():
         <h2 class="cps-title">امنیت</h2>
         <label class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">قفل با رمز عبور هنوز در دسترس نیست</span></span><input class="cps-switch" type="checkbox" disabled aria-label="قفل برنامه"></label>
         __CYRUS_2FA_ROW__
-        <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">مدیریت نشست‌ها در نسخه فعلی موجود نیست</span></span><span class="cps-chevron">›</span></div>
+        <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">خروج از نشست‌های دیگر</span></span><span class="cps-chevron">›</span></div>
       </section>
       <a class="cps-blocked" href="/blocked-users"><span>⊘</span><span class="cps-main"><span class="cps-name">کاربران مسدودشده</span><small>مشاهده و رفع مسدودیت کاربران</small></span><span class="cps-chevron">›</span></a>
       
