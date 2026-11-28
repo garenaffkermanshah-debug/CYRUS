@@ -373,7 +373,7 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=2">
+<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=3">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
 <meta name="mobile-web-app-capable" content="yes">
@@ -602,7 +602,7 @@ window.addEventListener('pageshow',function(event){
   if(roomMenu&&!roomMenu.hidden){roomMenu.hidden=true;closed=true;}
   if(openMessage){openMessage.classList.remove('context-open');const m=openMessage.querySelector('.message-context');if(m)m.setAttribute('aria-hidden','true');openMessage.setAttribute('aria-expanded','false');closed=true;}
   if(closed){try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(_e){}return;}
-  const a=read();if(a[a.length-1]===path)a.pop();
+  if(/^\\/chat\\/[^/]+/.test(location.pathname)){location.replace('/home');return;}\n  const a=read();if(a[a.length-1]===path)a.pop();
   let target=a.pop();write(a);
   if(!target||target===path)target=parentFallback();
   location.replace(target);
@@ -638,7 +638,7 @@ window.addEventListener('pageshow',function(event){
  if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone)bar.style.display='none';
 })();
 </script>
-<script src="/static/cyrus-rebuild.js?v=1" defer></script>
+<script src="/static/cyrus-rebuild.js?v=2" defer></script>
 </body>
 </html>
 """
@@ -682,7 +682,7 @@ def page(content):
         for href, icon, label in items:
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}" aria-label="{label}"><span class="nav-icon" aria-hidden="true">{icon}</span><span>{label}</span></a>'
-        nav = f'<style>.bottom{{height:76px;padding:5px 3px calc(5px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:4px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a span{{font-size:10px;line-height:1.3}}.bottom a .nav-icon{{font-size:23px;line-height:1.1;font-family:serif;display:grid;place-items:center}}.bottom a .nav-icon svg{{width:27px;height:27px;display:block;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
+        nav = f'<style>.bottom{{height:58px;padding:4px 3px calc(4px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:3px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a>span:not(.nav-icon){{font-size:10px;line-height:1.15}}.bottom a .nav-icon{{font-size:20px;line-height:1;font-family:serif;display:grid;place-items:center}}.bottom a .nav-icon svg{{width:20px;height:20px;display:block;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
     return render_template_string(BASE, content=content, nav=nav, header=header)
 
 def auth_request(path, data):
@@ -3399,7 +3399,7 @@ def chat(conversation_id):
     room_header = f"""
     <section class="room-header cyrus-chat-header">
       <style>.cyrus-verified-badge{{display:inline-block;width:auto;height:auto;margin-right:7px;border-radius:0;background:transparent;vertical-align:middle;box-shadow:none}}</style>
-      <a class="chat-back" href="#" onclick="event.preventDefault();cyrusGoBack()" aria-label="بازگشت">➜</a>
+      <a class="chat-back" href="/home" aria-label="بازگشت به پیام‌رسان">➜</a>
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}{cyrus_verified_badge_html(18) if is_official_channel else ''}</h2>
