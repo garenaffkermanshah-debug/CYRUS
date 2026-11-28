@@ -4412,18 +4412,26 @@ async function cyrusToggleVoiceRecord(b){
         try{p=JSON.parse(localStorage.getItem('cyrus-chat-preferences-v1')||'{}')||{};}catch(_e){}
         const size=Math.max(12,Math.min(22,Number(p.size)||16));
         const radius=p.bubble===false?'5px':'16px';
-        document.querySelectorAll('.message .message-body').forEach(el=>el.style.setProperty('font-size',size+'px','important'));
+        document.documentElement.style.setProperty('--cyrus-chat-font-size',size+'px','important');
+        document.querySelectorAll('.message .message-body').forEach(el=>{el.style.setProperty('font-size',size+'px','important');el.style.setProperty('line-height','1.55','important');});
         document.querySelectorAll('.message').forEach(el=>el.style.setProperty('border-radius',radius,'important'));
         const walls={
           default:'linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9))',
           blue:'linear-gradient(160deg,#0b2540,#174b72,#081b31)',
           green:'linear-gradient(160deg,#102c28,#286454,#0b1d22)',
           purple:'linear-gradient(160deg,#251a3b,#514078,#151426)',
-          gold:'linear-gradient(160deg,#302417,#70512b,#171a20)'
+          gold:'linear-gradient(160deg,#302417,#70512b,#171a20)',
+          rose:'linear-gradient(160deg,#3b1c2a,#8b4562,#211522)',
+          teal:'linear-gradient(160deg,#0d3036,#217782,#10232c)',
+          slate:'linear-gradient(160deg,#252c35,#56616e,#171d25)',
+          pasargad:'linear-gradient(145deg,#092c3c 0%,#176a78 42%,#c9a45b 43%,#e7d29a 48%,#102d40 49%,#061a2b 100%)',
+          custom:p.customColor||'#142638'
         };
         const chat=document.querySelector('.container:has(.cyrus-chat-header)');
         if(chat&&p.customWallpaper){chat.style.setProperty('background-image','linear-gradient(rgba(5,12,21,.58),rgba(5,12,21,.72)),url("'+p.customWallpaper+'")','important');chat.style.setProperty('background-size','cover','important');chat.style.setProperty('background-position','center','important');chat.style.setProperty('background-attachment','fixed','important');}
         else if(chat&&walls[p.wall]){chat.style.setProperty('background',walls[p.wall],'important');chat.style.removeProperty('background-image');}
+        if(chat){const h=chat.querySelector('.cyrus-chat-header');if(p.wall==='pasargad'&&h)h.style.setProperty('background','linear-gradient(110deg,#082b3c,#176a78,#c5a15b)','important');else if(h)h.style.removeProperty('background');}
+        document.querySelectorAll('.message').forEach(el=>{if(p.wall==='pasargad'){el.style.setProperty('border-color','#b99750','important');el.style.setProperty('background',el.classList.contains('mine')?'linear-gradient(135deg,#155b70,#0d3d55)':'linear-gradient(135deg,#173b4a,#102a38)','important');}else{el.style.removeProperty('border-color');el.style.removeProperty('background');}});
         document.documentElement.classList.toggle('cyrus-chat-prefs-no-animation',p.animations===false);
         const input=document.querySelector('.send-box input[name="content"]');
         if(input&&!input.dataset.cyrusEnterPrefBound){
@@ -4442,6 +4450,7 @@ async function cyrusToggleVoiceRecord(b){
       }
       if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',applyCyrusChatPreferences,{once:true});
       else applyCyrusChatPreferences();
+      const observer=new MutationObserver(()=>applyCyrusChatPreferences());observer.observe(document.querySelector('.messages-area')||document.body,{childList:true,subtree:true});
     })();
     </script>
     """
@@ -6755,6 +6764,12 @@ def chat_settings():
           <button class="tgcs-wall" data-wall="green" aria-label="سبز" aria-pressed="false" style="background:linear-gradient(160deg,#102c28,#286454,#0b1d22)"></button>
           <button class="tgcs-wall" data-wall="purple" aria-label="بنفش" aria-pressed="false" style="background:linear-gradient(160deg,#251a3b,#514078,#151426)"></button>
           <button class="tgcs-wall" data-wall="gold" aria-label="طلایی" aria-pressed="false" style="background:linear-gradient(160deg,#302417,#70512b,#171a20)"></button>
+          <button class="tgcs-wall" data-wall="rose" aria-label="صورتی" aria-pressed="false" style="background:linear-gradient(160deg,#3b1c2a,#8b4562,#211522)"></button>
+          <button class="tgcs-wall" data-wall="teal" aria-label="فیروزه‌ای" aria-pressed="false" style="background:linear-gradient(160deg,#0d3036,#217782,#10232c)"></button>
+          <button class="tgcs-wall" data-wall="slate" aria-label="خاکستری" aria-pressed="false" style="background:linear-gradient(160deg,#252c35,#56616e,#171d25)"></button>
+          <button class="tgcs-wall" data-wall="pasargad" aria-label="تم پاسارگاد" aria-pressed="false" title="تم پاسارگاد" style="background:linear-gradient(145deg,#092c3c 0%,#176a78 42%,#c9a45b 43%,#e7d29a 48%,#102d40 49%,#061a2b 100%)"></button>
+          <label class="tgcs-wall" for="tgcs-custom-color" title="انتخاب رنگ دلخواه" style="background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);display:grid;place-items:center;color:#fff;font-size:18px">✎</label>
+          <input id="tgcs-custom-color" type="color" value="#142638" aria-label="رنگ دلخواه پس‌زمینه" style="width:44px;height:44px;padding:2px;border:1px solid #52606d;border-radius:10px;background:transparent;align-self:center>
           <button type="button" class="tgcs-wall" id="tgcs-gallery-open" aria-label="انتخاب عکس از گالری" title="انتخاب عکس از گالری" style="background:#263747;color:#e8edf4;font-size:23px;display:grid;place-items:center">＋</button>
           <button type="button" class="tgcs-wall" id="tgcs-gallery-remove" aria-label="حذف عکس شخصی" title="حذف عکس شخصی" style="background:#263747;color:#e8edf4;font-size:15px;display:grid;place-items:center">×</button>
           <input id="tgcs-gallery-file" type="file" accept="image/*" hidden>
@@ -6770,12 +6785,15 @@ def chat_settings():
     <script>
     (function(){
       const key='cyrus-chat-preferences-v1';
-      const defaults={size:16,bubble:true,enter:false,video:false,animations:true,wall:'default'};
+      const defaults={size:16,bubble:true,enter:false,video:false,animations:true,wall:'default',customColor:'#142638'};
       let prefs={...defaults};try{prefs={...prefs,...JSON.parse(localStorage.getItem(key)||'{}')}}catch(e){}
       const ids={size:'tgcs-size',bubble:'tgcs-bubble',enter:'tgcs-enter',video:'tgcs-video',animations:'tgcs-animations'};
       const gallery=document.getElementById('tgcs-gallery-file');
+      const colorPicker=document.getElementById('tgcs-custom-color');
       document.getElementById('tgcs-gallery-open').addEventListener('click',()=>gallery.click());
-      document.getElementById('tgcs-gallery-remove').addEventListener('click',()=>{prefs.customWallpaper='';prefs.wall='default';save();document.getElementById('tgcs-status').textContent='عکس پس‌زمینه حذف شد';});
+      document.getElementById('tgcs-gallery-remove').addEventListener('click',()=>{prefs.customWallpaper='';prefs.customColor='';prefs.wall='default';save();document.getElementById('tgcs-status').textContent='پس‌زمینهٔ شخصی حذف شد';});
+      colorPicker.value=/^#[0-9a-f]{6}$/i.test(prefs.customColor||'')?prefs.customColor:'#142638';
+      colorPicker.addEventListener('input',()=>{prefs.customColor=colorPicker.value;prefs.customWallpaper='';prefs.wall='custom';save();document.getElementById('tgcs-status').textContent='رنگ دلخواه اعمال شد';});
       gallery.addEventListener('change',()=>{
         const file=gallery.files&&gallery.files[0];if(!file)return;
         if(!file.type.startsWith('image/')){document.getElementById('tgcs-status').textContent='لطفاً یک فایل تصویری انتخاب کن';gallery.value='';return;}
