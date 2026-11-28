@@ -2223,7 +2223,7 @@ def public_user_profile(user_id):
     except ValueError:
         back_chat_id = ""
     back_href = "/chat/" + back_chat_id if back_chat_id else "/home"
-    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="/start-chat/{safe_id}" aria-label="ارسال پیام" title="ارسال پیام">➤</a>'
+    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="{html.escape(back_href, quote=True)}" aria-label="بازگشت به گفتگو" title="بازگشت به گفتگو"><svg viewBox="0 0 48 48" aria-hidden="true"><path class="profile-chat-bubble" d="M8 10.5A5.5 5.5 0 0 1 13.5 5h21A5.5 5.5 0 0 1 40 10.5v17a5.5 5.5 0 0 1-5.5 5.5H22l-9 7v-7.4A5.5 5.5 0 0 1 8 27.5z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 23h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>'
 
     content = f"""<main class="container cyrus-user-profile" data-profile-user="{safe_id}">
       <style>
@@ -2234,8 +2234,8 @@ def public_user_profile(user_id):
         .user-profile-photo img{{width:100%;height:100%;object-fit:cover}}
         .profile-user-symbol{{font-size:28px;color:#d8b46a}}
         .profile-more{{position:absolute;left:12px;top:12px;z-index:15}}
-        .profile-back{{position:absolute;left:52px;top:12px;z-index:15;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:23px;text-decoration:none;background:#172838}}
-        .profile-more summary{{list-style:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:25px;cursor:pointer}}
+        .profile-back{{position:absolute;left:52px;top:12px;z-index:15;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:23px;text-decoration:none;background:transparent;border:0;box-shadow:none}}
+        .profile-more summary{{list-style:none;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#dce7ef;font-size:25px;cursor:pointer;background:transparent;border:0;box-shadow:none}}
         .profile-more summary::-webkit-details-marker{{display:none}}
         .profile-more-menu{{position:absolute;left:0;top:37px;width:178px;padding:4px;background:#223344;border:1px solid #3a5267;border-radius:10px;box-shadow:0 8px 24px #0008;z-index:20}}
         .profile-more-menu form{{margin:0}}
@@ -2252,8 +2252,8 @@ def public_user_profile(user_id):
         .user-profile-name{{margin:8px 0 2px;text-align:right;color:#f0f4f7;font-size:16px;font-weight:500}}
         .user-profile-username{{text-align:right;color:#78b8e6;font-size:11px;direction:ltr;unicode-bidi:plaintext}}
         .user-profile-bio{{text-align:right;color:#c3cfda;font-size:12px;line-height:1.55;margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
-        .profile-primary-action{{display:grid;place-items:center;margin:9px auto 12px;width:44px;height:44px;border-radius:50%;background:#248bd0;color:#fff;text-decoration:none;font-size:20px}}
-        .profile-media-tabs{{display:flex;background:#111e2b;border-bottom:1px solid #263b50;margin-top:8px}}
+        .profile-primary-action{{display:grid;place-items:center;margin:9px auto 12px;width:42px;height:42px;border-radius:50%;background:transparent;color:#9eb4c6;text-decoration:none;font-size:20px;border:0;box-shadow:none}} .profile-primary-action svg{{width:31px;height:31px;display:block}} .profile-primary-action:active{{color:#e2c17c}}
+        .profile-media-tabs{{display:flex;background:transparent;border-bottom:1px solid #263b50;margin-top:8px}}
         .profile-media-tabs button{{flex:1;min-width:0;margin:0;padding:9px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:10px}}
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
         .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
@@ -3972,6 +3972,12 @@ async function cyrusToggleVoiceRecord(b){
         .composer-send{{background:linear-gradient(145deg,#2c91d2,#176da9);box-shadow:0 2px 8px #0004;}}
         .composer-attach{{color:#d8b46a!important;}}
         .composer-emoji{{color:#d0b170;}}
+        /* CYRUS minimal chat controls: icons without blue button tiles */
+        .cyrus-chat-header .chat-back{{background:transparent!important;border:0!important;box-shadow:none!important;transform:none!important;color:#dce6ee!important;font-size:25px!important;padding:4px 8px!important;}}
+        .tg-chat-menu-wrap .chat-header-more,.send-box .composer-emoji,.send-box .composer-attach,.send-box .composer-voice,.send-box .composer-voice-cancel{{background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;}}
+        .send-box .composer-emoji,.send-box .composer-attach,.send-box .composer-voice{{color:#c3d0dc!important;padding:5px!important;min-width:32px;}}
+        .send-box .composer-attach-wrap{{background:transparent!important;border:0!important;box-shadow:none!important;}}
+        .send-box .composer-attach-menu{{background:#142333!important;border:1px solid #2a4054!important;}}
         .cyrus-older-messages{{border-color:#b9954b55;background:#172838;color:#d9c18c;}}
         @media(max-width:520px){{.room-header{{margin-inline:-8px;padding-inline:10px;}}}}
 
