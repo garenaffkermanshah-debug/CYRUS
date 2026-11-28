@@ -3605,11 +3605,18 @@ def chat(conversation_id):
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
     room_last_seen = "آخرین بازدید نامشخص"
     room_last_seen_raw = ""
-    if room_type == "group":
+    if room_type in ("group", "channel"):
         try:
-            count_response = requests.get(URL + "/rest/v1/cyrus_members", params={"select":"user_id","conversation_id":"eq."+conversation_id}, headers=headers, timeout=12)
+            count_response = requests.get(
+                URL + "/rest/v1/cyrus_members",
+                params={"select":"user_id","conversation_id":"eq."+conversation_id,"limit":"1"},
+                headers={**headers,"Prefer":"count=exact","Range":"0-0"}, timeout=12
+            )
             if count_response.ok:
-                room_subtitle = str(len(count_response.json())) + " عضو"
+                content_range = str(count_response.headers.get("Content-Range") or "")
+                total = content_range.rsplit("/",1)[-1]
+                if total.isdigit():
+                    room_subtitle = total + " عضو"
         except Exception:
             pass
     room_blocked = False
@@ -3708,7 +3715,7 @@ def chat(conversation_id):
             '<button type="button" onclick="cyrusToggleMute()">بی‌صدا کردن</button>'
             '<button type="button" onclick="cyrusTogglePin()">سنجاق / برداشتن سنجاق</button>'
             '<button type="button" onclick="cyrusSearchInChat()">جستجو در گفتگو</button>'
-            '<form method="post" action="/chat/' + html.escape(conversation_id,quote=True) + '/mark-unread"><button type="submit">علامت‌گذاری به‌عنوان خوانده‌نشده</button></form>'
+            '<form method="post" action="/chat/' + html.escape(conversation_id,quote=True) + '/mark-unread"><button type="submit">خوانده‌نشده</button></form>'
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات ' + ("گروه" if room_type=="group" else "کانال") + '</a>'
             + room_manage_menu
             + ('<button type="button" onclick="cyrusCopyRoomInvite()">کپی لینک دعوت</button>' if room_invite_url else '')
@@ -3720,7 +3727,7 @@ def chat(conversation_id):
             '<div class="tg-chat-menu-wrap"><button type="button" class="chat-header-more" aria-label="گزینه‌های گفتگو" onclick="cyrusToggleRoomMenu(event)">⋮</button>'
             '<div class="tg-chat-menu" id="cyrusRoomMenu" hidden>'
             '<button type="button" onclick="cyrusSearchInChat()">جستجو در گفتگو</button>'
-            '<form method="post" action="/chat/' + html.escape(conversation_id,quote=True) + '/mark-unread"><button type="submit">علامت‌گذاری به‌عنوان خوانده‌نشده</button></form>'
+            '<form method="post" action="/chat/' + html.escape(conversation_id,quote=True) + '/mark-unread"><button type="submit">خوانده‌نشده</button></form>'
             '<a href="' + html.escape(room_profile_href,quote=True) + '">اطلاعات مخاطب</a>'
             '</div></div>'
         )
@@ -3905,7 +3912,7 @@ async function cyrusToggleVoiceRecord(b){
             ('<div class="cyrus-blocked-composer"><p>این کاربر را مسدود کرده‌اید.</p><form method="post" action="/user/' + html.escape(room_other_user_id, quote=True) + '/block?from_chat=' + html.escape(conversation_id, quote=True) + '"><button type="submit">رفع مسدودیت</button></form></div>' if room_blocked_by_me else
              '<div class="cyrus-blocked-composer"><p>امکان ارسال پیام وجود ندارد.</p></div>')
             if room_blocked else
-            '<div class="cyrus-blocked-composer"><p>این کانال فقط برای مالک و مدیران امکان انتشار پیام دارد.</p></div>'
+            '<div class="cyrus-blocked-composer"><p>امکان ارسال پیام نیست.</p></div>'
         )
     )
 
