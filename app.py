@@ -1470,9 +1470,9 @@ def search():
 
         people_rows += f"""
         <div class="chat-row search-result" data-kind="people">
-          <div class="avatar">𓅃</div>
+          <a class="avatar" href="/user/{html.escape(uid, quote=True)}" style="overflow:hidden">{('<img src="' + html.escape(str(person.get("avatar_url") or ""),quote=True) + '" alt="" style="width:100%;height:100%;object-fit:cover">' if person.get("avatar_url") else "𓅃")}</a>
           <div class="chat-info">
-            <div class="chat-name">{html.escape(name)}</div>
+            <a class="chat-name" href="/user/{html.escape(uid, quote=True)}">{html.escape(name)}</a>
             <div class="chat-preview">@{html.escape(username)}</div>
           </div>
           <form method="post" action="/start-chat/{html.escape(uid, quote=True)}">
@@ -1583,7 +1583,7 @@ def search():
                placeholder="جستجوی افراد، گروه‌ها و کانال‌ها"
                type="search" autocomplete="off" autofocus>
         <button type="button" aria-label="پاک کردن" onclick="this.form.q.value=this.form.q.value.slice(0,0);this.form.q.focus()" style="width:auto;margin:0;padding:6px 8px;background:transparent;color:#70b7e7">×</button>
-        <button type="submit" aria-label="جستجو">⌕</button>
+        <button type="submit" aria-label="جستجو" style="display:none">⌕</button>
       </form>
 
       <p class="error">{html.escape(error)}</p>
@@ -1627,7 +1627,7 @@ def search():
             row.appendChild(link);list.appendChild(row);
           }});}}
         }}
-        if(input)input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8)));}});
+        if(input){{let searchTimer=null;input.form.addEventListener("submit",e=>e.preventDefault());input.addEventListener("input",()=>{{clearTimeout(searchTimer);searchTimer=setTimeout(async()=>{{const value=input.value.trim();try{{const response=await fetch("/search?q="+encodeURIComponent(value)+"&type="+encodeURIComponent(kind),{{credentials:"same-origin",headers:{{"X-Requested-With":"fetch"}}}});if(!response.ok)return;const doc=new DOMParser().parseFromString(await response.text(),"text/html");const oldLists=[...document.querySelectorAll(".chat-list")],newLists=[...doc.querySelectorAll(".chat-list")];oldLists.forEach((el,i)=>{{if(newLists[i])el.innerHTML=newLists[i].innerHTML;}});const oldEmpty=document.querySelector(".search-live-empty"),newEmpty=doc.querySelector(".empty");if(oldEmpty)oldEmpty.remove();if(newEmpty){{newEmpty.classList.add("search-live-empty");document.querySelector(".chat-list:last-of-type")?.after(newEmpty);}}document.querySelectorAll(".search-result").forEach(el=>{{if(kind!=="all"&&el.dataset.kind!==kind)el.style.display="none";}});}}catch(e){{}}}},260);}});input.addEventListener('keydown',e=>{{if(e.key==='Enter'&&input.value.trim())localStorage.setItem(key,JSON.stringify([input.value.trim(),...read().filter(x=>x!==input.value.trim())].slice(0,8)));}});}}
       }})();
       </script>
     </div>
@@ -2258,7 +2258,7 @@ def privacy_security():
         <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">مدیریت نشست‌ها در نسخه فعلی موجود نیست</span></span><span class="cps-chevron">›</span></div>
       </section>
       <a class="cps-blocked" href="/blocked-users"><span>⊘</span><span class="cps-main"><span class="cps-name">کاربران مسدودشده</span><small>مشاهده و رفع مسدودیت کاربران</small></span><span class="cps-chevron">›</span></a>
-      <p class="cps-note">توجه: ظاهر و دسته‌بندی‌ها از الگوی تلگرام الهام گرفته شده‌اند؛ گزینه‌هایی که توضیح «هنوز پشتیبانی نمی‌شود» دارند، فعلاً فقط نمایشی/ترجیح محلی هستند و محدودیت امنیتی واقعی اعمال نمی‌کنند.</p>
+      
       <div class="cps-sheet-bg" id="cps-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="cps-sheet-title"><section class="cps-sheet"><h2 id="cps-sheet-title"></h2><p id="cps-sheet-desc"></p><div id="cps-sheet-options"></div><button type="button" id="cps-sheet-save">ذخیره</button></section></div>
       <script>
       (function(){
@@ -2286,13 +2286,24 @@ def privacy_security():
         });
         bg.addEventListener('click',e=>{if(e.target===bg)bg.classList.remove('open');});
         document.addEventListener('keydown',e=>{if(e.key==='Escape')bg.classList.remove('open');});
-        document.getElementById('cps-sessions').addEventListener('click',()=>alert('مدیریت نشست‌های فعال هنوز در CYRUS پیاده‌سازی نشده است.'));
+        document.getElementById('cps-sessions').addEventListener('click',async()=>{if(!confirm('نشست‌های دیگر حساب از سیستم خارج شوند؟'))return;try{const r=await fetch('/privacy-security/sessions/logout-others',{method:'POST',credentials:'same-origin',headers:{'X-Requested-With':'fetch'}});const j=await r.json();alert(j.ok?'نشست‌های دیگر خارج شدند.':'خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.');}catch(e){alert('ارتباط با سرور برقرار نشد.');}});
       })();
       </script>
     </main>
     """
     content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
     return page(content)
+
+
+@app.route("/privacy-security/sessions/logout-others", methods=["POST"])
+def logout_other_sessions():
+    if not session.get("access_token"):
+        return {"ok": False}, 401
+    try:
+        response = requests.post(URL + "/auth/v1/logout?scope=others", headers={"apikey": KEY, "Authorization": "Bearer " + session["access_token"]}, timeout=20)
+        return {"ok": bool(response.ok)}, (200 if response.ok else 502)
+    except Exception:
+        return {"ok": False}, 502
 
 
 @app.route("/privacy-security/2fa", methods=["POST"])
@@ -3056,18 +3067,18 @@ def chat(conversation_id):
 
         meta = msg.get("metadata") if isinstance(msg.get("metadata"), dict) else {}
         sender_label_html = ""
-        if not mine and str(room_data_for_history.get("type") or "") in ("group", "channel"):
+        message_room_type = str(room_data_for_history.get("type") or "")
+        if message_room_type == "channel":
+            channel_name = str(room_data_for_history.get("title") or "کانال")
+            channel_avatar = str(room_data_for_history.get("avatar_url") or "")
+            channel_avatar_html = ('<img src="' + html.escape(channel_avatar, quote=True) + '" alt="" loading="lazy" style="width:30px;height:30px;border-radius:50%;object-fit:cover">') if channel_avatar else '<span style="width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;background:#29445a;color:#e5bd69;font-size:15px">𓆃</span>'
+            sender_label_html = '<div class="cyrus-message-sender" style="display:flex;align-items:center;gap:8px;margin:0 0 7px;color:#8fc9f2;font-size:12px">' + channel_avatar_html + '<span>' + html.escape(channel_name) + '</span></div>'
+        elif message_room_type == "group":
             sender_profile = sender_profiles.get(str(msg.get("sender_id") or ""), {})
             sender_name = str(sender_profile.get("display_name") or sender_profile.get("username") or "عضو")
             sender_avatar = str(sender_profile.get("avatar_url") or "")
-            if sender_avatar:
-                sender_avatar_html = '<img src="' + html.escape(sender_avatar, quote=True) + '" alt="" loading="lazy" style="width:20px;height:20px;border-radius:50%;object-fit:cover">'
-            else:
-                sender_avatar_html = '<span style="width:20px;height:20px;border-radius:50%;display:inline-grid;place-items:center;background:#29445a;color:#e5bd69;font-size:11px">𓅃</span>'
-            sender_label_html = (
-                '<div class="cyrus-message-sender" style="display:flex;align-items:center;gap:6px;margin:0 0 5px;color:#8fc9f2;font-size:11px">'
-                + sender_avatar_html + '<span>' + html.escape(sender_name) + '</span></div>'
-            )
+            sender_avatar_html = ('<img src="' + html.escape(sender_avatar, quote=True) + '" alt="" loading="lazy" style="width:30px;height:30px;border-radius:50%;object-fit:cover">') if sender_avatar else '<span style="width:30px;height:30px;border-radius:50%;display:inline-grid;place-items:center;background:#29445a;color:#e5bd69;font-size:15px">𓅃</span>'
+            sender_label_html = '<div class="cyrus-message-sender" style="display:flex;align-items:center;gap:8px;margin:0 0 7px;color:#8fc9f2;font-size:12px">' + sender_avatar_html + '<span>' + html.escape(sender_name) + '</span></div>'
         reply_source = html.escape(str(meta.get("reply_to_content") or ""))
         reply_target_id = html.escape(str(meta.get("reply_to_id") or ""), quote=True)
         reply_preview = (f'<button type="button" class="reply-preview" data-reply-target="{reply_target_id}" onclick="cyrusJumpToMessage(event,this)">↪ پاسخ به: {reply_source}</button>' if reply_source else "")
@@ -3128,7 +3139,14 @@ def chat(conversation_id):
     room_title_text = str(room_data.get("title") or "گفتگو")
     room_avatar_source = str(room_data.get("avatar_url") or "")
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
-    room_last_seen = "آخرین بازدید نامشخص"
+    room_last_seen = "گفتگوی خصوصی"
+    if room_type == "group":
+        try:
+            count_response = requests.get(URL + "/rest/v1/cyrus_members", params={"select":"user_id","conversation_id":"eq."+conversation_id}, headers=headers, timeout=12)
+            if count_response.ok:
+                room_subtitle = str(len(count_response.json())) + " عضو"
+        except Exception:
+            pass
     room_blocked = False
     room_blocked_by_me = False
     room_blocked_by_other = False
@@ -3204,6 +3222,8 @@ def chat(conversation_id):
                     room_profile_href = "/user/" + other_id + "?from_chat=" + conversation_id
         except Exception:
             pass
+    if room_type == "private" and not room_blocked:
+        room_last_seen = "گفتگوی خصوصی"
     room_title = html.escape(room_title_text)
     room_description = html.escape(str(room_data.get("description") or ""))
     room_avatar_url = html.escape(room_avatar_source, quote=True)
@@ -3312,7 +3332,7 @@ def chat(conversation_id):
         '<button type="button" onclick="cyrusShareLocation()"><span>⌖</span> موقعیت مکانی</button>'
         '<button type="button" onclick="cyrusShareContact()"><span>♙</span> مخاطب</button></div></div>'
         '<input type="hidden" name="client_nonce" value=""><input name="content" maxlength="4000" placeholder="پیام بنویسید..." autocomplete="off">'
-        '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><span id="cyrusVoiceStatus" class="cyrus-voice-status" aria-live="polite"></span><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button type="button" id="cyrusVoiceCancel" class="composer-voice-cancel" hidden onclick="cyrusCancelVoiceRecord()">لغو ضبط</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled>➤</button></form>'
+        '<small class="cyrus-composer-counter" id="cyrusComposerCounter" aria-live="polite">۰ / ۴۰۰۰</small><span id="cyrusVoiceStatus" class="cyrus-voice-status" aria-live="polite"></span><button type="button" class="composer-voice" id="cyrusVoiceButton" aria-label="ضبط پیام صوتی" onclick="cyrusToggleVoiceRecord(this)">🎙</button><button type="button" id="cyrusVoiceCancel" class="composer-voice-cancel" hidden onclick="cyrusCancelVoiceRecord()">لغو ضبط</button><button class="composer-send" type="submit" aria-label="ارسال پیام" disabled hidden>➤</button></form>'
         '<script>function cyrusToggleAttach(e){e.stopPropagation();const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=!m.hidden;}'
         'function cyrusPickMedia(k){const i=document.getElementById("cyrusMediaInput"),m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;i.value="";i.multiple=true;i.accept=k==="photo"?"image/*,video/mp4,video/webm":k==="music"?"audio/*":"*/*";i.click();}'
         'function cyrusShareLocation(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;if(!navigator.geolocation){alert("موقعیت مکانی پشتیبانی نمی‌شود");return;}navigator.geolocation.getCurrentPosition(p=>{const i=document.querySelector(".send-box input[name=content]");i.value="موقعیت مکانی: https://maps.google.com/?q="+p.coords.latitude+","+p.coords.longitude;i.focus();},()=>alert("اجازهٔ مکان را به مرورگر بدهید"),{timeout:12000});}function cyrusShareContact(){const m=document.getElementById("cyrusAttachMenu");if(m)m.hidden=true;const n=prompt("نام مخاطب");if(!n)return;const p=prompt("شماره تماس");if(!p)return;const i=document.querySelector(".send-box input[name=content]");i.value="مخاطب: "+n+" | شماره: "+p;i.focus();}'
@@ -3409,7 +3429,7 @@ async function cyrusToggleVoiceRecord(b){
           const justSent=new URLSearchParams(location.search).get("sent")==="1";
           if(justSent){try{localStorage.removeItem(draftKey);sessionStorage.removeItem(nonceKey);}catch(e){}history.replaceState(null,"",location.pathname+location.hash);}
           else{try{if(!input.value)input.value=localStorage.getItem(draftKey)||"";}catch(e){}}
-          function update(){const n=input.value.length;send.disabled=!input.value.trim();if(counter)counter.textContent=n.toLocaleString("fa-IR")+" / ۴۰۰۰";try{if(input.value)localStorage.setItem(draftKey,input.value);else localStorage.removeItem(draftKey);}catch(e){}}
+          function update(){const n=input.value.length,hasText=!!input.value.trim();send.disabled=!hasText;send.hidden=!hasText;const voice=form.querySelector(".composer-voice");if(voice)voice.hidden=hasText;if(counter)counter.textContent=n.toLocaleString("fa-IR")+" / ۴۰۰۰";try{if(input.value)localStorage.setItem(draftKey,input.value);else localStorage.removeItem(draftKey);}catch(e){}}
           update();input.addEventListener("input",update);
           input.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!send.disabled)form.requestSubmit();}});
           form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}if(nonceField){const body=input.value.trim();let saved=null;try{saved=JSON.parse(sessionStorage.getItem(nonceKey)||"null");}catch(err){}let nonce=saved&&saved.body===body&&saved.nonce?saved.nonce:"";if(!nonce){nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2));try{sessionStorage.setItem(nonceKey,JSON.stringify({body:body,nonce:nonce}));}catch(err){}}nonceField.value=nonce;}form.dataset.sending="1";send.disabled=true;send.textContent="…";});
@@ -3466,7 +3486,7 @@ async function cyrusToggleVoiceRecord(b){
         .send-box input[name="content"]{{color:#edf4fa;line-height:1.5;}}.cyrus-composer-counter{{position:absolute;bottom:-18px;right:16px;color:#8fa5b8;font-size:10px;pointer-events:none}}.composer-send:disabled{{opacity:.45;cursor:default}}
         .composer-emoji,.composer-send{{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;margin:0;padding:0;border-radius:50%;font-size:22px}}
         .composer-emoji{{background:transparent;color:#a9bdce;border:0}}
-        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}}.cyrus-voice-status{{font-size:10px;color:#8fc8f1;white-space:nowrap}}.composer-voice-cancel{{width:auto;padding:7px 9px;margin:0;border:1px solid #754d4d;border-radius:12px;background:#321e25;color:#ffb5a8;font-size:10px}}.composer-voice-cancel[hidden]{{display:none}}.composer-voice.recording{{background:#9d3434;color:#fff;animation:cyrusVoicePulse 1s infinite alternate}}@keyframes cyrusVoicePulse{{to{{opacity:.55}}}}
+        .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-send[hidden]{{display:none!important}}.composer-voice[hidden]{{display:none!important}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}}.cyrus-voice-status{{font-size:10px;color:#8fc8f1;white-space:nowrap}}.composer-voice-cancel{{width:auto;padding:7px 9px;margin:0;border:1px solid #754d4d;border-radius:12px;background:#321e25;color:#ffb5a8;font-size:10px}}.composer-voice-cancel[hidden]{{display:none}}.composer-voice.recording{{background:#9d3434;color:#fff;animation:cyrusVoicePulse 1s infinite alternate}}@keyframes cyrusVoicePulse{{to{{opacity:.55}}}}
         .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
         .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
         .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20;display:none}}
@@ -3500,7 +3520,7 @@ async function cyrusToggleVoiceRecord(b){
 
         .messages-area{{display:flex;flex-direction:column;gap:8px;padding:8px 2px 18px}}
         .message{{position:relative;max-width:84%;padding:10px 13px;border:1px solid transparent;border-radius:16px;background:#172432;overflow-wrap:anywhere;box-shadow:0 1px 2px #0003}}
-        .message .message-body{{color:#edf4fa;font-size:14px;line-height:1.8}}
+        .message .message-body{{color:#edf4fa;font-size:var(--cyrus-chat-font-size,14px);line-height:1.8}}
         .message small{{display:block;color:#93a8ba;font-size:10px;margin-top:5px;text-align:left}}
         .message{{cursor:pointer}}
         .message-context{{display:none;position:fixed;z-index:30;left:50%;bottom:calc(78px + env(safe-area-inset-bottom) + 12px);transform:translateX(-50%);width:min(355px,calc(100vw - 34px));filter:drop-shadow(0 12px 28px #0008);cursor:default}}
@@ -3535,6 +3555,7 @@ async function cyrusToggleVoiceRecord(b){
       </style>
       <div class="messages-area">{message_rows}</div>
       <script>
+      (function(){{try{{const p=JSON.parse(localStorage.getItem("cyrus-chat-preferences-v1")||"{{}}");const size=Math.min(22,Math.max(12,Number(p.size)||14));document.documentElement.style.setProperty("--cyrus-chat-font-size",size+"px");}}catch(e){{}}}})();
       function cyrusToggleEmoji(event) {{
         event.preventDefault();event.stopPropagation();
         const panel=document.getElementById("cyrusEmojiPanel");
@@ -3553,7 +3574,9 @@ async function cyrusToggleVoiceRecord(b){
       }}
       document.addEventListener('DOMContentLoaded',function(){{
         window.scrollTo(0,document.body.scrollHeight);
-        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
+        window.addEventListener("load",()=>{{if(!new URLSearchParams(location.search).has("message"))window.scrollTo(0,document.body.scrollHeight);}},{{once:true}});setTimeout(()=>{{if(!new URLSearchParams(location.search).has("message"))window.scrollTo(0,document.body.scrollHeight);}},180);
+       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>65&&Math.abs(dx)>Math.abs(dy)*1.35){{const b={{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}};cyrusReply(b);}}}},{{passive:true}});}});
+       const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
         if(deepLinkedMessage) {{
           requestAnimationFrame(()=>requestAnimationFrame(()=>{{
             const target=document.getElementById('message-'+deepLinkedMessage);
@@ -6668,10 +6691,8 @@ def settings():
           <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
           <a class="s-button" href="/settings/chat"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="button-title">تنظیمات گفتگو</span><span>‹</span></a>
-          <a class="s-button" href="/account/export"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></span><span class="button-title">دریافت نسخهٔ پشتیبان اطلاعات حساب</span><span>‹</span></a>
           <a class="s-button" href="/privacy-security"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0M4 4l16 16"/></svg></span><span class="button-title">حریم خصوصی و امنیت</span><span>‹</span></a>
           <a class="s-button" href="/saved-messages"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-7-4-7 4z"/><path d="M8 7h8M8 10h8"/></svg></span><span class="button-title">پیام‌های ذخیره‌شده</span><span>‹</span></a>
-          <a class="s-button" href="https://t.me/CyrusSupport_Aria" target="_blank" rel="noopener noreferrer"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M21.5 3.5 18 20.2a1.5 1.5 0 0 1-2.4.8l-4.7-3.5-2.3 2.2a1 1 0 0 1-1.7-.6l-.8-5.2L2.4 11a1.4 1.4 0 0 1 .1-2.6L20 2.8a1.2 1.2 0 0 1 1.5.7Z"/><path d="m6.2 13.7 11.2-8.1-6.5 11.9"/></svg></span><span class="button-title">پشتیبانی رسمی سرزمین‌های پارس</span><span>‹</span></a>
           <a class="s-button" href="/contacts"><span class="buttons-icons"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M17 4a4 4 0 0 1 0 8M18 16a5 5 0 0 1 4 5"/></svg></span><span class="button-title">خویشان و مخاطبان</span><span>‹</span></a>
           <button class="s-button" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cyrus-settings-share').value).then(()=>alert('شناسه کپی شد'))"><span class="buttons-icons"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></span><span class="button-title">کپی شناسه برای دوستان</span><span>‹</span></button>
           <form method="post" action="/logout"><button class="s-button" type="submit"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg></span><span class="button-title">خروج از حساب</span><span>‹</span></button></form>
