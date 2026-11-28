@@ -525,8 +525,6 @@ ALTER TABLE public.cyrus_account_security
     ADD COLUMN IF NOT EXISTS pending_password_hash text,
     ADD COLUMN IF NOT EXISTS pending_expires_at timestamptz;
 ALTER TABLE public.cyrus_account_security
-    ADD COLUMN IF NOT EXISTS password_login_enabled boolean NOT NULL DEFAULT false;
-ALTER TABLE public.cyrus_account_security
     ADD COLUMN IF NOT EXISTS app_lock_pin_hash text,
     ADD COLUMN IF NOT EXISTS app_lock_enabled boolean NOT NULL DEFAULT false;
 ALTER TABLE public.cyrus_account_security ENABLE ROW LEVEL SECURITY;
