@@ -1545,21 +1545,60 @@ def login_with_account_password():
 
 @app.route("/privacy-security/password-login", methods=["POST"])
 def manage_password_login():
-    if not session.get("access_token") or not session.get("user_id"):return redirect("/login")
-    uid=str(session.get("user_id"));action=str(request.form.get("action") or "")
+    if not session.get("access_token") or not session.get("user_id"):
+        return redirect("/login")
+    uid=str(session.get("user_id"))
+    action=str(request.form.get("action") or "")
     record,err=cyrus_get_account_security(uid)
-    if err:return page('<main class="container card"><p>جدول امنیت حساب آماده نیست؛ management.sql را در Supabase اجرا کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+    if err:
+        return page('<main class="container card"><p>خواندن تنظیمات امنیت حساب انجام نشد؛ کلید مدیریتی و جدول امنیت را بررسی کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+
     if action=="enable":
-        password=str(request.form.get("new_password") or "");confirm=str(request.form.get("confirm_password") or "")
+        password=str(request.form.get("new_password") or "")
+        confirm=str(request.form.get("confirm_password") or "")
         if len(password)<10 or len(password)>128 or password!=confirm:
             return page('<main class="container card"><p>گذرواژه باید ۱۰ تا ۱۲۸ نویسه باشد و دو ورودی یکسان باشند.</p><a href="/privacy-security">بازگشت</a></main>'),400
         try:
-            changed=requests.put(URL+"/auth/v1/user",json={"password":password},headers={"apikey":KEY,"Authorization":"Bearer "+str(session.get("access_token")),"Content-Type":"application/json"},timeout=20)
-            if not changed.ok:return page('<main class="container card"><p>تغییر گذرواژه انجام نشد؛ دوباره وارد شوید و تلاش کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
-        except Exception:return page('<main class="container card"><p>ارتباط با سرویس احراز هویت برقرار نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
-        if not cyrus_save_account_security(uid,{"password_login_enabled":True}):return page('<main class="container card"><p>گذرواژه ثبت شد اما فعال‌سازی ذخیره نشد؛ کد ایمیل همچنان قابل استفاده است.</p><a href="/privacy-security">بازگشت</a></main>'),502
+            changed=requests.put(
+                URL+"/auth/v1/user",
+                json={"password":password},
+                headers={"apikey":KEY,"Authorization":"Bearer "+str(session.get("access_token")),"Content-Type":"application/json"},
+                timeout=20
+            )
+            if not changed.ok:
+                return page('<main class="container card"><p>سرویس ورود گذرواژه را نپذیرفت. از حساب خارج شوید، با کد ایمیل دوباره وارد شوید و سپس فعال‌سازی را تکرار کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+        except Exception:
+            return page('<main class="container card"><p>ارتباط با سرویس احراز هویت برقرار نشد؛ دوباره تلاش کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+
+        try:
+            saved=requests.post(
+                URL+"/rest/v1/cyrus_account_security",
+                params={"on_conflict":"user_id"},
+                json={"user_id":uid,"password_login_enabled":True,"updated_at":datetime.now(timezone.utc).isoformat()},
+                headers={**cyrus_admin_api_headers(),"Prefer":"resolution=merge-duplicates,return=minimal"},
+                timeout=20
+            )
+            if not saved.ok:
+                return page('<main class="container card"><p>گذرواژه در حساب احراز هویت ثبت شد، اما فعال‌سازی در جدول امنیت ذخیره نشد. migration مربوط به password_login_enabled را دوباره اجرا کنید؛ سپس فعال‌سازی را تکرار کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+        except Exception:
+            return page('<main class="container card"><p>ذخیره وضعیت ورود با گذرواژه انجام نشد؛ دوباره تلاش کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+
     elif action=="disable":
-        if not cyrus_save_account_security(uid,{"password_login_enabled":False}):return page('<main class="container card"><p>خاموش‌کردن ورود با گذرواژه ذخیره نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
+        try:
+            saved=requests.post(
+                URL+"/rest/v1/cyrus_account_security",
+                params={"on_conflict":"user_id"},
+                json={"user_id":uid,"password_login_enabled":False,"updated_at":datetime.now(timezone.utc).isoformat()},
+                headers={**cyrus_admin_api_headers(),"Prefer":"resolution=merge-duplicates,return=minimal"},
+                timeout=20
+            )
+            if not saved.ok:
+                return page('<main class="container card"><p>خاموش‌کردن ورود با گذرواژه در جدول امنیت ذخیره نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
+        except Exception:
+            return page('<main class="container card"><p>ذخیره وضعیت امنیتی انجام نشد؛ دوباره تلاش کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
+    else:
+        return page('<main class="container card"><p>درخواست نامعتبر است.</p><a href="/privacy-security">بازگشت</a></main>'),400
+
     return redirect("/privacy-security")
 
 
@@ -2532,7 +2571,7 @@ def privacy_security():
     content = """
     <main class="cyrus-privacy-page">
       <style>
-        .cyrus-privacy-page{max-width:430px;min-height:calc(100dvh - 76px);margin:0 auto;padding:0 0 90px;background:#17212b;color:#eaf0f5;font:14px Roboto,Tahoma,sans-serif}
+        .cyrus-privacy-page{display:block!important;overflow:visible!important;max-width:430px;min-height:calc(100dvh - 76px);margin:0 auto;padding:0 0 90px;background:#17212b;color:#eaf0f5;font:14px Roboto,Tahoma,sans-serif}.cyrus-privacy-page .cps-section{display:block!important;visibility:visible!important}.cyrus-privacy-page .cps-row{display:flex!important;visibility:visible!important;flex-wrap:wrap;align-items:center;gap:11px;min-height:62px}.cyrus-privacy-page form.cps-row{display:block!important}.cyrus-privacy-page .cps-main,.cyrus-privacy-page .cps-name,.cyrus-privacy-page .cps-value{display:block!important;visibility:visible!important;color:#eaf0f5!important}.cyrus-privacy-page .cps-value{color:#9eafbd!important}.cyrus-privacy-page form.cps-row input:not([type=hidden]){display:block!important;width:100%!important;min-height:44px;margin:8px 0!important;padding:11px 12px!important;border:1px solid #405566!important;border-radius:10px!important;background:#101d2a!important;color:#f2f6fa!important;font:14px Tahoma!important}.cyrus-privacy-page form.cps-row button{display:block!important;width:100%!important;min-height:44px;margin:8px 0!important}
         .cps-head{height:56px;display:flex;align-items:center;gap:20px;padding:0 16px;background:#17212b;position:sticky;top:0;z-index:4}
         .cps-head a{font-size:27px;color:#e8edf4;text-decoration:none;line-height:1}
         .cps-head h1{font-size:20px;font-weight:500;margin:0}
