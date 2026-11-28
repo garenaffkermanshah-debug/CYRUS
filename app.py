@@ -3733,7 +3733,7 @@ async function cyrusToggleVoiceRecord(b){
         if(!panel)return;
         const opening=panel.style.display==="none"||!panel.style.display;
         if(!opening){{panel.style.display="none";return;}}
-        panel.hidden=false;panel.hidden=false;panel.style.display="block";panel.style.position="fixed";
+        panel.hidden=false;panel.style.display="block";panel.style.position="fixed";
         panel.style.left="12px";panel.style.right="12px";
         panel.style.bottom="calc(88px + env(safe-area-inset-bottom))";
         panel.style.width="auto";panel.style.maxWidth="520px";
