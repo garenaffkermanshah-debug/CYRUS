@@ -7052,8 +7052,6 @@ def settings():
     return page(content)
 
 
-from cyrus_stories import register_story_routes
-register_story_routes(app, URL, KEY, ADMIN_KEY, page)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False)
