@@ -3752,6 +3752,7 @@ async function cyrusToggleVoiceRecord(b){
           }}));
         }}
         document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const dt=new Date(el.dataset.createdAt);if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}catch(e){{}}}});
+        const presence=document.getElementById("cyrusRoomPresence");if(presence&&presence.dataset.seen){{try{{const seen=new Date(presence.dataset.seen);if(!Number.isNaN(seen.getTime())){{const age=Math.max(0,Date.now()-seen.getTime());presence.textContent=age<=300000?"آنلاین":"آخرین بازدید "+seen.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}}}catch(e){{}}}}
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker){{
           const insertPickedEmoji=function(event){{
