@@ -6385,7 +6385,7 @@ def manage_room(conversation_id):
 
           <section class="tg-room-id-card"><div class="tg-room-id-title">شناسه گروه</div><div class="tg-room-id-row"><input id="invite-link" readonly value="{invite_safe}" aria-label="شناسه و لینک دعوت"><button type="button" onclick="cyrusCopyInvite()">کپی</button></div><form method="post" onsubmit="return confirm('لینک دعوت قبلی از کار می‌افتد. ادامه می‌دهید؟')"><input type="hidden" name="action" value="rotate_invite"><button>ساخت لینک تازه</button></form><script>function cyrusCopyInvite(){{const v=document.getElementById("invite-link").value;if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(v).then(()=>alert("لینک کپی شد")).catch(()=>prompt("شناسه گروه",v));else prompt("شناسه گروه",v);}}</script></section>
 
-          <section class="tg-add-member-card"><h3>افزودن عضو</h3><form method="post" action="/rooms/{conversation_id}/add-member"><input name="username" placeholder="نام کاربری" required><button>افزودن</button></form></section>
+          <section class="tg-add-member-card"><h3>افزودن با نام کاربری</h3><form method="post" action="/rooms/{conversation_id}/add-member"><input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="نام کاربری یا @username" aria-label="نام کاربری عضو" required><button>افزودن عضو</button></form></section>
 
           {('<section class="card"><h3>درخواست‌های عضویت (' + str(len(join_requests)) + ')</h3>' + join_request_rows + '</section>') if join_requests else ''}
 
