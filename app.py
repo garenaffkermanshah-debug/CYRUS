@@ -48,7 +48,7 @@ def cyrus_manifest():
 
 @app.route("/service-worker.js")
 def cyrus_service_worker():
-    worker = r"""const CACHE='cyrus-static-v2';
+    worker = r"""const CACHE='cyrus-static-v3';
 const STATIC=['/static/cyrus-app-icon.webp','/static/cyrus-app-icon.svg','/static/cyrus-cylinder.jpg','/static/cyrus-tomb.jpg'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
@@ -392,7 +392,7 @@ BASE = """
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-homepolish1">
-<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=7">
+<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=8">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
 <meta name="mobile-web-app-capable" content="yes">
