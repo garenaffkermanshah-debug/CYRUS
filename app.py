@@ -1318,7 +1318,7 @@ def register():
             if lookup_error:
                 error = "بررسی حساب انجام نشد؛ کلید امن Supabase را در تنظیمات محیطی سرور قرار دهید."
             elif existing and existing.get("email_confirmed_at"):
-                error = "این ایمیل قبلاً ثبت‌نام و تأیید شده است؛ از بخش ورود کد دریافت کنید."
+                error = "این ایمیل قبلاً ثبت شده است؛ وارد حساب خود شوید"
             else:
                 code, data = auth_request("/auth/v1/otp", {"email": email, "create_user": True})
                 if code in (200, 201, 202):
