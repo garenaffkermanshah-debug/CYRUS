@@ -106,3 +106,6 @@ body:has(.cyrus-welcome) .container{display:none!important}
   background:linear-gradient(180deg,#06142640,#06142620 45%,#061426b0);
 }
 @media(max-width:760px){.cyrus-welcome:before{background-position:center 45%;opacity:.24}}
+
+.welcome-photo-credit{display:inline-block;margin-top:5px;font-size:8px;line-height:1.5;color:#71869a!important;text-decoration:none;opacity:.65}
+.welcome-photo-credit:hover{opacity:1}
