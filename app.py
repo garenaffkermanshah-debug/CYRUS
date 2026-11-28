@@ -1792,15 +1792,24 @@ def search():
 
       <div class="search-category-tabs">
         <a class="{ 'active' if selected_type == 'all' else '' }" href="/search?q={html.escape(query, quote=True)}&type=all">همه</a>
-        <a class="{ 'active' if selected_type == 'messages' else '' }" href="/search?q={html.escape(query, quote=True)}&type=messages">پیام‌ها</a>
         <a class="{ 'active' if selected_type == 'people' else '' }" href="/search?q={html.escape(query, quote=True)}&type=people">افراد</a>
         <a class="{ 'active' if selected_type == 'groups' else '' }" href="/search?q={html.escape(query, quote=True)}&type=groups">گروه‌ها</a>
         <a class="{ 'active' if selected_type == 'channels' else '' }" href="/search?q={html.escape(query, quote=True)}&type=channels">کانال‌ها</a>
       </div>
       <style>
-        .search-category-tabs{{display:flex;gap:0;overflow-x:auto;border-bottom:1px solid #20364b;margin:0 12px 8px}}
-        .search-category-tabs a{{padding:12px 10px;white-space:nowrap;color:#91a6b8;font-size:12px;border-bottom:2px solid transparent}}
-        .search-category-tabs a:focus,.search-category-tabs a:hover,.search-category-tabs a.active{{color:#69b9f7;border-color:#3297df}}
+        .cyrus-explore-search{{background:linear-gradient(145deg,#101f31,#172b40);border-color:#b9954b55;box-shadow:0 5px 16px #0003}}
+        .cyrus-explore-search input{{color:#f4e3bb}}
+        .cyrus-explore-search input::placeholder{{color:#879bad}}
+        .cyrus-explore-search button,.cyrus-explore-search>a{{color:#d5b16b!important}}
+        .search-category-tabs{{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid #b9954b33;margin:0 12px 8px;padding:0 2px}}
+        .search-category-tabs a{{padding:12px 11px;white-space:nowrap;color:#91a6b8;font-size:12px;border-bottom:2px solid transparent;text-decoration:none}}
+        .search-category-tabs a:focus,.search-category-tabs a:hover,.search-category-tabs a.active{{color:#f0d59a;border-color:#c9a45b}}
+        .search-result{{border-bottom:1px solid #b9954b20;padding-block:10px}}
+        .search-result .chat-name{{color:#f0dfb8}}
+        .search-result .chat-preview{{color:#91a9bd}}
+        .search-result form button,.search-result .action{{border:1px solid #b9954b66;border-radius:18px;background:#172b40;color:#e3c47e;padding:7px 13px;font-size:12px;text-decoration:none}}
+        .search-result .avatar{{outline:1px solid #b9954b55;outline-offset:1px}}
+
       </style>
       <div class="chat-list">{people_rows}</div>
       <div class="chat-list">{room_rows}</div>
