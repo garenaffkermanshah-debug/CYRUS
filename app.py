@@ -3283,6 +3283,7 @@ def chat(conversation_id):
     room_avatar_source = str(room_data.get("avatar_url") or "")
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
     room_last_seen = "آخرین بازدید نامشخص"
+    room_last_seen_raw = ""
     if room_type == "group":
         try:
             count_response = requests.get(URL + "/rest/v1/cyrus_members", params={"select":"user_id","conversation_id":"eq."+conversation_id}, headers=headers, timeout=12)
@@ -3331,6 +3332,7 @@ def chat(conversation_id):
                     except Exception:
                         pass
                     seen_raw = str(person.get("last_seen_at") or "").strip()
+                    room_last_seen_raw = seen_raw
                     if seen_raw:
                         try:
                             seen_dt = datetime.fromisoformat(seen_raw.replace("Z", "+00:00"))
@@ -3404,7 +3406,7 @@ def chat(conversation_id):
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}{cyrus_verified_badge_html(18) if is_official_channel else ''}</h2>
-        <span class="room-type">{room_last_seen if room_type == 'private' else room_subtitle}</span>
+        <span class="room-type" id="cyrusRoomPresence" data-seen="{html.escape(room_last_seen_raw, quote=True)}">{room_last_seen if room_type == 'private' else room_subtitle}</span>
       </a>
       {room_more_html}
     </section>
