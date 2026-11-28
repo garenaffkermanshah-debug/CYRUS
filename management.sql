@@ -641,3 +641,5 @@ CREATE POLICY cyrus_chat_preferences_delete_own
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cyrus_chat_preferences TO authenticated;
 REVOKE ALL ON TABLE public.cyrus_chat_preferences FROM anon;
+
+CREATE INDEX IF NOT EXISTS idx_cyrus_chat_preferences_conversation_id ON public.cyrus_chat_preferences (conversation_id);
