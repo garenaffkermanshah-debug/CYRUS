@@ -6791,7 +6791,7 @@ def settings():
         .setting-info:active{{transform:scale(.99)}}
         .setting-info .info{{grid-column:1/2;font-size:15px;text-align:right;align-self:center;min-width:0;overflow-wrap:anywhere;color:#edf2f7}}
         .smal-title{{grid-column:2/3;grid-row:1/2;align-self:center;font-size:12px;padding:0 8px;color:#8fa4b7;white-space:nowrap}}
-        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-template-rows:repeat(5,minmax(56px,auto));padding:8px 9px 18px}}.setting-avatar-success{{color:#8ee0b0;text-align:center;font-size:12px;margin:4px 0}}
+        .setting-buttons{{grid-row:5/6;display:grid;grid-gap:7px;grid-auto-rows:minmax(56px,auto);padding:8px 9px 18px}}.setting-avatar-success{{color:#8ee0b0;text-align:center;font-size:12px;margin:4px 0}}
         .setting-avatar-picker{{position:absolute;inset-inline-start:calc(50% - 64px);top:calc(50% - 64px);width:34px;height:34px;border:2px solid #0b1724;border-radius:50%;background:#2b9be8;color:#fff;display:grid;place-items:center;box-shadow:0 3px 12px #0008;cursor:pointer;z-index:3;padding:0;margin:0}}
         .setting-avatar-picker svg{{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}}
         .setting-avatar-hidden{{display:none!important}}
@@ -6931,7 +6931,7 @@ def settings():
             textarea.value=value;
             if(key==='username'){{input.minLength=3;input.maxLength=24;input.removeAttribute('pattern');input.required=true;input.dir='ltr';}}
             else if(key==='display_name'){{input.minLength=2;input.maxLength=40;input.removeAttribute('pattern');input.required=true;input.dir='auto';}}
-            else{{textarea.maxLength=120;}}
+            else{{textarea.maxLength=250;}}
             overlay.classList.add('open');
             setTimeout(()=>{{(useBio?textarea:input).focus();}},40);
           }}
