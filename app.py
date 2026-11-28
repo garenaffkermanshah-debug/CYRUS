@@ -1668,7 +1668,7 @@ def search():
 
     raw_query = request.args.get("q", "").strip()
     selected_type = request.args.get("type", "all")
-    if selected_type not in ("all", "messages", "people", "groups", "channels"):
+    if selected_type not in ("all", "people", "contacts", "groups", "channels"):
         selected_type = "all"
     query = "".join(
         ch for ch in raw_query
@@ -1745,6 +1745,30 @@ def search():
         except Exception:
             error = "جستجو با مشکل اتصال روبه‌رو شد"
 
+    saved_contact_ids = set()
+    contacts_rows = ""
+    try:
+        cr = requests.get(URL + "/rest/v1/cyrus_contacts", params={"select":"contact_user_id","owner_id":"eq."+str(session.get("user_id") or ""),"limit":"1000"}, headers=headers, timeout=15)
+        if cr.ok and isinstance(cr.json(), list):
+            saved_contact_ids = {str(x.get("contact_user_id") or "") for x in cr.json() if isinstance(x, dict)}
+        if saved_contact_ids:
+            cids = sorted(saved_contact_ids)[:1000]
+            cp = {"select":"id,username,display_name,avatar_url","id":"in.("+",".join(cids)+")","order":"display_name.asc","limit":"1000"}
+            if query:
+                cp["or"] = "(username.ilike.*"+query.lstrip("@")+"*,display_name.ilike.*"+query+"*)"
+            cpr = requests.get(URL+"/rest/v1/cyrus_profiles", params=cp, headers=headers, timeout=20)
+            if cpr.ok and isinstance(cpr.json(), list):
+                for contact in cpr.json():
+                    uid=str(contact.get("id") or ""); uname=str(contact.get("username") or ""); cname=str(contact.get("display_name") or uname or "کاربر"); avatar=str(contact.get("avatar_url") or "")
+                    try:
+                        uuid.UUID(uid)
+                    except ValueError:
+                        continue
+                    avatar_html=("<img src=\""+html.escape(avatar,quote=True)+"\" alt=\"\" loading=\"lazy\" style=\"width:100%;height:100%;object-fit:cover;border-radius:50%\">") if avatar else "𓅃"
+                    contacts_rows += "<div class=\"chat-row search-result\" data-kind=\"contacts\"><a class=\"avatar\" href=\"/user/"+html.escape(uid,quote=True)+"\" style=\"overflow:hidden\">"+avatar_html+"</a><div class=\"chat-info\"><a class=\"chat-name\" href=\"/user/"+html.escape(uid,quote=True)+"\">"+html.escape(cname)+"</a><div class=\"chat-preview\">@"+html.escape(uname)+"</div></div><a class=\"action\" href=\"/start-chat/"+html.escape(uid,quote=True)+"\">گفتگو</a></div>"
+    except Exception:
+        contacts_rows = ""
+
     people_rows = ""
     for person in people:
         uid = str(person.get("id") or "")
@@ -1814,50 +1838,7 @@ def search():
         </div>
         """
 
-    message_rows = ""
-    if query and joined_ids:
-        try:
-            message_response = requests.get(
-                URL + "/rest/v1/cyrus_messages",
-                params={
-                    "select": "id,conversation_id,content,created_at",
-                    "conversation_id": "in.(" + ",".join(sorted(joined_ids)) + ")",
-                    "content": "ilike.*" + query.replace("*", "") + "*",
-                    "order": "created_at.desc",
-                    "limit": "50"
-                },
-                headers=headers, timeout=25
-            )
-            if message_response.ok and isinstance(message_response.json(), list):
-                hits = message_response.json()
-                room_ids_for_hits = list(dict.fromkeys(str(x.get("conversation_id") or "") for x in hits if x.get("conversation_id")))
-                room_names = {}
-                if room_ids_for_hits:
-                    names_response = requests.get(URL + "/rest/v1/cyrus_conversations",
-                        params={"select":"id,title","id":"in.(" + ",".join(room_ids_for_hits) + ")"},
-                        headers=headers, timeout=20)
-                    if names_response.ok and isinstance(names_response.json(), list):
-                        room_names = {str(x.get("id")): str(x.get("title") or "گفتگو") for x in names_response.json() if isinstance(x, dict)}
-                for hit in hits:
-                    mid, rid = str(hit.get("id") or ""), str(hit.get("conversation_id") or "")
-                    try:
-                        uuid.UUID(mid); uuid.UUID(rid)
-                    except ValueError:
-                        continue
-                    text_value = str(hit.get("content") or "")
-                    snippet = text_value if len(text_value) <= 170 else text_value[:167] + "…"
-                    message_rows += f"""
-                    <a class="chat-row search-result search-message-result" data-kind="messages" href="/chat/{html.escape(rid, quote=True)}?message={html.escape(mid, quote=True)}">
-                      <div class="avatar">⌕</div><div class="chat-info">
-                        <div class="chat-name">{html.escape(room_names.get(rid, "گفتگو"))}</div>
-                        <div class="chat-preview">{html.escape(snippet)}</div>
-                      </div><span style="color:#70b7e7">‹</span></a>"""
-        except Exception:
-            pass
-
-    if message_rows:
-        room_rows += '<div class="section-title">پیام‌ها</div>' + message_rows
-    if query and not people_rows and not room_rows and not error:
+    if query and not people_rows and not contacts_rows and not room_rows and not error:
         empty = '<div class="empty"><h3>نتیجه‌ای پیدا نشد</h3></div>'
     else:
         empty = ""
@@ -1889,6 +1870,7 @@ def search():
         <a class="{ 'active' if selected_type == 'people' else '' }" href="/search?q={html.escape(query, quote=True)}&type=people">افراد</a>
         <a class="{ 'active' if selected_type == 'groups' else '' }" href="/search?q={html.escape(query, quote=True)}&type=groups">گروه‌ها</a>
         <a class="{ 'active' if selected_type == 'channels' else '' }" href="/search?q={html.escape(query, quote=True)}&type=channels">کانال‌ها</a>
+        <a class="{ 'active' if selected_type == 'contacts' else '' }" href="/search?q={html.escape(query, quote=True)}&type=contacts">خویشان</a>
       </div>
       <style>
         .cyrus-explore-search{{background:linear-gradient(145deg,#101f31,#172b40);border-color:#b9954b55;box-shadow:0 5px 16px #0003}}
@@ -1906,6 +1888,7 @@ def search():
 
       </style>
       <div class="chat-list">{people_rows}</div>
+      <div class="chat-list">{contacts_rows}</div>
       <div class="chat-list">{room_rows}</div>
       {empty}
       <script>
