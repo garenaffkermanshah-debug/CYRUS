@@ -293,7 +293,7 @@ def cyrus_update_last_seen():
         response = requests.patch(
             URL + "/rest/v1/cyrus_profiles",
             params={"id": "eq." + str(session.get("user_id"))},
-            json={"last_seen_at": datetime.now().astimezone().isoformat()},
+            json={"last_seen_at": datetime.now(timezone.utc).isoformat()},
             headers={
                 "apikey": KEY,
                 "Authorization": "Bearer " + session["access_token"],
@@ -306,6 +306,14 @@ def cyrus_update_last_seen():
             session["last_seen_ping_at"] = now
     except Exception:
         pass
+
+@app.route("/presence/ping", methods=["POST"])
+def cyrus_presence_ping():
+    if not session.get("access_token") or not session.get("user_id"):
+        return Response('{"ok":false}', status=401, mimetype="application/json")
+    session["last_seen_ping_at"] = 0
+    cyrus_update_last_seen()
+    return Response('{"ok":true}', mimetype="application/json", headers={"Cache-Control":"no-store"})
 
 @app.before_request
 def cyrus_protect_state_changes():
