@@ -583,9 +583,13 @@ window.addEventListener('pageshow',function(event){
  else if(path.startsWith('/user/'))target='/search';
  else if(path.startsWith('/settings')||path.startsWith('/profile')||path.startsWith('/privacy-security'))target='/home';
  else if(path==='/search'||path==='/contacts'||path==='/channels'||path==='/rooms/create')target='/home';
+ // Put a guard entry on top of the browser history so Android's hardware
+ // Back is caught on this screen instead of exposing an old visited tab/page.
  let handling=false;
+ try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(e){}
  window.addEventListener('popstate',function(){
   if(handling)return;handling=true;
+  // Replace the popped history slot with the intended parent screen.
   try{history.replaceState({cyrusBackTarget:target},'',target);}catch(e){}
   location.replace(target);
  });
