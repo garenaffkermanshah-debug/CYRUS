@@ -1114,7 +1114,7 @@ def home():
           const response=await fetch('/chat/mark-read',{{method:'POST',credentials:'same-origin',headers:{{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}},body:JSON.stringify({{conversation_id:id}})}});
           if(!response.ok)throw new Error('mark read failed');
           const row=button.closest('.cyrus-chat-row');if(row){{row.dataset.unread='0';row.querySelector('.unread-badge')?.remove();row.classList.remove('cyrus-is-unread');row.classList.remove('remove-open');}}
-          cyrusApplyListTools();
+          window.location.reload();
         }}catch(error){{button.disabled=false;button.textContent='خوانده‌شده';alert('علامت‌گذاری انجام نشد؛ اتصال را بررسی کن.');}}
       }}
       function cyrusApplyListTools(){{
