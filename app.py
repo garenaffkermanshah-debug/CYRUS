@@ -3158,7 +3158,7 @@ def chat(conversation_id):
     room_title_text = str(room_data.get("title") or "گفتگو")
     room_avatar_source = str(room_data.get("avatar_url") or "")
     room_subtitle = "گفتگوی خصوصی" if room_type == "private" else ("کانال" if room_type == "channel" else "گروه")
-    room_last_seen = "گفتگوی خصوصی"
+    room_last_seen = "آخرین بازدید نامشخص"
     if room_type == "group":
         try:
             count_response = requests.get(URL + "/rest/v1/cyrus_members", params={"select":"user_id","conversation_id":"eq."+conversation_id}, headers=headers, timeout=12)
@@ -3218,7 +3218,8 @@ def chat(conversation_id):
                             if age_seconds <= 300:
                                 room_last_seen = "آنلاین"
                             elif age_seconds < 7 * 86400:
-                                room_last_seen = "آخرین بازدید " + seen_local.strftime("%Y/%m/%d · %H:%M")
+                                # نمایش فقط ساعت؛ تاریخ امروز یا تاریخ کامل در سربرگ چت نیاید.
+                                room_last_seen = "آخرین بازدید " + seen_local.strftime("%H:%M")
                             elif age_seconds < 30 * 86400:
                                 room_last_seen = "آخرین بازدید یک هفته پیش"
                             else:
@@ -3241,8 +3242,6 @@ def chat(conversation_id):
                     room_profile_href = "/user/" + other_id + "?from_chat=" + conversation_id
         except Exception:
             pass
-    if room_type == "private" and not room_blocked:
-        room_last_seen = "گفتگوی خصوصی"
     room_title = html.escape(room_title_text)
     room_description = html.escape(str(room_data.get("description") or ""))
     room_avatar_url = html.escape(room_avatar_source, quote=True)
@@ -3452,7 +3451,19 @@ async function cyrusToggleVoiceRecord(b){
           update();input.addEventListener("input",update);
           input.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(!send.disabled)form.requestSubmit();}});
           form.addEventListener("submit",function(e){if(!input.value.trim()||form.dataset.sending==="1"){e.preventDefault();return;}if(nonceField){const body=input.value.trim();let saved=null;try{saved=JSON.parse(sessionStorage.getItem(nonceKey)||"null");}catch(err){}let nonce=saved&&saved.body===body&&saved.nonce?saved.nonce:"";if(!nonce){nonce=window.crypto&&crypto.randomUUID?crypto.randomUUID():(Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)+"-"+Math.random().toString(36).slice(2));try{sessionStorage.setItem(nonceKey,JSON.stringify({body:body,nonce:nonce}));}catch(err){}}nonceField.value=nonce;}form.dataset.sending="1";send.disabled=true;send.textContent="…";});
-          const picker=document.getElementById("cyrusFullEmojiPicker");if(picker)picker.addEventListener("emoji-click",function(e){const emoji=e.detail&&e.detail.unicode;if(!emoji)return;const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;input.setRangeText(emoji,start,end,"end");input.dispatchEvent(new Event("input",{bubbles:true}));input.focus();});
+          // Delegated event survives delayed custom-element upgrade in mobile WebViews.
+          let emojiStart=input.value.length,emojiEnd=input.value.length;
+          const rememberEmojiCaret=()=>{emojiStart=input.selectionStart??input.value.length;emojiEnd=input.selectionEnd??emojiStart;};
+          input.addEventListener("select",rememberEmojiCaret);input.addEventListener("keyup",rememberEmojiCaret);input.addEventListener("click",rememberEmojiCaret);
+          document.addEventListener("emoji-click",function(e){
+            const emoji=e.detail&&e.detail.unicode;if(!emoji)return;
+            const start=Math.min(emojiStart,input.value.length),end=Math.min(Math.max(start,emojiEnd),input.value.length);
+            input.setRangeText(emoji,start,end,"end");
+            emojiStart=emojiEnd=start+emoji.length;
+            input.dispatchEvent(new Event("input",{bubbles:true}));
+            const panel=document.getElementById("cyrusEmojiPanel");if(panel)panel.style.display="block";
+            requestAnimationFrame(()=>{input.focus({preventScroll:true});input.setSelectionRange(emojiStart,emojiEnd);});
+          });
           document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;const a=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(a)a.hidden=true;if(p)p.style.display="none";});
         })();
         document.addEventListener("click",function(e){const m=document.getElementById("cyrusAttachMenu"),p=document.getElementById("cyrusEmojiPanel");if(m&&!e.target.closest(".composer-attach-wrap"))m.hidden=true;if(p&&!e.target.closest(".composer-emoji")&&!e.target.closest(".composer-emoji-panel"))p.style.display="none";});</script>"""
@@ -3508,7 +3519,7 @@ async function cyrusToggleVoiceRecord(b){
         .composer-send{{background:#268bd0;color:#fff;font-size:20px;transform:scaleX(-1)}}.composer-send[hidden]{{display:none!important}}.composer-voice[hidden]{{display:none!important}}.composer-voice{{width:34px;height:34px;flex:0 0 34px;margin:0;padding:0;border:0;border-radius:50%;background:transparent;color:#a9bdce;font-size:19px}}.cyrus-voice-status{{font-size:10px;color:#8fc8f1;white-space:nowrap}}.composer-voice-cancel{{width:auto;padding:7px 9px;margin:0;border:1px solid #754d4d;border-radius:12px;background:#321e25;color:#ffb5a8;font-size:10px}}.composer-voice-cancel[hidden]{{display:none}}.composer-voice.recording{{background:#9d3434;color:#fff;animation:cyrusVoicePulse 1s infinite alternate}}@keyframes cyrusVoicePulse{{to{{opacity:.55}}}}
         .cyrus-reply-composer{{position:absolute;right:10px;left:10px;bottom:calc(100% + 8px);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 12px;border-right:3px solid #d8b46a;border-radius:10px;background:#172838;color:#d9c18c;font-size:12px;}}
         .cyrus-reply-composer button{{width:28px;min-width:28px;margin:0;padding:3px;background:transparent;color:#b6c8d8;font-size:20px}}
-        .composer-emoji-panel{{position:absolute;bottom:calc(100% + 10px);right:6px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:20;display:none}}
+        .composer-emoji-panel{{position:fixed;bottom:calc(78px + env(safe-area-inset-bottom));right:10px;width:min(360px,calc(100vw - 20px));height:min(450px,62vh);padding:0;overflow:hidden;border-radius:16px;background:#203243;border:1px solid #3a5268;box-shadow:0 8px 28px #0008;z-index:1000;display:none}}
         .composer-emoji-panel emoji-picker{{display:block;width:100%;height:100%;--background:#203243;--border-color:#3a5268;--input-border-color:#435b70;--input-font-color:#edf4fa;--button-hover-background:#334b60}}
         .send-box .composer-send:disabled{{opacity:.55;cursor:wait}}
         @media(max-width:520px){{.container:has(.cyrus-chat-header){{padding-inline:8px}}.message{{max-width:88%}}.messages-area{{gap:7px}}}}
@@ -3541,7 +3552,7 @@ async function cyrusToggleVoiceRecord(b){
         .message{{position:relative;max-width:84%;padding:10px 13px;border:1px solid transparent;border-radius:16px;background:#172432;overflow-wrap:anywhere;box-shadow:0 1px 2px #0003}}
         .message .message-body{{color:#edf4fa;font-size:var(--cyrus-chat-font-size,14px);line-height:1.8}}
         .message small{{display:block;color:#93a8ba;font-size:10px;margin-top:5px;text-align:left}}
-        .message{{cursor:pointer}}
+        .message{{cursor:pointer;touch-action:pan-y;user-select:none;-webkit-user-select:none}}
         .message-context{{display:none;position:fixed;z-index:30;left:50%;bottom:calc(78px + env(safe-area-inset-bottom) + 12px);transform:translateX(-50%);width:min(355px,calc(100vw - 34px));filter:drop-shadow(0 12px 28px #0008);cursor:default}}
         .message.context-open .message-context{{display:block}}
         .reaction-strip{{display:flex;justify-content:space-around;align-items:center;gap:3px;padding:8px 9px;margin-bottom:8px;border-radius:30px;background:#253747;border:1px solid #354d61}}
@@ -3685,7 +3696,8 @@ async function cyrusToggleVoiceRecord(b){
       function cyrusOpenMessageMenu(event,message) {{
         if(event.target.closest('.message-context')) return;
         if(event.target.closest('button,form,select,input,a')) return;
-        if(window.getSelection&&String(window.getSelection()).trim())return;
+        // انتخاب متن باقی‌مانده از لمس قبلی نباید منوی پیام را در موبایل مسدود کند.
+        if(event.type!=='click'&&window.getSelection&&String(window.getSelection()).trim())return;
         const clickedId=message&&message.dataset.messageId;
         if(event.type==='click'&&clickedId&&cyrusSelectedMessages.size) {{
           const rows=[...document.querySelectorAll('.message[data-message-id]')];
