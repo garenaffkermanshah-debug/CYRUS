@@ -373,6 +373,7 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=1">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
 <meta name="mobile-web-app-capable" content="yes">
@@ -637,6 +638,7 @@ window.addEventListener('pageshow',function(event){
  if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone)bar.style.display='none';
 })();
 </script>
+<script src="/static/cyrus-rebuild.js?v=1" defer></script>
 </body>
 </html>
 """
