@@ -607,3 +607,34 @@ CREATE INDEX IF NOT EXISTS idx_cyrus_official_channels_channel_id ON public.cyru
 CREATE INDEX IF NOT EXISTS idx_cyrus_saved_messages_user_id ON public.cyrus_saved_messages(user_id);
 CREATE INDEX IF NOT EXISTS idx_cyrus_saved_profiles_saved_user_id ON public.cyrus_saved_profiles(saved_user_id);
 CREATE INDEX IF NOT EXISTS idx_cyrus_user_links_contact_user_id ON public.cyrus_user_links(contact_user_id);
+
+
+-- CYRUS Telegram-style per-account chat list preferences (archive/pin/mute).
+CREATE TABLE IF NOT EXISTS public.cyrus_chat_preferences (
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  conversation_id uuid NOT NULL REFERENCES public.cyrus_conversations(id) ON DELETE CASCADE,
+  archived boolean NOT NULL DEFAULT false,
+  pinned boolean NOT NULL DEFAULT false,
+  muted boolean NOT NULL DEFAULT false,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, conversation_id)
+);
+
+ALTER TABLE public.cyrus_chat_preferences ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS cyrus_chat_preferences_select_own ON public.cyrus_chat_preferences;
+CREATE POLICY cyrus_chat_preferences_select_own
+  ON public.cyrus_chat_preferences FOR SELECT TO authenticated
+  USING (user_id = (SELECT auth.uid()));
+DROP POLICY IF EXISTS cyrus_chat_preferences_insert_own ON public.cyrus_chat_preferences;
+CREATE POLICY cyrus_chat_preferences_insert_own
+  ON public.cyrus_chat_preferences FOR INSERT TO authenticated
+  WITH CHECK (user_id = (SELECT auth.uid()));
+DROP POLICY IF EXISTS cyrus_chat_preferences_update_own ON public.cyrus_chat_preferences;
+CREATE POLICY cyrus_chat_preferences_update_own
+  ON public.cyrus_chat_preferences FOR UPDATE TO authenticated
+  USING (user_id = (SELECT auth.uid()))
+  WITH CHECK (user_id = (SELECT auth.uid()));
+DROP POLICY IF EXISTS cyrus_chat_preferences_delete_own ON public.cyrus_chat_preferences;
+CREATE POLICY cyrus_chat_preferences_delete_own
+  ON public.cyrus_chat_preferences FOR DELETE TO authenticated
+  USING (user_id = (SELECT auth.uid()));
