@@ -12,16 +12,33 @@ BEGIN
 END; $$;
 
 CREATE OR REPLACE FUNCTION public.cyrus_manage_add_member(p_conversation_id uuid,p_user_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
-DECLARE v_role text;
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $
+DECLARE
+ v_role text;
+ v_type text;
+ v_permissions jsonb;
+ v_actor uuid := auth.uid();
 BEGIN
+ IF v_actor IS NULL THEN RAISE EXCEPTION 'ورود لازم است'; END IF;
  v_role:=public.cyrus_room_actor_role(p_conversation_id);
- IF v_role NOT IN ('owner','admin') THEN RAISE EXCEPTION 'اجازه ندارید'; END IF;
- IF NOT EXISTS(SELECT 1 FROM cyrus_profiles WHERE id=p_user_id) THEN RAISE EXCEPTION 'کاربر پیدا نشد'; END IF;
- IF NOT EXISTS(SELECT 1 FROM cyrus_members WHERE conversation_id=p_conversation_id AND user_id=p_user_id) THEN
-  INSERT INTO cyrus_members(conversation_id,user_id,role) VALUES(p_conversation_id,p_user_id,'member');
+ SELECT type,COALESCE(member_permissions,'{}'::jsonb)
+ INTO v_type,v_permissions
+ FROM public.cyrus_conversations
+ WHERE id=p_conversation_id
+ FOR UPDATE;
+ IF v_type NOT IN ('group','channel') THEN RAISE EXCEPTION 'گروه یا کانال پیدا نشد'; END IF;
+ IF v_role NOT IN ('owner','admin') THEN
+   IF v_type<>'group' OR v_role<>'member'
+      OR COALESCE((v_permissions->>'add_members')::boolean,false) IS NOT TRUE THEN
+     RAISE EXCEPTION 'اجازه ندارید';
+   END IF;
  END IF;
-END; $$;
+ IF p_user_id IS NULL OR p_user_id=v_actor THEN RAISE EXCEPTION 'عضو مقصد نامعتبر است'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.cyrus_profiles WHERE id=p_user_id) THEN RAISE EXCEPTION 'کاربر پیدا نشد'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.cyrus_members WHERE conversation_id=p_conversation_id AND user_id=p_user_id) THEN
+  INSERT INTO public.cyrus_members(conversation_id,user_id,role) VALUES(p_conversation_id,p_user_id,'member');
+ END IF;
+END; $;
 
 CREATE OR REPLACE FUNCTION public.cyrus_manage_remove_member(p_conversation_id uuid,p_user_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
