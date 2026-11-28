@@ -2593,7 +2593,8 @@ def privacy_security():
       document.addEventListener("visibilitychange",()=>{if(document.hidden&&__CYRUS_APP_LOCK_ENABLED__)fetch("/privacy-security/app-lock",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"lock"})});});
       document.getElementById("cps-sessions").addEventListener("click",async()=>{if(!confirm("نشست‌های دیگر حساب از سیستم خارج شوند؟"))return;try{const r=await fetch("/privacy-security/sessions/logout-others",{method:"POST",credentials:"same-origin",headers:{"X-Requested-With":"fetch"}});const j=await r.json();alert(j.ok?"نشست‌های دیگر خارج شدند.":"خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.");}catch(e){alert("ارتباط با سرور برقرار نشد.");}});
       })();
-      </script>t>   </main>
+      </script>
+    </main>
     """
     content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
     password_login_enabled=bool(security and security.get("password_login_enabled"))
