@@ -3590,7 +3590,9 @@ async function cyrusToggleVoiceRecord(b){
       function cyrusToggleEmoji(event) {{
         event.preventDefault();event.stopPropagation();
         const panel=document.getElementById("cyrusEmojiPanel");
+        const input=document.querySelector('.send-box input[name="content"]');
         if(panel)panel.style.display=panel.style.display==="none"?"block":"none";
+        if(input)input.focus({{preventScroll:true}});
       }}
       function cyrusInsertEmoji(emoji,closePanel=true) {{
         const input=document.querySelector('.send-box input[name="content"]');
@@ -3630,12 +3632,6 @@ async function cyrusToggleVoiceRecord(b){
             if(value){{event.stopPropagation();cyrusInsertEmoji(value,false);}}
           }};
           picker.addEventListener("emoji-click",insertPickedEmoji);
-          if(window.customElements)customElements.whenDefined("emoji-picker").then(()=>{{
-            if(!picker.dataset.cyrusEmojiReady){{
-              picker.dataset.cyrusEmojiReady="1";
-              picker.addEventListener("emoji-click",insertPickedEmoji);
-            }}
-          }});
           picker.addEventListener("pointerdown",function(){{
             const input=document.querySelector('.send-box input[name="content"]');
             if(input)input.focus({{preventScroll:true}});
