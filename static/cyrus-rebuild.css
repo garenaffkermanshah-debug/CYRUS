@@ -1,0 +1,30 @@
+/* CYRUS Telegram-inspired interface rebuild layer. Existing backend/routes and feature handlers remain intact. */
+:root{--tg-bg:#0e1722;--tg-panel:#172533;--tg-panel2:#202f3e;--tg-line:#26394b;--tg-blue:#3390ec;--tg-text:#e8f0f7;--tg-muted:#91a5b8}
+body{background-color:var(--tg-bg)!important;color:var(--tg-text);font-family:Tahoma,Arial,sans-serif}
+body:before{background:rgba(3,9,16,.22)}
+.top{background:rgba(14,23,34,.97)!important;border-color:var(--tg-line)!important;backdrop-filter:blur(16px)}
+.container{max-width:680px}
+.card,.empty{background:rgba(23,37,51,.97)!important;border:1px solid var(--tg-line)!important;border-radius:16px;box-shadow:0 12px 35px #0002}
+.chat-row{background:rgba(14,23,34,.96)!important;border-color:#1d2c3a!important;min-height:72px;transition:background .15s}
+.chat-row:active{background:#1b2b3b!important}
+.avatar{background:#203d56!important;color:#9bd0ff!important;border:0!important}
+.chat-name{color:#eaf2f8!important;font-weight:600}
+.chat-preview{color:#91a5b8!important}
+.searchbar{background:#1b2b3a!important;border:1px solid #263c50!important;border-radius:24px!important}
+.tabs{border-color:var(--tg-line)!important}
+.tab{color:#a7bacb!important}
+.tab.active{color:#62b7ff!important;border-color:var(--tg-blue)!important}
+.bottom{background:rgba(14,23,34,.98)!important;border-color:var(--tg-line)!important;backdrop-filter:blur(16px)}
+.bottom a.current{color:#62b7ff!important;border-color:var(--tg-blue)!important}
+button,.action{cursor:pointer;touch-action:manipulation}
+input,textarea,select{background:#101c29!important;border-color:#2b4155!important;color:#edf5fb!important}
+.container:has(.cyrus-chat-header){max-width:720px!important;min-height:calc(100dvh - 74px)!important;background:rgba(14,23,34,.88)!important;border-inline:1px solid #203244}
+.cyrus-chat-header{background:rgba(20,33,46,.98)!important;border-bottom:1px solid var(--tg-line)!important}
+.messages-area{background-color:transparent!important;scroll-behavior:smooth}
+.message{box-shadow:0 2px 6px #0002!important}
+.message .message-context,.message-context{background:#1b2b3a!important;border:1px solid #30475a!important;border-radius:14px!important;box-shadow:0 12px 35px #0007!important}
+.send-box{background:rgba(14,23,34,.98)!important;border:1px solid #263b4e!important;border-radius:28px!important;box-shadow:0 8px 26px #0004}
+.composer-attach-menu{background:#1b2b3a!important;border:1px solid #30475a!important;border-radius:16px!important;box-shadow:0 16px 40px #0008!important}
+.composer-emoji-panel{background:#172533!important;border:1px solid #30475a!important;border-radius:16px!important}
+.chat-back{touch-action:manipulation}
+@media(max-width:600px){.top{height:56px!important;padding:7px 12px!important}.container:has(.cyrus-chat-header){min-height:calc(100dvh - 64px)!important;padding-inline:5px!important}.chat-row{padding:10px 12px!important}.bottom{height:62px!important}.bottom a span{font-size:22px!important}}
