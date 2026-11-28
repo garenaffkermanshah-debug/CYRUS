@@ -80,3 +80,36 @@ input,textarea,select{background:#081a2e!important;border-color:#234767!importan
 .send-box{background:rgba(5,20,39,.98)!important;border-color:#1c4166!important}
 .send-box button{background:#087ff0!important}
 @media(max-width:600px){.top{height:56px!important}.chat-row{padding:10px 12px!important}.bottom{height:58px!important}}
+
+
+/* CYRUS royal-blue palette + persistent day/night theme */
+:root{color-scheme:dark;--royal:#174a91;--royal-deep:#0b2852;--button-blue:#55a9f5;--sent-bubble:#285b91;--received-bubble:#273747;--main-text:#f5f8fc;--secondary-text:#b7c5d3;--soft-red:#ef858b;--soft-green:#7bc99c}
+html[data-theme="night"]{color-scheme:dark}
+html[data-theme="day"]{color-scheme:light;--tg-bg:#f3f6fa;--tg-panel:#ffffff;--tg-panel2:#e9eff5;--tg-line:#d5e0eb;--tg-blue:#246fbe;--tg-text:#20364b;--tg-muted:#6f8192;--royal:#245fa8;--royal-deep:#e5eef8;--button-blue:#438fdb;--sent-bubble:#d7eaff;--received-bubble:#e8edf2;--main-text:#20364b;--secondary-text:#687b8e;--soft-red:#cf555e;--soft-green:#31865b}
+html[data-theme="day"] body,html[data-theme="day"] body:before{background-image:none!important;background-color:#f3f6fa!important}
+html[data-theme="day"] body{color:var(--main-text)!important}
+html[data-theme="day"] .top,html[data-theme="day"] .bottom{background:#fff!important;border-color:#d5e0eb!important}
+html[data-theme="day"] .logo,html[data-theme="day"] h2,html[data-theme="day"] .section-title{color:#245fa8!important}
+html[data-theme="day"] .container:has(.cyrus-chat-header),html[data-theme="day"] .card,html[data-theme="day"] .empty{background:#fff!important;border-color:#d5e0eb!important}
+html[data-theme="day"] .chat-row{background:#fff!important;border-color:#e2e9f0!important}
+html[data-theme="day"] .chat-name,html[data-theme="day"] .empty p,html[data-theme="day"] .muted{color:#20364b!important}
+html[data-theme="day"] .chat-preview,html[data-theme="day"] .sub{color:#718294!important}
+html[data-theme="day"] .cyrus-chat-header,html[data-theme="day"] .send-box{background:#fff!important;border-color:#d5e0eb!important}
+html[data-theme="day"] .messages-area{background:#f3f6fa!important;background-image:none!important}
+html[data-theme="day"] .message.mine{background:var(--sent-bubble)!important;border-color:#b9d8f8!important;color:#20364b!important}
+html[data-theme="day"] .message.theirs{background:var(--received-bubble)!important;border-color:#d8e1e9!important;color:#20364b!important}
+html[data-theme="day"] .message small,html[data-theme="day"] .message-time{color:#718294!important}
+html[data-theme="day"] input,html[data-theme="day"] textarea,html[data-theme="day"] select{background:#fff!important;border-color:#cbd9e6!important;color:#20364b!important}
+html[data-theme="day"] .searchbar{background:#fff!important;border-color:#d5e0eb!important;color:#718294!important}
+html[data-theme="day"] .tab{color:#6f8192!important}
+html[data-theme="day"] .tab.active,html[data-theme="day"] .bottom a.current{color:#246fbe!important}
+html[data-theme="day"] .bottom a{color:#718294!important}
+html[data-theme="day"] .message-context,html[data-theme="day"] .message .message-context{background:#fff!important;border-color:#d5e0eb!important;color:#20364b!important}
+html[data-theme="day"] .send-box button,html[data-theme="day"] button,html[data-theme="day"] .action{background:#438fdb!important;color:#fff!important}
+.message.mine{background:var(--sent-bubble)!important;color:var(--main-text)!important}
+.message.theirs{background:var(--received-bubble)!important;color:var(--main-text)!important}
+.message .message-body{color:inherit!important}
+.error,.alert-error,.warning{color:var(--soft-red)!important}
+.success,.alert-success,.toast-success{color:var(--soft-green)!important}
+.cyrus-theme-toggle{width:36px!important;height:36px!important;min-width:36px!important;padding:0!important;margin:0!important;border-radius:50%!important;background:#174a91!important;color:#fff!important;box-shadow:none!important;display:inline-grid!important;place-items:center!important;font-size:18px!important;border:1px solid #3c82c6!important}
+html[data-theme="day"] .cyrus-theme-toggle{background:#e5eef8!important;color:#245fa8!important;border-color:#c8dcec!important}
