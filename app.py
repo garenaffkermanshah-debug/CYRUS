@@ -1874,6 +1874,10 @@ def search():
         <button type="submit" aria-label="جستجو" style="display:none">⌕</button>
       </form>
 
+      <section id="cyrus-search-recent" style="display:none;padding:6px 15px 10px">
+        <div class="section-title">سابقه جستجو</div><div id="cyrus-search-recent-list"></div>
+      </section>
+
       <p class="error">{html.escape(error)}</p>
 
       <div class="search-category-tabs">
@@ -1897,10 +1901,6 @@ def search():
         .search-result .avatar{{outline:1px solid #b9954b55;outline-offset:1px}}
 
       </style>
-      <section id="cyrus-search-recent" style="display:none;padding:6px 15px 10px">
-        <div class="section-title">سابقه جستجو</div><div id="cyrus-search-recent-list"></div>
-      </section>
-
       <div class="chat-list">{people_rows}</div>
       <div class="chat-list">{room_rows}</div>
       {empty}
