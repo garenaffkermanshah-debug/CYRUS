@@ -6006,17 +6006,24 @@ def manage_room(conversation_id):
             data = {"p_conversation_id": conversation_id}
             rpc = None
 
+            if action == "save_avatar":
+                uploaded_avatar, avatar_error = cyrus_upload_room_avatar(
+                    conversation_id, request.files.get("avatar_file"), session["access_token"]
+                )
+                if avatar_error:
+                    return page('<div class="container card"><p>' + html.escape(avatar_error) + '</p><a href="' + request.url + '">بازگشت</a></div>'), 400
+                if not uploaded_avatar:
+                    return page('<div class="container card"><p>اول تصویر را از گالری انتخاب کن.</p><a href="' + request.url + '">بازگشت</a></div>'), 400
+                if not cyrus_set_room_avatar(conversation_id, uploaded_avatar, session["access_token"]):
+                    return page('<div class="container card"><p>تصویر بارگذاری شد اما ثبت پروفایل گروه ناموفق بود. دوباره تأیید کن.</p><a href="' + request.url + '">بازگشت</a></div>'), 400
+                return redirect(request.url)
+
             if action == "save_settings":
                 title = request.form.get("title", "").strip()
                 if is_official_room:
                     title = "امپراتوری پارس"
                 description = request.form.get("description", "").strip()
                 avatar_url = str(room.get("avatar_url") or "")
-                uploaded_avatar, avatar_error = cyrus_upload_room_avatar(conversation_id, request.files.get("avatar_file"), session["access_token"])
-                if avatar_error:
-                    return page('<div class="container card"><p>' + html.escape(avatar_error) + '</p><a href="' + request.url + '">بازگشت</a></div>'), 400
-                if uploaded_avatar:
-                    avatar_url = uploaded_avatar
                 reactions = request.form.get("reactions_enabled") == "on"
                 is_public = request.form.get("is_public") == "on"
                 join_approval = request.form.get("join_approval") == "on"
@@ -6320,6 +6327,8 @@ def manage_room(conversation_id):
             .tg-avatar-picker{{display:flex;align-items:center;gap:9px;min-width:0;flex:1;padding:10px 12px;border:1px solid #2a4358;border-radius:12px;background:#142332;color:#9bd3fb;font-size:13px;cursor:pointer}}
             .tg-avatar-picker input{{display:none}}
             .tg-avatar-picker small{{display:block;color:#8099ad;font-size:10px;margin-top:3px}}
+            .tg-avatar-confirm{{display:block;width:100%;margin:0 0 10px;padding:10px 12px;border:1px solid #2d5c7c;border-radius:10px;background:#173b55;color:#a6d9fb;font-size:12px;font-weight:600}}
+            .tg-avatar-confirm:disabled{{opacity:.45}}
             .tg-room-id-card{{margin:8px 12px 12px;padding:10px 12px;border:1px solid #263c50;border-radius:13px;background:#101d2a}}
             .tg-room-id-title{{font-size:12px;color:#8fbfe4;margin-bottom:7px}}
             .tg-room-id-row{{display:flex;gap:7px;align-items:center}}
@@ -6339,12 +6348,11 @@ def manage_room(conversation_id):
             .tg-danger-card.delete button{{background:#482a32;color:#e6a8b2}}
             .tg-room-settings hr{{display:none}}
           </style>
-          <header class="tg-manage-topbar"><button class="tg-top-save" type="submit" form="cyrusRoomSettingsForm" aria-label="ذخیره تنظیمات" disabled>✓</button><span>تنظیمات {kind}</span><a href="/chat/{conversation_id}" aria-label="بازگشت به گفتگو">‹</a></header>
+          <header class="tg-manage-topbar"><button class="tg-top-save" type="submit" form="cyrusRoomSettingsForm" name="action" value="save_settings" aria-label="ذخیره تنظیمات" disabled>✓</button><span>تنظیمات {kind}</span><a href="/chat/{conversation_id}" aria-label="بازگشت به گفتگو">‹</a></header>
           <form id="cyrusRoomSettingsForm" class="tg-room-settings" method="post" enctype="multipart/form-data">
-            <input type="hidden" name="action" value="save_settings">
             <div class="tg-section">
               <div class="tg-section-title">اطلاعات {kind}</div>
-              <div class="tg-room-avatar-line"><div id="cyrusRoomAvatarPreview">{avatar_preview}</div><label class="tg-avatar-picker"><span>انتخاب تصویر گروه<small>تصویر پروفایل · از گالری</small></span><input id="cyrusRoomAvatarFile" type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp"></label></div>
+              <div class="tg-room-avatar-line"><div id="cyrusRoomAvatarPreview">{avatar_preview}</div><label class="tg-avatar-picker"><span>انتخاب تصویر گروه<small>تصویر پروفایل · از گالری</small></span><input id="cyrusRoomAvatarFile" type="file" name="avatar_file" accept="image/jpeg,image/png,image/webp"></label></div><button id="cyrusRoomAvatarConfirm" class="tg-avatar-confirm" type="submit" name="action" value="save_avatar" disabled>✓ تأیید و ثبت تصویر گروه</button>
               <label class="tg-field">نام
                 <input name="title" minlength="2" maxlength="60" value="{title}" required>
               </label>
@@ -6371,7 +6379,7 @@ def manage_room(conversation_id):
               '<label class="tg-field">حالت آهسته ارسال پیام<select name="slow_mode_seconds">' + slow_options + '</select></label></div>') if room_type == "group" else ('<div class="tg-section"><div class="tg-section-title">تنظیمات کانال</div><label class="tg-switch-row"><span>نمایش امضای مدیر در پست‌ها</span><span class="tg-switch"><input type="checkbox" name="sign_messages" ' + sign_checked + '><i></i></span></label><p class="muted">در کانال فقط مالک و مدیران مجاز به انتشار هستند.</p></div>')}
           </form>
           <script>
-          (function(){{const input=document.getElementById('cyrusRoomAvatarFile'),box=document.getElementById('cyrusRoomAvatarPreview');if(!input||!box)return;input.addEventListener('change',()=>{{const file=input.files&&input.files[0];if(!file)return;if(!/^image\/(jpeg|png|webp)$/.test(file.type)){{alert('فقط تصویر JPG، PNG یا WebP انتخاب کن.');input.value='';return;}}if(file.size>5*1024*1024){{alert('حجم تصویر باید حداکثر ۵ مگابایت باشد.');input.value='';return;}}const reader=new FileReader();reader.onload=()=>{{box.innerHTML='<img class="tg-room-avatar-preview" alt="پیش‌نمایش تصویر گروه" src="'+String(reader.result).replace(/"/g,'&quot;')+'">';}};reader.readAsDataURL(file);}});}})();
+          (function(){{const input=document.getElementById('cyrusRoomAvatarFile'),box=document.getElementById('cyrusRoomAvatarPreview'),confirm=document.getElementById('cyrusRoomAvatarConfirm');if(!input||!box||!confirm)return;input.addEventListener('change',()=>{{const file=input.files&&input.files[0];confirm.disabled=!file;if(!file)return;if(!/^image\/(jpeg|png|webp)$/.test(file.type)){{alert('فقط تصویر JPG، PNG یا WebP انتخاب کن.');input.value='';return;}}if(file.size>5*1024*1024){{alert('حجم تصویر باید حداکثر ۵ مگابایت باشد.');input.value='';return;}}const reader=new FileReader();reader.onload=()=>{{box.innerHTML='<img class="tg-room-avatar-preview" alt="پیش‌نمایش تصویر گروه" src="'+String(reader.result).replace(/"/g,'&quot;')+'">';}};reader.readAsDataURL(file);}});}})();
           (function(){{
             const form=document.querySelector('.tg-room-settings'),save=document.querySelector('.tg-top-save');
             if(!form||!save)return;
