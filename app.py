@@ -1263,8 +1263,6 @@ def welcome():
     return page(content)
 
 @app.route("/register", methods=["GET", "POST"])
-
-@app.route("/register", methods=["GET", "POST"])
 def register():
     error = ""
     if request.method == "POST":
