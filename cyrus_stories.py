@@ -40,6 +40,9 @@ def register_story_routes(app, URL, KEY, ADMIN_KEY, page):
         try:
             r=requests.get(URL+"/rest/v1/cyrus_contacts",params={"select":"contact_user_id","owner_id":"eq."+str(user_id),"limit":"1000"},headers=admin_headers(),timeout=15)
             if r.ok:allowed.update(str(x.get("contact_user_id")) for x in r.json() if x.get("contact_user_id"))
+            # Also include users who saved this account as a contact.
+            inbound=requests.get(URL+"/rest/v1/cyrus_contacts",params={"select":"owner_id","contact_user_id":"eq."+str(user_id),"limit":"1000"},headers=admin_headers(),timeout=15)
+            if inbound.ok:allowed.update(str(x.get("owner_id")) for x in inbound.json() if x.get("owner_id"))
         except Exception:pass
         try:
             m=requests.get(URL+"/rest/v1/cyrus_members",params={"select":"conversation_id","user_id":"eq."+str(user_id),"limit":"1000"},headers=admin_headers(),timeout=15)
