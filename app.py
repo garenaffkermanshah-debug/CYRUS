@@ -899,7 +899,7 @@ def home():
             preview = preview[:65] + "..."
 
         unread = int(unread_counts.get(room_id, 0))
-        unread_badge = f'<span class="unread-badge">{unread}</span>' if unread else ""
+        unread_badge = f'<span class="unread-badge">{min(99, unread)}</span>' if unread else ""
         avatar_color_list = [
             "#b85c78", "#4f8fbd", "#8d6bb8", "#3d9b87",
             "#c18a45", "#6b83c9", "#ba6650", "#658d52",
