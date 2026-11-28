@@ -1385,8 +1385,7 @@ def register():
     content = f"""
     <main class="cyrus-auth cyrus-auth-register">
       <section class="auth-intro">
-        <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
-        <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
+        <div class="auth-brand"><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
         <p class="auth-kicker">همراه تازهٔ پارسی</p>
         <h1>به جمع ما<br><em>خوش آمدید</em></h1>
         <p class="auth-description">حساب خود را بسازید و با دوستان، خانواده و همراهانتان در ارتباط بمانید.</p>
@@ -1491,7 +1490,7 @@ def verify_email():
     content = f"""
     <main class="cyrus-auth cyrus-auth-verify">
       <section class="auth-intro">
-        <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
+        <div class="auth-brand"><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
         <p class="auth-description">کد یک‌بارمصرف را از پیام ارسالی CYRUS بردارید و در کادر روبه‌رو وارد کنید.</p>
       </section>
       <section class="auth-panel">
@@ -1564,7 +1563,7 @@ def login():
     content = f"""
     <main class="cyrus-auth">
       <section class="auth-intro">
-        <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
+        <div class="auth-brand"><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
         <h1 class="auth-main-title"><em>شکوهی ماندگار</em></h1>
       </section>
       <section class="auth-panel">
@@ -6340,7 +6339,7 @@ def manage_room(conversation_id):
             .tg-danger-card.delete button{{background:#482a32;color:#e6a8b2}}
             .tg-room-settings hr{{display:none}}
           </style>
-          <header class="tg-manage-topbar"><button class="tg-top-save" type="submit" form="cyrusRoomSettingsForm" aria-label="ذخیره تنظیمات" disabled>✓</button><span>تنظیمات {kind}</span><a href="/conversation/{conversation_id}/profile" aria-label="بازگشت به اطلاعات مجموعه">‹</a></header>
+          <header class="tg-manage-topbar"><button class="tg-top-save" type="submit" form="cyrusRoomSettingsForm" aria-label="ذخیره تنظیمات" disabled>✓</button><span>تنظیمات {kind}</span><a href="/chat/{conversation_id}" aria-label="بازگشت به گفتگو">‹</a></header>
           <form id="cyrusRoomSettingsForm" class="tg-room-settings" method="post" enctype="multipart/form-data">
             <input type="hidden" name="action" value="save_settings">
             <div class="tg-section">
@@ -6405,9 +6404,7 @@ def manage_room(conversation_id):
             <section class="tg-danger-card delete"><h3>حذف گروه</h3><form method="post" onsubmit="return confirm('تمام پیام‌ها و اعضا حذف می‌شوند. مطمئن هستید؟')"><input type="hidden" name="action" value="delete"><button>حذف گروه</button></form></section>
             """
 
-        content += (
-            '<p><a href="/chat/' + conversation_id + '">بازگشت به گفتگو</a></p></div>'
-        )
+        content += '</div>'
         return page(content)
 
     except Exception:
