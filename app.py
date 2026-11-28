@@ -170,7 +170,7 @@ def cyrus_get_account_security(user_id):
         return None, "missing_admin_key"
     try:
         r = requests.get(URL + "/rest/v1/cyrus_account_security",
-            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until,pending_password_hash,pending_expires_at,app_lock_pin_hash,app_lock_enabled,password_login_enabled","user_id":"eq."+str(user_id),"limit":"1"},
+            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until,pending_password_hash,pending_expires_at,app_lock_pin_hash,app_lock_enabled","user_id":"eq."+str(user_id),"limit":"1"},
             headers=cyrus_admin_api_headers(), timeout=12)
         if not r.ok:
             return None, "security_lookup_failed"
@@ -1498,18 +1498,14 @@ def login():
         <h1 class="auth-main-title"><em>شکوهی ماندگار</em></h1>
       </section>
       <section class="auth-panel">
-        <div class="auth-panel-head"><span class="auth-step">خوش بازگشتید</span><h2>ورود به حساب</h2><p>با گذرواژه وارد شو یا از کد ایمیل استفاده کن.</p></div>
+        <div class="auth-panel-head"><span class="auth-step">خوش بازگشتید</span><h2>ورود به حساب</h2><p>برای دریافت کد ورود، ایمیل حساب خود را وارد کنید.</p></div>
         <p class="error">{html.escape(error)}</p>
-        <form method="post" action="/login/password" class="auth-form">
-          <label for="auth-password-email">ایمیل حساب</label><input id="auth-password-email" name="email" type="email" required maxlength="254" autocomplete="username" dir="ltr">
-          <label for="auth-password">گذرواژه</label><input id="auth-password" name="password" type="password" required maxlength="128" autocomplete="current-password">
-          <button class="auth-submit">ورود با گذرواژه <span>←</span></button>
-        </form>
-        <div class="auth-divider"><span>یا ورود با کد ایمیل</span></div>
         <form method="post" class="auth-form">
-          <label for="auth-email">نشانی ایمیل</label><input id="auth-email" name="email" type="email" placeholder="name@example.com" required maxlength="254" autocomplete="email" dir="ltr">
-          <button class="auth-secondary" style="width:100%">ارسال کد ورود <span>←</span></button>
+          <label for="auth-email">نشانی ایمیل</label>
+          <input id="auth-email" name="email" type="email" placeholder="name@example.com" required maxlength="254" autocomplete="email" dir="ltr">
+          <button class="auth-submit">ارسال کد ورود <span>←</span></button>
         </form>
+        <div class="auth-divider"><span>یا</span></div>
         <a class="auth-secondary" href="/register">ساخت حساب جدید <span>←</span></a>
         <p class="auth-legal">با ورود به CYRUS، تجربه‌ای ساده و امن از پیام‌رسانی را آغاز می‌کنید.</p>
       </section>
@@ -1517,50 +1513,6 @@ def login():
     </main>
     """
     return page(content)
-
-
-@app.route("/login/password", methods=["POST"])
-def login_with_account_password():
-    email=str(request.form.get("email") or "").strip().lower()
-    password=str(request.form.get("password") or "")
-    if not email or len(email)>254 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+",email) or not password:
-        return page('<main class="container card"><p>ایمیل یا گذرواژه معتبر نیست.</p><a href="/login">بازگشت</a></main>'),400
-    existing,lookup_error=auth_find_user_by_email(email)
-    if lookup_error or not existing:
-        return page('<main class="container card"><p>حساب پیدا نشد؛ ایمیل را بررسی کنید.</p><a href="/login">بازگشت</a></main>'),400
-    security,security_error=cyrus_get_account_security(existing.get("id"))
-    if security_error or not security or not security.get("password_login_enabled"):
-        return page('<main class="container card"><p>ورود با گذرواژه برای این حساب فعال نیست؛ از ورود با کد ایمیل استفاده کنید.</p><a href="/login">ورود با کد ایمیل</a></main>'),403
-    code,data=auth_request("/auth/v1/token?grant_type=password",{"email":email,"password":password})
-    if code!=200 or not data.get("access_token") or not data.get("user"):
-        return page('<main class="container card"><p>ایمیل یا گذرواژه نادرست است.</p><a href="/login">تلاش دوباره</a></main>'),401
-    user=data["user"]
-    if security.get("two_factor_enabled"):
-        session.clear();session["cyrus_2fa_email"]=email;session["cyrus_2fa_user_id"]=str(user.get("id") or existing.get("id"));session["cyrus_2fa_started_at"]=time.time()
-        return redirect(url_for("login_second_factor"))
-    session.clear();session["access_token"]=data["access_token"];session["refresh_token"]=data.get("refresh_token","");session["token_expires_at"]=time.time()+int(data.get("expires_in",3600));session.permanent=True;session["user_id"]=str(user.get("id") or existing.get("id"));session["cyrus_login_email"]=email
-    cyrus_ensure_profile(email)
-    return redirect(url_for("home"))
-
-
-@app.route("/privacy-security/password-login", methods=["POST"])
-def manage_password_login():
-    if not session.get("access_token") or not session.get("user_id"):return redirect("/login")
-    uid=str(session.get("user_id"));action=str(request.form.get("action") or "")
-    record,err=cyrus_get_account_security(uid)
-    if err:return page('<main class="container card"><p>جدول امنیت حساب آماده نیست؛ management.sql را در Supabase اجرا کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
-    if action=="enable":
-        password=str(request.form.get("new_password") or "");confirm=str(request.form.get("confirm_password") or "")
-        if len(password)<10 or len(password)>128 or password!=confirm:
-            return page('<main class="container card"><p>گذرواژه باید ۱۰ تا ۱۲۸ نویسه باشد و دو ورودی یکسان باشند.</p><a href="/privacy-security">بازگشت</a></main>'),400
-        try:
-            changed=requests.put(URL+"/auth/v1/user",json={"password":password},headers={"apikey":KEY,"Authorization":"Bearer "+str(session.get("access_token")),"Content-Type":"application/json"},timeout=20)
-            if not changed.ok:return page('<main class="container card"><p>تغییر گذرواژه انجام نشد؛ دوباره وارد شوید و تلاش کنید.</p><a href="/privacy-security">بازگشت</a></main>'),502
-        except Exception:return page('<main class="container card"><p>ارتباط با سرویس احراز هویت برقرار نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
-        if not cyrus_save_account_security(uid,{"password_login_enabled":True}):return page('<main class="container card"><p>گذرواژه ثبت شد اما فعال‌سازی ذخیره نشد؛ کد ایمیل همچنان قابل استفاده است.</p><a href="/privacy-security">بازگشت</a></main>'),502
-    elif action=="disable":
-        if not cyrus_save_account_security(uid,{"password_login_enabled":False}):return page('<main class="container card"><p>خاموش‌کردن ورود با گذرواژه ذخیره نشد.</p><a href="/privacy-security">بازگشت</a></main>'),502
-    return redirect("/privacy-security")
 
 
 @app.route("/login/second-factor", methods=["GET","POST"])
@@ -2580,7 +2532,6 @@ def privacy_security():
         <h2 class="cps-title">امنیت</h2>
         <div class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">__CYRUS_LOCK_STATUS__</span></span><button type="button" id="cps-lock-manage" style="border:0;border-radius:9px;padding:9px 11px;background:#2e91d0;color:white;font:12px Tahoma">__CYRUS_LOCK_ACTION__</button></div>
         __CYRUS_2FA_ROW__
-        __CYRUS_PASSWORD_LOGIN_ROW__
         <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">خروج از نشست‌های دیگر</span></span><span class="cps-chevron">›</span></div>
       </section>
       <a class="cps-blocked" href="/blocked-users"><span>⊘</span><span class="cps-main"><span class="cps-name">کاربران مسدودشده</span><small>مشاهده و رفع مسدودیت کاربران</small></span><span class="cps-chevron">›</span></a>
@@ -2598,13 +2549,6 @@ def privacy_security():
     </main>
     """
     content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
-    password_login_enabled=bool(security and security.get("password_login_enabled"))
-    password_login_row = (
-        '<form class="cps-row" method="post" action="/privacy-security/password-login" style="display:block"><input type="hidden" name="action" value="disable"><span class="cps-icon">⌑</span><span class="cps-main"><span class="cps-name">ورود با گذرواژه</span><span class="cps-value">فعال است · ورود با کد ایمیل نیز باقی می‌ماند</span></span><button type="submit" style="width:100%;margin-top:8px">خاموش‌کردن</button></form>'
-        if password_login_enabled else
-        '<form class="cps-row" method="post" action="/privacy-security/password-login" style="display:block"><input type="hidden" name="action" value="enable"><span class="cps-icon">⌑</span><span class="cps-main"><span class="cps-name">ورود با گذرواژه</span><span class="cps-value">پس از ورود تأییدشده با ایمیل، گذرواژه بساز تا دفعات بعد بدون کد وارد شوی.</span></span><input name="new_password" type="password" minlength="10" maxlength="128" placeholder="گذرواژهٔ جدید (۱۰ نویسه یا بیشتر)" autocomplete="new-password" required><input name="confirm_password" type="password" minlength="10" maxlength="128" placeholder="تکرار گذرواژه" autocomplete="new-password" required><button type="submit" style="width:100%;margin-top:8px">فعال‌سازی</button></form>'
-    )
-    content = content.replace("__CYRUS_PASSWORD_LOGIN_ROW__", password_login_row)
     content = content.replace("__CYRUS_LOCK_STATUS__", "فعال · قفل پس از ۳ دقیقه بی‌کاری" if app_lock_enabled else "خاموش · رمز ۴ تا ۸ رقمی")
     content = content.replace("__CYRUS_LOCK_ACTION__", "تغییر رمز" if app_lock_enabled else "فعال‌سازی")
     content = content.replace("__CYRUS_APP_LOCK_ENABLED__", "true" if app_lock_enabled else "false")
