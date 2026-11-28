@@ -1033,11 +1033,19 @@ def home():
       function cyrusApplyArchiveView(){{
         cyrusApplyListTools();
       }}
+      async function cyrusPersistChatPref(id,preference,value){{
+        try{{
+          const response=await fetch('/chat/preferences',{{method:'POST',credentials:'same-origin',headers:{{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}},body:JSON.stringify({{conversation_id:id,preference,value}})}});
+          if(!response.ok)throw new Error('preference save failed');
+        }}catch(error){{console.warn('CYRUS chat preference sync unavailable',error);}}
+      }}
       function cyrusArchiveToggle(button){{
         const id=button.dataset.roomId;let ids=cyrusArchivedIds();
-        if(ids.includes(id))ids=ids.filter(x=>x!==id);else ids.push(id);
+        const enabled=!ids.includes(id);
+        if(enabled)ids.push(id);else ids=ids.filter(x=>x!==id);
         localStorage.setItem(CYRUS_ARCHIVE_KEY,JSON.stringify(ids));
         cyrusApplyArchiveView();
+        cyrusPersistChatPref(id,'archived',enabled);
       }}
       const CYRUS_PIN_KEY='cyrus_pinned_chats_v1',CYRUS_MUTE_KEY='cyrus_muted_chats_v1';
       const CYRUS_LIST_PREFS_KEY='cyrus_chat_list_preferences_v1';
@@ -1050,8 +1058,8 @@ def home():
       }}
       function cyrusReadSet(key){{try{{const v=JSON.parse(localStorage.getItem(key)||'[]');return new Set(Array.isArray(v)?v.map(String):[]);}}catch(_e){{return new Set();}}}}
       function cyrusWriteSet(key,set){{localStorage.setItem(key,JSON.stringify(Array.from(set)));}}
-      function cyrusTogglePinned(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_PIN_KEY);set.has(id)?set.delete(id):set.add(id);cyrusWriteSet(CYRUS_PIN_KEY,set);cyrusApplyListTools();}}
-      function cyrusToggleMuted(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_MUTE_KEY);set.has(id)?set.delete(id):set.add(id);cyrusWriteSet(CYRUS_MUTE_KEY,set);cyrusApplyListTools();}}
+      function cyrusTogglePinned(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_PIN_KEY),enabled=!set.has(id);enabled?set.add(id):set.delete(id);cyrusWriteSet(CYRUS_PIN_KEY,set);cyrusApplyListTools();cyrusPersistChatPref(id,'pinned',enabled);}}
+      function cyrusToggleMuted(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_MUTE_KEY),enabled=!set.has(id);enabled?set.add(id):set.delete(id);cyrusWriteSet(CYRUS_MUTE_KEY,set);cyrusApplyListTools();cyrusPersistChatPref(id,'muted',enabled);}}
       function cyrusApplyListTools(){{
         const rows=Array.from(document.querySelectorAll('.cyrus-chat-row'));
         const pins=cyrusReadSet(CYRUS_PIN_KEY),mutes=cyrusReadSet(CYRUS_MUTE_KEY);
@@ -1082,6 +1090,27 @@ def home():
         cyrusSaveListPrefs();
       }}
       cyrusLoadListPrefs();
+      async function cyrusLoadServerChatPrefs(){{
+        try{{
+          const response=await fetch('/chat/preferences',{{credentials:'same-origin',headers:{{'X-Requested-With':'XMLHttpRequest'}}}});
+          if(!response.ok)return;
+          const rows=await response.json();if(!Array.isArray(rows))return;
+          const serverById=new Map(rows.map(row=>[String(row.conversation_id),row]));
+          const localArchive=new Set(cyrusArchivedIds()),localPin=cyrusReadSet(CYRUS_PIN_KEY),localMute=cyrusReadSet(CYRUS_MUTE_KEY);
+          const archive=new Set(),pin=new Set(),mute=new Set();
+          rows.forEach(row=>{{const id=String(row.conversation_id||'');if(!id)return;if(row.archived)archive.add(id);if(row.pinned)pin.add(id);if(row.muted)mute.add(id);}});
+          const localMap=[['archived',localArchive,archive],['pinned',localPin,pin],['muted',localMute,mute]];
+          for(const [field,local,server] of localMap){{
+            for(const id of local){{
+              if(!serverById.has(id)){{server.add(id);await cyrusPersistChatPref(id,field,true);}}
+            }}
+          }}
+          localStorage.setItem(CYRUS_ARCHIVE_KEY,JSON.stringify([...archive]));
+          cyrusWriteSet(CYRUS_PIN_KEY,pin);cyrusWriteSet(CYRUS_MUTE_KEY,mute);
+          cyrusApplyListTools();
+        }}catch(error){{console.warn('CYRUS chat preference load unavailable',error);}}
+      }}
+      cyrusLoadServerChatPrefs();
       document.getElementById('cyrus-list-search')?.addEventListener('input',cyrusApplyListTools);
       document.getElementById('cyrus-unread-filter')?.addEventListener('click',function(){{const on=this.getAttribute('aria-pressed')!=='true';this.setAttribute('aria-pressed',String(on));this.textContent=on?'نمایش همه گفتگوها':'فقط خوانده‌نشده‌ها';cyrusApplyListTools();}});
       document.getElementById('cyrus-list-sort')?.addEventListener('change',cyrusApplyListTools);
@@ -1133,6 +1162,70 @@ def home():
     """
     content = content.replace('<div class="tabs">', '<div class="tabs"><a class="tab" href="/stories">داستان‌ها</a>')
     return page(content)
+
+
+@app.route("/chat/preferences", methods=["GET", "POST"])
+def chat_preferences():
+    if not session.get("access_token"):
+        return Response('{"error":"unauthorized"}', status=401, mimetype="application/json")
+    uid = str(session.get("user_id") or "")
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Content-Type": "application/json"
+    }
+    try:
+        if request.method == "GET":
+            result = requests.get(
+                URL + "/rest/v1/cyrus_chat_preferences",
+                params={"select":"conversation_id,archived,pinned,muted", "user_id":"eq."+uid},
+                headers=headers, timeout=15
+            )
+            if not result.ok:
+                return Response('{"error":"preferences_read_failed"}', status=502, mimetype="application/json")
+            return Response(__import__("json").dumps(result.json()), mimetype="application/json")
+
+        data = request.get_json(silent=True) or {}
+        conversation_id = str(data.get("conversation_id") or "").strip()
+        preference = str(data.get("preference") or "").strip()
+        value = data.get("value")
+        try:
+            uuid.UUID(conversation_id)
+        except ValueError:
+            return Response('{"error":"invalid_conversation"}', status=400, mimetype="application/json")
+        if preference not in ("archived", "pinned", "muted") or not isinstance(value, bool):
+            return Response('{"error":"invalid_preference"}', status=400, mimetype="application/json")
+
+        membership = requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"conversation_id", "conversation_id":"eq."+conversation_id, "user_id":"eq."+uid, "limit":"1"},
+            headers=headers, timeout=15
+        )
+        if not membership.ok or not membership.json():
+            return Response('{"error":"not_a_member"}', status=403, mimetype="application/json")
+
+        current = requests.get(
+            URL + "/rest/v1/cyrus_chat_preferences",
+            params={"select":"archived,pinned,muted", "user_id":"eq."+uid, "conversation_id":"eq."+conversation_id, "limit":"1"},
+            headers=headers, timeout=15
+        )
+        if not current.ok:
+            return Response('{"error":"preferences_read_failed"}', status=502, mimetype="application/json")
+        row = current.json()[0] if current.json() else {"archived":False,"pinned":False,"muted":False}
+        row[preference] = value
+        saved = requests.post(
+            URL + "/rest/v1/cyrus_chat_preferences",
+            params={"on_conflict":"user_id,conversation_id"},
+            json={"user_id":uid,"conversation_id":conversation_id,
+                  "archived":bool(row.get("archived")),"pinned":bool(row.get("pinned")),"muted":bool(row.get("muted"))},
+            headers={**headers,"Prefer":"resolution=merge-duplicates,return=minimal"},
+            timeout=15
+        )
+        if not saved.ok:
+            return Response('{"error":"preferences_save_failed"}', status=502, mimetype="application/json")
+        return Response('{"saved":true}', mimetype="application/json")
+    except Exception:
+        return Response('{"error":"preferences_server_error"}', status=502, mimetype="application/json")
 
 
 @app.route("/welcome")
