@@ -1395,8 +1395,8 @@ def verify_email():
                         error = data.get("msg", data.get("message", "ارسال دوباره کد انجام نشد"))
         else:
             token = str(request.form.get("token") or "").strip()
-            if not re.fullmatch(r"\d{6,8}", token):
-                error = "کد ۶ تا ۸ رقمی را درست وارد کنید"
+            if not re.fullmatch(r"\d{6}", token):
+                error = "کد باید دقیقاً ۶ رقم باشد"
             else:
                 code, data = auth_request("/auth/v1/verify", {"type": "signup" if flow == "register" else "email", "email": email, "token": token})
                 if code == 200 and data.get("access_token") and data.get("user"):
@@ -1448,7 +1448,7 @@ def verify_email():
         <p class="error">{html.escape(error)}</p><p class="auth-notice">{html.escape(notice)}</p>
         <form method="post" class="auth-form">
           <label for="auth-token">کد یک‌بارمصرف</label>
-          <input id="auth-token" class="auth-code" name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="000000" required autocomplete="one-time-code" dir="ltr">
+          <input id="auth-token" class="auth-code" name="token" inputmode="numeric" pattern="[0-9]{{6}}" minlength="6" maxlength="6" placeholder="000000" required autocomplete="one-time-code" dir="ltr">
           <button class="auth-submit">تأیید و ورود <span>←</span></button>
         </form>
         <form method="post" class="auth-resend"><input type="hidden" name="resend" value="1"><button id="cyrus-resend-button" type="submit" disabled>ارسال دوباره کد (۶۰)</button></form>
