@@ -1937,169 +1937,210 @@ def contacts():
     if not session.get("access_token"):
         return redirect("/login")
 
-    query = request.args.get("q", "").strip()
-    users = []
+    query = request.args.get("q", "").strip().lstrip("@")[:80]
+    own_id = str(session.get("user_id") or "")
+    headers = {"apikey": KEY, "Authorization": "Bearer " + session["access_token"]}
     error = request.args.get("error", "")
-
-    headers = {
-        "apikey": KEY,
-        "Authorization": "Bearer " + session["access_token"]
-    }
+    users = []
+    saved_ids = set()
+    contact_names = {}
 
     try:
-        response = requests.post(
-            URL + "/rest/v1/rpc/cyrus_search_users",
-            json={"p_query": query or None},
-            headers={**headers, "Content-Type": "application/json"},
-            timeout=20
+        cr = requests.get(
+            URL + "/rest/v1/cyrus_contacts",
+            params={"select":"contact_user_id,contact_name,created_at",
+                    "owner_id":"eq."+own_id, "order":"created_at.desc", "limit":"1000"},
+            headers=headers, timeout=20
         )
-        if response.ok:
-            users = response.json()
-        else:
-            error = "دریافت کاربران انجام نشد؛ تابع جستجوی کاربران را در پایگاه داده فعال کنید"
-    except Exception:
-        error = "ارتباط با سرور برقرار نشد"
-
-    # Enrich the directory with current avatar and presence data in one batched request.
-    directory_profiles = {}
-    directory_ids = []
-    for item in users if isinstance(users, list) else []:
-        if isinstance(item, dict) and item.get("id"):
-            try:
-                directory_ids.append(str(uuid.UUID(str(item.get("id")))))
-            except (ValueError, TypeError):
-                pass
-    directory_ids = list(dict.fromkeys(directory_ids))[:100]
-    if directory_ids:
-        try:
-            profile_response = requests.get(
-                URL + "/rest/v1/cyrus_profiles",
-                params={
-                    "select": "id,avatar_url,last_seen_at",
-                    "id": "in.(" + ",".join(directory_ids) + ")"
-                },
-                headers=headers,
-                timeout=15
+        if not cr.ok:
+            raise RuntimeError("contacts")
+        contact_rows = cr.json() if isinstance(cr.json(), list) else []
+        saved_ids = {str(x.get("contact_user_id") or "") for x in contact_rows}
+        contact_names = {str(x.get("contact_user_id") or ""):str(x.get("contact_name") or "")
+                         for x in contact_rows}
+        if query:
+            sr = requests.post(
+                URL + "/rest/v1/rpc/cyrus_search_users",
+                json={"p_query":query},
+                headers={**headers,"Content-Type":"application/json"}, timeout=20
             )
-            if profile_response.ok:
-                directory_profiles = {
-                    str(row.get("id") or ""): row
-                    for row in profile_response.json()
-                    if isinstance(row, dict)
-                }
-        except Exception:
-            directory_profiles = {}
+            if not sr.ok:
+                raise RuntimeError("search")
+            users = sr.json() if isinstance(sr.json(), list) else []
+        else:
+            ids = [x for x in saved_ids if x]
+            if ids:
+                for offset in range(0, len(ids), 80):
+                    batch=ids[offset:offset+80]
+                    pr=requests.get(URL+"/rest/v1/cyrus_profiles",
+                        params={"select":"id,username,display_name,bio,avatar_url,last_seen_at",
+                                "id":"in.("+",".join(batch)+")"},
+                        headers=headers,timeout=20)
+                    if not pr.ok:
+                        raise RuntimeError("profiles")
+                    users.extend(pr.json() if isinstance(pr.json(),list) else [])
+                users.sort(key=lambda x: next((i for i,row in enumerate(contact_rows)
+                    if str(row.get("contact_user_id"))==str(x.get("id"))),99999))
+    except Exception:
+        error = "دریافت مخاطبان یا کاربران انجام نشد؛ اتصال و دسترسی پایگاه داده را بررسی کنید"
 
-    directory_privacy = {}
-    directory_contacts = set()
-    if directory_ids:
+    ids=[]
+    for item in users:
+        try:
+            ids.append(str(uuid.UUID(str(item.get("id") or ""))))
+        except (ValueError,TypeError):
+            continue
+    ids=list(dict.fromkeys(ids))[:100]
+    profiles={}
+    privacy={}
+    if ids:
+        try:
+            pr=requests.get(URL+"/rest/v1/cyrus_profiles",
+                params={"select":"id,avatar_url,last_seen_at","id":"in.("+",".join(ids)+")"},
+                headers=headers,timeout=15)
+            if pr.ok:
+                profiles={str(x.get("id")):x for x in pr.json() if isinstance(x,dict)}
+        except Exception:
+            pass
         try:
             pr=requests.get(URL+"/rest/v1/cyrus_privacy_settings",
-                params={"select":"user_id,last_seen_visibility,profile_photo_visibility","user_id":"in.("+",".join(directory_ids)+")"},
+                params={"select":"user_id,last_seen_visibility,profile_photo_visibility",
+                        "user_id":"in.("+",".join(ids)+")"},
                 headers=cyrus_admin_api_headers(),timeout=15)
             if pr.ok:
-                directory_privacy={str(x.get("user_id")):x for x in pr.json() if isinstance(x,dict)}
-        except Exception: pass
-        try:
-            cr=requests.get(URL+"/rest/v1/cyrus_contacts",
-                params={"select":"contact_user_id","owner_id":"eq."+str(session.get("user_id") or ""),"contact_user_id":"in.("+",".join(directory_ids)+")"},
-                headers=headers,timeout=15)
-            if cr.ok: directory_contacts={str(x.get("contact_user_id")) for x in cr.json()}
-        except Exception: pass
+                privacy={str(x.get("user_id")):x for x in pr.json() if isinstance(x,dict)}
+        except Exception:
+            pass
 
-    def directory_presence(profile, privacy=None, is_contact=False):
-        privacy=privacy or {}
-        visibility=str(privacy.get("last_seen_visibility") or "everyone")
-        if visibility=="nobody" or (visibility=="contacts" and not is_contact):
-            return "آخرین بازدید مخفی", False
-        seen = str((profile or {}).get("last_seen_at") or "").strip()
-        if not seen:
-            return "آخرین بازدید نامشخص", False
-        try:
-            seen_dt = datetime.fromisoformat(seen.replace("Z", "+00:00"))
-            if seen_dt.tzinfo is None:
-                seen_dt = seen_dt.replace(tzinfo=timezone.utc)
-            age = max(0, (datetime.now(timezone.utc) - seen_dt.astimezone(timezone.utc)).total_seconds())
-            if age <= 300:
-                return "آنلاین", True
-            if age < 86400:
-                return "آخرین بازدید امروز", False
-            if age < 7 * 86400:
-                return "آخرین بازدید این هفته", False
-            return "مدتی پیش", False
-        except (TypeError, ValueError, OverflowError):
-            return "آخرین بازدید نامشخص", False
-
-    rows = ""
+    rows=""
     for user in users:
-        name = str(user.get("display_name") or user.get("username") or "کاربر")
-        username = str(user.get("username") or "")
-        bio = str(user.get("bio") or "عضو CYRUS")
-        user_id = str(user.get("id") or "")
-
-        if query and query.casefold() not in (name + " " + username).casefold():
-            continue
-
+        uid=str(user.get("id") or "")
         try:
-            uuid.UUID(user_id)
+            uuid.UUID(uid)
         except ValueError:
             continue
-
-        safe_id = html.escape(user_id, quote=True)
-        profile = directory_profiles.get(user_id, {})
-        privacy = directory_privacy.get(user_id, {})
-        is_contact_for_privacy = user_id in directory_contacts
-        photo_visibility = str(privacy.get("profile_photo_visibility") or "everyone")
-        avatar_url = str(profile.get("avatar_url") or "")
-        if photo_visibility=="nobody" or (photo_visibility=="contacts" and not is_contact_for_privacy): avatar_url=""
-        presence_text, is_online = directory_presence(profile, privacy, is_contact_for_privacy)
-        avatar_html = (
-            '<img src="' + html.escape(avatar_url, quote=True) + '" alt="" loading="lazy" '
-            'style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
-            if avatar_url else "𓅃"
+        username=str(user.get("username") or "")
+        original_name=str(user.get("display_name") or username or "کاربر")
+        name=contact_names.get(uid) or original_name
+        bio=str(user.get("bio") or "عضو CYRUS")
+        profile=profiles.get(uid,{})
+        rules=privacy.get(uid,{})
+        is_contact=uid in saved_ids
+        avatar=str(profile.get("avatar_url") or user.get("avatar_url") or "")
+        if rules.get("profile_photo_visibility")=="nobody" or (rules.get("profile_photo_visibility")=="contacts" and not is_contact):
+            avatar=""
+        avatar_html=('<img src="'+html.escape(avatar,quote=True)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%">') if avatar else "𓅃"
+        seen_label="آخرین بازدید نامشخص"
+        seen=str(profile.get("last_seen_at") or user.get("last_seen_at") or "")
+        visibility=str(rules.get("last_seen_visibility") or "everyone")
+        if visibility=="nobody" or (visibility=="contacts" and not is_contact):
+            seen_label="آخرین بازدید مخفی"
+        elif seen:
+            try:
+                dt=datetime.fromisoformat(seen.replace("Z","+00:00"))
+                if dt.tzinfo is None: dt=dt.replace(tzinfo=timezone.utc)
+                age=max(0,(datetime.now(timezone.utc)-dt.astimezone(timezone.utc)).total_seconds())
+                seen_label="آنلاین" if age<=300 else ("آخرین بازدید امروز" if age<86400 else ("آخرین بازدید این هفته" if age<604800 else "مدتی پیش"))
+            except Exception:
+                pass
+        safe_id=html.escape(uid,quote=True)
+        actions = (
+            '<form method="post" action="/user/'+safe_id+'/contact/remove" onsubmit="return confirm(\\'این مخاطب از فهرست خویشان حذف شود؟\\')"><button class="contact-remove" type="submit">حذف</button></form>'
+            if is_contact else
+            '<form method="post" action="/user/'+safe_id+'/contact"><button type="submit">افزودن</button></form>'
         )
-        presence_color = "#79d6a4" if is_online else "#91a6b9"
-        chat_href = "/start-chat/" + safe_id
-
         rows += f"""
-        <div class="chat-row">
-          <div class="avatar" style="position:relative;overflow:hidden">{avatar_html}
-            <span aria-label="{html.escape(presence_text, quote=True)}" title="{html.escape(presence_text, quote=True)}"
-              style="position:absolute;right:0;bottom:0;width:11px;height:11px;border-radius:50%;background:{presence_color};border:2px solid #101c29"></span>
-          </div>
+        <div class="chat-row contact-entry">
+          <a class="avatar" href="/user/{safe_id}" style="position:relative;overflow:hidden;text-decoration:none">{avatar_html}</a>
           <div class="chat-info">
-            <div class="chat-name">{html.escape(name)}</div>
+            <a class="chat-name" href="/user/{safe_id}" style="text-decoration:none">{html.escape(name)}</a>
             <div class="chat-preview">@{html.escape(username)} · {html.escape(bio)}</div>
-            <small style="color:{presence_color}">{html.escape(presence_text)}</small>
+            <small>{html.escape(seen_label)}</small>
           </div>
-          <a class="action" style="margin:0;padding:10px 12px;text-align:center" href="{chat_href}" aria-label="ارسال پیام به {html.escape(name, quote=True)}">پیام</a>
-          <a class="action" style="margin:0;padding:10px 12px;text-align:center" href="/user/{safe_id}">پروفایل</a>
+          <div class="contact-actions">
+            <a class="action" href="/start-chat/{safe_id}">پیام</a>
+            {actions}
+          </div>
         </div>"""
 
     if not rows and not error:
-        rows = '<div class="empty"><div class="empty-icon">𓅃</div><h3>مخاطبی پیدا نشد</h3><p>کاربران ثبت‌نام‌شده CYRUS در این بخش نمایش داده می‌شوند</p></div>'
+        empty_title="مخاطبی پیدا نشد" if not query else "کاربری پیدا نشد"
+        empty_text="با نام کاربری افراد را پیدا و به خویشان اضافه کن." if not query else "نام کاربری را بررسی کن یا عبارت دیگری جستجو کن."
+        rows='<div class="empty"><div class="empty-icon">𓅃</div><h3>'+empty_title+'</h3><p>'+empty_text+'</p></div>'
 
-    content = f"""
-    <div class="container">
-      <section class="welcome">
-        <h2>خویشان پارسی</h2>
-        <p>کاربران و همراهان CYRUS</p>
-      </section>
-      <div style="display:flex;gap:10px;margin:12px 16px">
-        <a class="action" style="flex:1;margin:0;text-align:center" href="/rooms/create?type=group">𓅃 ساخت گروه</a>
-        <a class="action" style="flex:1;margin:0;text-align:center" href="/rooms/create?type=channel">𓆃 ساخت کانال</a>
-        <a class="action" style="flex:1;margin:0;text-align:center" href="/channels">کانال‌های عمومی</a>
+    content=f"""
+    <main class="container cyrus-contacts">
+      <style>
+        .cyrus-contacts{{padding-bottom:90px}}
+        .contacts-add{{margin:12px 16px;padding:14px;background:#111e2b;border:1px solid #263b50;border-radius:14px}}
+        .contacts-add h3{{margin:0 0 9px;font-size:15px}}
+        .contacts-add form{{display:flex;gap:8px}}
+        .contacts-add input{{min-width:0;flex:1;padding:12px;border-radius:9px;border:1px solid #344b60;background:#0a1521;color:#fff}}
+        .contacts-add button,.contact-actions button,.contact-actions .action{{border:0;border-radius:9px;background:#248bd0;color:#fff;padding:10px 12px;text-decoration:none;font-size:12px;white-space:nowrap}}
+        .contact-actions{{display:flex;gap:5px;align-items:center}}
+        .contact-actions form{{margin:0}}
+        .contact-actions .contact-remove{{background:#59323a;color:#ffdce0}}
+        .contact-entry{{gap:9px}}
+        .contact-entry .chat-info{{min-width:0}}
+        .contact-entry .chat-preview{{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+        .contacts-search{{margin:12px 16px;display:flex;gap:8px}}
+        .contacts-search input{{min-width:0;flex:1}}
+      </style>
+      <section class="welcome"><h2>خویشان پارسی</h2><p>فهرست مخاطبان و همراهان CYRUS</p></section>
+      <div class="contacts-add"><h3>افزودن با نام کاربری</h3>
+        <form method="post" action="/contacts/add">
+          <input name="username" maxlength="41" placeholder="نام کاربری یا @username" required autocomplete="off">
+          <button type="submit">افزودن</button>
+        </form>
       </div>
-
-      <form class="card" method="get">
-        <input name="q" value="{html.escape(query, quote=True)}" placeholder="جستجوی نام یا شناسه">
-        <button>جستجو در مخاطبان</button>
+      <div style="display:flex;gap:8px;margin:12px 16px">
+        <a class="action" style="flex:1;text-align:center" href="/rooms/create?type=group">ساخت گروه</a>
+        <a class="action" style="flex:1;text-align:center" href="/rooms/create?type=channel">ساخت کانال</a>
+        <a class="action" style="flex:1;text-align:center" href="/channels">کانال‌ها</a>
+      </div>
+      <form class="contacts-search" method="get">
+        <input name="q" value="{html.escape(query,quote=True)}" placeholder="جستجوی نام یا @username">
+        <button type="submit">جستجو</button>
       </form>
-      <div class="section-title">𓅃 · کاربران عضو CYRUS</div>
+      <div class="section-title">{'نتایج جستجو' if query else 'مخاطبان ذخیره‌شده'}</div>
       <div class="chat-list">{rows}</div>
       <p class="error">{html.escape(error)}</p>
-    </div>"""
+    </main>"""
     return page(content)
+
+
+@app.route("/contacts/add", methods=["POST"])
+def add_contact_by_username():
+    if not session.get("access_token"):
+        return redirect("/login")
+    username=request.form.get("username","").strip().lstrip("@").lower()
+    if not username or len(username)>40 or not re.fullmatch(r"[a-zA-Z0-9_]{3,40}",username):
+        return redirect("/contacts?error=نام%20کاربری%20نامعتبر%20است")
+    own_id=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"],"Content-Type":"application/json",
+             "Prefer":"resolution=merge-duplicates,return=minimal"}
+    try:
+        found=requests.get(URL+"/rest/v1/cyrus_profiles",
+            params={"select":"id,username","username":"ilike."+username,"limit":"2"},
+            headers=headers,timeout=20)
+        if not found.ok:
+            return redirect("/contacts?error=جستجوی%20نام%20کاربری%20ناموفق%20بود")
+        matches=found.json() if isinstance(found.json(),list) else []
+        matches=[x for x in matches if str(x.get("username") or "").lower()==username]
+        if not matches:
+            return redirect("/contacts?error=این%20نام%20کاربری%20وجود%20ندارد")
+        target=str(matches[0].get("id") or "")
+        if target==own_id:
+            return redirect("/contacts?error=نمی‌توانید%20خودتان%20را%20اضافه%20کنید")
+        added=requests.post(URL+"/rest/v1/cyrus_contacts",
+            params={"on_conflict":"owner_id,contact_user_id"},
+            json={"owner_id":own_id,"contact_user_id":target},
+            headers=headers,timeout=20)
+        if not added.ok:
+            return redirect("/contacts?error=افزودن%20مخاطب%20انجام%20نشد")
+        return redirect("/user/"+target)
+    except Exception:
+        return redirect("/contacts?error=ارتباط%20با%20سرور%20برقرار%20نشد")
 
 
 @app.route("/user/<user_id>")
@@ -2201,6 +2242,7 @@ def public_user_profile(user_id):
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
         .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
+        .profile-share-button{{display:block;margin:12px auto 0;padding:10px 18px;border:1px solid #31516b;border-radius:10px;background:#172b3d;color:#9bd0f5}}
         .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
         .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
         .profile-contact-edit summary::-webkit-details-marker{{display:none}}
@@ -2224,6 +2266,7 @@ def public_user_profile(user_id):
         <h2 class="user-profile-name">{html.escape(display_name)}</h2>
         <div class="user-profile-username" role="button" tabindex="0" title="برای کپی نام کاربری لمس کنید" data-username="{html.escape(username, quote=True)}" onclick="cyrusCopyUsername(this)">@{html.escape(username)}</div>
         <p class="user-profile-bio">{html.escape(bio) if bio else "بیوگرافی اضافه نشده است"}</p>
+        <button type="button" class="profile-share-button" onclick="cyrusShareProfile()">اشتراک‌گذاری پروفایل</button>
       </section>
       {send_link}
       {blocked_notice}<div class="profile-media-tabs"><button class="active" type="button" data-tab="media">رسانه</button><button type="button" data-tab="links">پیوندها</button><button type="button" data-tab="files">فایل‌ها</button><button type="button" data-tab="music">موسیقی</button></div><small class="profile-history-count" id="profileHistoryCount" aria-live="polite"></small><div class="profile-media-content" id="profile-media-content">برای نمایش محتوای گفتگو، یکی از بخش‌ها را انتخاب کنید.</div>
@@ -2231,6 +2274,7 @@ def public_user_profile(user_id):
     </main>
     <script>
     function cyrusCopyUsername(el){{const u="@"+(el.dataset.username||"");if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(u).then(()=>{{el.title="نام کاربری کپی شد";}}).catch(()=>prompt("نام کاربری",u));else prompt("نام کاربری",u);}}
+    async function cyrusShareProfile(){{const url=window.location.origin+"/user/"+encodeURIComponent(document.querySelector(".cyrus-user-profile")?.dataset.profileUser||"");try{{if(navigator.share)await navigator.share({{title:"پروفایل CYRUS",url}});else if(navigator.clipboard?.writeText){{await navigator.clipboard.writeText(url);alert("پیوند پروفایل کپی شد");}}else prompt("پیوند پروفایل",url);}}catch(e){{if(e.name!=="AbortError")prompt("پیوند پروفایل",url);}}}}
     document.querySelector('.user-profile-username')?.addEventListener('keydown',function(e){{if(e.key==='Enter'||e.key===' '){{e.preventDefault();cyrusCopyUsername(this);}}}});
     document.addEventListener('click',function(e){{if(!e.target.closest('.profile-more'))document.querySelectorAll('.profile-more[open]').forEach(x=>x.open=false);}});
     (function(){{
@@ -2351,6 +2395,27 @@ def edit_user_contact(user_id):
     except Exception:
         return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'),502
     return redirect("/user/"+user_id)
+
+
+@app.route("/user/<user_id>/contact/remove", methods=["POST"])
+def remove_user_contact(user_id):
+    if not session.get("access_token"):
+        return redirect("/login")
+    try:
+        uuid.UUID(user_id)
+    except ValueError:
+        return "شناسه کاربر نامعتبر است",400
+    own_id=str(session.get("user_id") or "")
+    headers={"apikey":KEY,"Authorization":"Bearer "+session["access_token"]}
+    try:
+        deleted=requests.delete(URL+"/rest/v1/cyrus_contacts",
+            params={"owner_id":"eq."+own_id,"contact_user_id":"eq."+user_id},
+            headers=headers,timeout=20)
+        if not deleted.ok:
+            return page('<div class="container card"><p>حذف مخاطب انجام نشد</p><a href="/user/'+html.escape(user_id,quote=True)+'">بازگشت</a></div>'),400
+    except Exception:
+        return page('<div class="container card"><p>ارتباط با سرور برقرار نشد</p></div>'),502
+    return redirect("/contacts")
 
 
 @app.route("/user/<user_id>/save-profile", methods=["POST"])
