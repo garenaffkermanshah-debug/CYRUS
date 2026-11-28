@@ -1501,7 +1501,7 @@ def verify_email():
                         return redirect(url_for("home"))
                 else:
                     if str(data.get("error_code") or "") == "otp_expired":
-                        error = "کد منقضی شده است؛ پس از پایان شمارش معکوس، کد جدید درخواست کنید."
+                        error = "آخرین کد ایمیل منقضی شده است؛ اعتبار کد ۳۰۰ ثانیه است. پس از پایان شمارش معکوس، کد جدید درخواست کنید."
                     else:
                         error = "کد واردشده صحیح نیست"
 
