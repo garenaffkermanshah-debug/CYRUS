@@ -14,7 +14,9 @@ body:before{background:rgba(3,9,16,.22)}
 .tabs{border-color:var(--tg-line)!important}
 .tab{color:#a7bacb!important}
 .tab.active{color:#62b7ff!important;border-color:var(--tg-blue)!important}
-.bottom{background:rgba(14,23,34,.98)!important;border-color:var(--tg-line)!important;backdrop-filter:blur(16px)}
+.bottom{height:58px!important;background:rgba(14,23,34,.98)!important;border-color:var(--tg-line)!important;backdrop-filter:blur(16px)}
+.bottom a{gap:3px!important;font-size:9px!important}
+.bottom a span{font-size:18px!important;line-height:1!important}
 .bottom a.current{color:#62b7ff!important;border-color:var(--tg-blue)!important}
 button,.action{cursor:pointer;touch-action:manipulation}
 input,textarea,select{background:#101c29!important;border-color:#2b4155!important;color:#edf5fb!important}
@@ -27,4 +29,4 @@ input,textarea,select{background:#101c29!important;border-color:#2b4155!importan
 .composer-attach-menu{background:#1b2b3a!important;border:1px solid #30475a!important;border-radius:16px!important;box-shadow:0 16px 40px #0008!important}
 .composer-emoji-panel{background:#172533!important;border:1px solid #30475a!important;border-radius:16px!important}
 .chat-back{touch-action:manipulation}
-@media(max-width:600px){.top{height:56px!important;padding:7px 12px!important}.container:has(.cyrus-chat-header){min-height:calc(100dvh - 64px)!important;padding-inline:5px!important}.chat-row{padding:10px 12px!important}.bottom{height:62px!important}.bottom a span{font-size:22px!important}}
+@media(max-width:600px){.top{height:56px!important;padding:7px 12px!important}.container:has(.cyrus-chat-header){min-height:calc(100dvh - 60px)!important;padding-inline:5px!important}.chat-row{padding:10px 12px!important}.bottom{height:56px!important}.bottom a span{font-size:18px!important}}
