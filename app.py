@@ -2402,7 +2402,13 @@ def export_account_data():
 
 @app.before_request
 def cyrus_app_lock_guard():
-    if not session.get("access_token") or not session.get("cyrus_app_lock_enabled"): return
+    if not session.get("access_token"): return
+    if not session.get("cyrus_app_lock_checked"):
+        record,err=cyrus_get_account_security(session.get("user_id"))
+        session["cyrus_app_lock_enabled"]=bool(not err and record and record.get("app_lock_enabled") and record.get("app_lock_pin_hash"))
+        session["cyrus_app_lock_checked"]=True
+        if session["cyrus_app_lock_enabled"]: session["cyrus_app_lock_last_active"]=time.time()
+    if not session.get("cyrus_app_lock_enabled"): return
     path=request.path or "/"
     if path.startswith("/static/") or path in ("/app-lock","/privacy-security/app-lock","/logout"): return
     last=float(session.get("cyrus_app_lock_last_active",0) or 0)
