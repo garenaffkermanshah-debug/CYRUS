@@ -660,8 +660,8 @@ window.addEventListener('pageshow',function(event){
 </script>
 <script src="/static/cyrus-rebuild.js?v=2" defer></script>
 <script>
-(function(){const root=document.documentElement,key="cyrus-theme";let theme="night";try{theme=localStorage.getItem(key)==="day"?"day":"night";}catch(e){}root.dataset.theme=theme;
-const selector=document.getElementById("cyrus-appearance-theme");if(selector){selector.value=theme;selector.addEventListener("change",function(){theme=this.value==="day"?"day":"night";root.dataset.theme=theme;try{localStorage.setItem(key,theme);}catch(e){}});}
+(function(){const root=document.documentElement,key="cyrus-theme";let theme="night";try{const saved=localStorage.getItem(key);theme=["day","pasargad"].includes(saved)?saved:"night";}catch(e){}root.dataset.theme=theme;
+const selector=document.getElementById("cyrus-appearance-theme");if(selector){selector.value=theme;selector.addEventListener("change",function(){theme=["day","pasargad"].includes(this.value)?this.value:"night";root.dataset.theme=theme;try{localStorage.setItem(key,theme);}catch(e){}});}
 })();
 </script>
 </body>
@@ -6748,8 +6748,17 @@ def chat_settings():
         .tgcs-wall:after{content:'✓';position:absolute;bottom:4px;right:4px;background:#248bd2;border-radius:50%;width:18px;height:18px;display:grid;place-items:center;font-size:11px;opacity:0}
         .tgcs-wall[aria-pressed=true]:after{opacity:1}
         .tgcs-status{font-size:12px;color:#7fce9d;min-height:18px;padding:0 16px}
+        .tgcs-theme-select{max-width:150px;padding:9px 10px;border:1px solid #34516a;border-radius:10px;background:#14283b;color:#edf2f7;font:inherit}
       </style>
       <header class="tgcs-head"><a href="/settings" aria-label="بازگشت">‹</a><h1>تنظیمات گفتگو</h1></header>
+      <section class="tgcs-section">
+        <h2 class="tgcs-title">ظاهر برنامه</h2>
+        <div class="tgcs-row"><span class="tgcs-label">تم برنامه<span class="tgcs-sub">شب، روز یا پاسارگاد؛ روی همهٔ بخش‌ها اعمال می‌شود</span></span>
+          <select id="cyrus-appearance-theme" aria-label="انتخاب تم سراسری برنامه" class="tgcs-theme-select">
+            <option value="night">تم شب</option><option value="day">تم روز</option><option value="pasargad">تم پاسارگاد</option>
+          </select>
+        </div>
+      </section>
       <section class="tgcs-section">
         <h2 class="tgcs-title">گفتگوها</h2>
         <div class="tgcs-row" style="display:block">
@@ -6959,14 +6968,6 @@ def settings():
           </button>
         </section>
         <section class="setting-buttons">
-          <section class="s-button" style="cursor:default;grid-template-columns:42px minmax(0,1fr) 118px">
-            <span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/><path d="M16 3v4M14 5h4"/></svg></span>
-            <span class="button-title">نمایش و تم</span>
-            <select id="cyrus-appearance-theme" aria-label="انتخاب تم" style="grid-column:3;grid-row:1;background:#14283b;color:#edf2f7;border:1px solid #34516a;border-radius:9px;padding:8px;font:inherit;max-width:118px">
-              <option value="night">تم شب</option>
-              <option value="day">تم روز</option>
-            </select>
-          </section>
           <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
           <a class="s-button" href="/settings/chat"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="button-title">تنظیمات گفتگو</span><span>‹</span></a>
