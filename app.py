@@ -2223,7 +2223,7 @@ def public_user_profile(user_id):
     except ValueError:
         back_chat_id = ""
     back_href = "/chat/" + back_chat_id if back_chat_id else "/home"
-    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="{html.escape(back_href, quote=True)}" aria-label="بازگشت به گفتگو" title="بازگشت به گفتگو"><svg viewBox="0 0 48 48" aria-hidden="true"><path class="profile-chat-bubble" d="M8 10.5A5.5 5.5 0 0 1 13.5 5h21A5.5 5.5 0 0 1 40 10.5v17a5.5 5.5 0 0 1-5.5 5.5H22l-9 7v-7.4A5.5 5.5 0 0 1 8 27.5z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M17 23h14m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>'
+    send_link = "" if blocked_by_me else f'<a class="profile-primary-action" href="{html.escape(back_href, quote=True)}" aria-label="بازگشت به گفتگو" title="بازگشت به گفتگو"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 10.5A5.5 5.5 0 0 1 13.5 5h21A5.5 5.5 0 0 1 40 10.5v17a5.5 5.5 0 0 1-5.5 5.5H22l-9 7v-7.4A5.5 5.5 0 0 1 8 27.5z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><path d="M26 11c-5 2-8 7-9 12l6 1 4 6c5-2 10-7 12-13-5-4-9-6-13-6z" fill="currentColor"/><circle cx="29" cy="18" r="2.3" fill="#0d1722"/><path d="M17 23l-5 2 5 1m10 4-1 5 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>'
 
     content = f"""<main class="container cyrus-user-profile" data-profile-user="{safe_id}">
       <style>
@@ -2254,8 +2254,8 @@ def public_user_profile(user_id):
         .user-profile-bio{{text-align:right;color:#c3cfda;font-size:12px;line-height:1.55;margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}}
         .profile-primary-action{{display:grid;place-items:center;margin:9px auto 12px;width:42px;height:42px;border-radius:50%;background:transparent;color:#9eb4c6;text-decoration:none;font-size:20px;border:0;box-shadow:none}} .profile-primary-action svg{{width:31px;height:31px;display:block}} .profile-primary-action:active{{color:#e2c17c}}
         .profile-media-tabs{{display:flex;background:transparent;border-bottom:1px solid #263b50;margin-top:8px}}
-        .profile-media-tabs button{{flex:1;min-width:0;margin:0;padding:9px 3px;border:0;border-radius:0;background:transparent;color:#8fa5b8;font-size:10px}}
-        .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
+        .profile-media-tabs button{{flex:1;min-width:0;margin:0;padding:9px 3px;border:0;border-radius:0;background:transparent!important;color:#8fa5b8;font-size:10px;box-shadow:none!important}}
+        .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df;background:transparent!important;box-shadow:none!important}}
         .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
         .profile-share-button{{display:table;width:auto!important;min-width:0;min-height:34px;margin:9px auto 0;padding:7px 12px;border:1px solid #31516b;border-radius:8px;background:#172b3d;color:#9bd0f5;font-size:11px;line-height:1.2}}
@@ -2267,7 +2267,7 @@ def public_user_profile(user_id):
         .profile-contact-edit button{{margin-top:10px;width:100%;padding:12px;background:#248bd0;color:white;border:0;border-radius:9px}}
       </style>
       <section class="user-profile-card">
-        <a class="profile-back" href="{back_href}" aria-label="بازگشت به گفتگو" title="بازگشت">➜</a>
+        <a class="profile-back" href="{back_href}" aria-label="بازگشت به گفتگو" title="بازگشت">←</a>
         <div class="user-profile-top">
           <div class="user-profile-photo">{avatar_html}</div>
           <details class="profile-more">
@@ -3727,7 +3727,7 @@ def chat(conversation_id):
     room_header = f"""
     <section class="room-header cyrus-chat-header">
       <style>.cyrus-verified-badge{{display:inline-block;width:auto;height:auto;margin-right:7px;border-radius:0;background:transparent;vertical-align:middle;box-shadow:none}}</style>
-      <a class="chat-back" href="/home" aria-label="بازگشت به پیام‌رسان">➜</a>
+      <a class="chat-back" href="/home" aria-label="بازگشت به پیام‌رسان">←</a>
       <a class="room-avatar" href="{html.escape(room_profile_href, quote=True)}">{room_avatar}</a>
       <a class="room-info" href="{html.escape(room_profile_href, quote=True)}">
         <h2>{room_title}{cyrus_verified_badge_html(18) if is_official_channel else ''}</h2>
@@ -3978,6 +3978,7 @@ async function cyrusToggleVoiceRecord(b){
         .send-box .composer-emoji,.send-box .composer-attach,.send-box .composer-voice{{color:#c3d0dc!important;padding:5px!important;min-width:32px;}}
         .send-box .composer-attach-wrap{{background:transparent!important;border:0!important;box-shadow:none!important;}}
         .send-box .composer-attach-menu{{background:#142333!important;border:1px solid #2a4054!important;}}
+        .cyrus-inchat-search button[data-close],#cyrusRoomSearch button[aria-label*="بستن"]{{background:transparent!important;border:0!important;box-shadow:none!important;color:#c3d0dc!important;}}
         .cyrus-older-messages{{border-color:#b9954b55;background:#172838;color:#d9c18c;}}
         @media(max-width:520px){{.room-header{{margin-inline:-8px;padding-inline:10px;}}}}
 
