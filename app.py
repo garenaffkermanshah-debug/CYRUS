@@ -2400,6 +2400,17 @@ def export_account_data():
         return page('<main class="container card"><h3>خروجی اطلاعات آماده نشد</h3><p>ارتباط با سرور یا دسترسی به بخشی از اطلاعات کامل نبود. برای جلوگیری از تحویل فایل ناقص، خروجی صادر نشد.</p><a href="/settings">بازگشت به تنظیمات</a></main>'),502
 
 
+@app.before_request
+def cyrus_app_lock_guard():
+    if not session.get("access_token") or not session.get("cyrus_app_lock_enabled"): return
+    path=request.path or "/"
+    if path.startswith("/static/") or path in ("/app-lock","/privacy-security/app-lock","/logout"): return
+    last=float(session.get("cyrus_app_lock_last_active",0) or 0)
+    if last<=0 or time.time()-last>180:
+        session["cyrus_app_lock_last_active"]=0
+        return redirect("/app-lock")
+    session["cyrus_app_lock_last_active"]=time.time()
+
 @app.route("/privacy-security", methods=["GET"])
 def privacy_security():
     if not session.get("access_token"):
@@ -2409,6 +2420,9 @@ def privacy_security():
         return page('<main class="container card"><p>وضعیت امنیتی حساب دریافت نشد؛ دوباره تلاش کنید.</p><a href="/settings">بازگشت</a></main>'), 502
     two_factor_enabled = bool(security and security.get("two_factor_enabled"))
     privacy_settings = cyrus_get_privacy_settings(session.get("user_id")) or {"last_seen_visibility":"everyone","profile_photo_visibility":"everyone","calls_visibility":"everyone","groups_visibility":"everyone","forward_link_enabled":True}
+    app_lock_enabled = bool(security and security.get("app_lock_enabled") and security.get("app_lock_pin_hash"))
+    session["cyrus_app_lock_enabled"] = app_lock_enabled
+    if app_lock_enabled and not session.get("cyrus_app_lock_last_active"): session["cyrus_app_lock_last_active"] = time.time()
     two_factor_row = (
         '<form class="cps-row" method="post" action="/privacy-security/2fa">'
         '<input type="hidden" name="action" value="disable"><span class="cps-icon">✓</span>'
@@ -2473,7 +2487,7 @@ def privacy_security():
 <p class="cps-note" id="cps-privacy-status">تنظیمات در حساب ذخیره می‌شوند.</p></section><style>.cps-select{max-width:95px;min-width:80px;background:#263847;color:#eaf0f5;border:1px solid #405566;border-radius:9px;padding:8px 5px;font:12px Tahoma}</style>
       <section class="cps-section">
         <h2 class="cps-title">امنیت</h2>
-        <label class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">قفل با رمز عبور هنوز در دسترس نیست</span></span><input class="cps-switch" type="checkbox" disabled aria-label="قفل برنامه"></label>
+        <div class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">__CYRUS_LOCK_STATUS__</span></span><button type="button" id="cps-lock-manage" style="border:0;border-radius:9px;padding:9px 11px;background:#2e91d0;color:white;font:12px Tahoma">__CYRUS_LOCK_ACTION__</button></div>
         __CYRUS_2FA_ROW__
         <div class="cps-row" id="cps-sessions"><span class="cps-icon">▤</span><span class="cps-main"><span class="cps-name">نشست‌های فعال</span><span class="cps-value">خروج از نشست‌های دیگر</span></span><span class="cps-chevron">›</span></div>
       </section>
@@ -2484,11 +2498,16 @@ def privacy_security():
       (function(){const initial=__CYRUS_PRIVACY_SETTINGS__,status=document.getElementById("cps-privacy-status");
       document.querySelectorAll("[data-privacy]").forEach(el=>{const key=el.dataset.privacy;el.type==="checkbox"?(el.checked=!!initial[key]):(el.value=initial[key]||"everyone");
       el.addEventListener("change",async()=>{status.textContent="در حال ذخیره…";try{const r=await fetch("/privacy-security/preferences",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({[key]:el.type==="checkbox"?el.checked:el.value})});const j=await r.json();status.textContent=j.ok?"ذخیره شد ✓":"ذخیره نشد؛ دوباره تلاش کن";}catch(e){status.textContent="ارتباط با سرور برقرار نشد";}});});
+      document.getElementById("cps-lock-manage").addEventListener("click",async()=>{const enabled=__CYRUS_APP_LOCK_ENABLED__;const pin=prompt(enabled?"رمز فعلی را وارد کن":"رمز ۴ تا ۸ رقمی انتخاب کن");if(pin===null)return;if(!/^[0-9]{4,8}$/.test(pin)){alert("رمز باید ۴ تا ۸ رقم باشد");return;}let body;if(enabled){const next=prompt("رمز جدید وارد کن؛ برای خاموش‌کردن خالی بگذار");if(next===null)return;if(next!==""&&!/^[0-9]{4,8}$/.test(next)){alert("رمز جدید معتبر نیست");return;}body=next===""?{action:"disable",pin}:{action:"change",pin,new_pin:next};}else{const again=prompt("رمز را دوباره وارد کن");if(again!==pin){alert("رمزها یکسان نیستند");return;}body={action:"enable",pin,confirm_pin:again};}const r=await fetch("/privacy-security/app-lock",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const j=await r.json();alert(j.ok?"قفل برنامه به‌روز شد":"انجام نشد؛ رمز فعلی را بررسی کن");if(j.ok)location.reload();});
+      document.addEventListener("visibilitychange",()=>{if(document.hidden&&__CYRUS_APP_LOCK_ENABLED__)fetch("/privacy-security/app-lock",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"lock"})});});
       document.getElementById("cps-sessions").addEventListener("click",async()=>{if(!confirm("نشست‌های دیگر حساب از سیستم خارج شوند؟"))return;try{const r=await fetch("/privacy-security/sessions/logout-others",{method:"POST",credentials:"same-origin",headers:{"X-Requested-With":"fetch"}});const j=await r.json();alert(j.ok?"نشست‌های دیگر خارج شدند.":"خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.");}catch(e){alert("ارتباط با سرور برقرار نشد.");}});
       })();
       </script>t>   </main>
     """
     content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
+    content = content.replace("__CYRUS_LOCK_STATUS__", "فعال · قفل پس از ۳ دقیقه بی‌کاری" if app_lock_enabled else "خاموش · رمز ۴ تا ۸ رقمی")
+    content = content.replace("__CYRUS_LOCK_ACTION__", "تغییر رمز" if app_lock_enabled else "فعال‌سازی")
+    content = content.replace("__CYRUS_APP_LOCK_ENABLED__", "true" if app_lock_enabled else "false")
     content = content.replace("__CYRUS_PRIVACY_SETTINGS__", json_module.dumps(privacy_settings, ensure_ascii=False))
     return page(content)
 
@@ -2503,6 +2522,36 @@ def logout_other_sessions():
     except Exception:
         return {"ok": False}, 502
 
+
+@app.route("/privacy-security/app-lock", methods=["POST"])
+def manage_app_lock():
+    if not session.get("access_token"): return jsonify(ok=False),401
+    data=request.get_json(silent=True) or {}; action=str(data.get("action") or "")
+    record,error=cyrus_get_account_security(session.get("user_id"))
+    if error:return jsonify(ok=False),502
+    stored=str((record or {}).get("app_lock_pin_hash") or "");enabled=bool((record or {}).get("app_lock_enabled") and stored)
+    if action=="lock":
+        if enabled:session["cyrus_app_lock_last_active"]=0
+        return jsonify(ok=True)
+    pin=str(data.get("pin") or "")
+    if enabled and not check_password_hash(stored,pin):return jsonify(ok=False,error="رمز فعلی نادرست است."),403
+    if action=="disable":
+        if not cyrus_save_account_security(session.get("user_id"),{"app_lock_enabled":False,"app_lock_pin_hash":None}):return jsonify(ok=False),502
+        session["cyrus_app_lock_enabled"]=False;session.pop("cyrus_app_lock_last_active",None);return jsonify(ok=True)
+    new_pin=str(data.get("new_pin") or data.get("pin") or "")
+    if action not in ("enable","change") or not re.fullmatch(r"[0-9]{4,8}",new_pin):return jsonify(ok=False,error="رمز باید ۴ تا ۸ رقم باشد."),400
+    if action=="enable" and (enabled or str(data.get("confirm_pin") or "")!=new_pin):return jsonify(ok=False,error="تأیید رمز نامعتبر است."),400
+    if not cyrus_save_account_security(session.get("user_id"),{"app_lock_enabled":True,"app_lock_pin_hash":generate_password_hash(new_pin,method="scrypt")}):return jsonify(ok=False),502
+    session["cyrus_app_lock_enabled"]=True;session["cyrus_app_lock_last_active"]=time.time();return jsonify(ok=True)
+
+@app.route("/app-lock", methods=["GET","POST"])
+def app_lock_screen():
+    if not session.get("access_token"):return redirect("/login")
+    if request.method=="POST":
+        pin=str(request.form.get("pin") or "");record,error=cyrus_get_account_security(session.get("user_id"));hashed=str((record or {}).get("app_lock_pin_hash") or "")
+        if error or not hashed or not check_password_hash(hashed,pin):return page('<main class="container card"><h2>قفل CYRUS</h2><p>رمز نادرست است.</p><form method="post"><input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" required autofocus><button>بازگشایی</button></form></main>'),403
+        session["cyrus_app_lock_enabled"]=True;session["cyrus_app_lock_last_active"]=time.time();return redirect("/home")
+    return page('<main class="container card" style="max-width:360px;margin:12vh auto;text-align:center"><h2>قفل CYRUS</h2><p>برای ادامه رمز برنامه را وارد کن.</p><form method="post"><input type="password" name="pin" inputmode="numeric" pattern="[0-9]{4,8}" minlength="4" maxlength="8" placeholder="رمز ۴ تا ۸ رقمی" required autofocus><button style="width:100%">بازگشایی</button></form></main>')
 
 @app.route("/privacy-security/preferences", methods=["POST"])
 def save_privacy_preferences():
