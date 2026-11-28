@@ -1217,7 +1217,7 @@ def chat_preferences():
             URL + "/rest/v1/cyrus_chat_preferences",
             params={"on_conflict":"user_id,conversation_id"},
             json={"user_id":uid,"conversation_id":conversation_id,
-                  "archived":bool(row.get("archived")),"pinned":bool(row.get("pinned")),"muted":bool(row.get("muted"))},
+                  "archived":bool(row.get("archived")),"pinned":bool(row.get("pinned")),"muted":bool(row.get("muted")),"updated_at":datetime.now(timezone.utc).isoformat()},
             headers={**headers,"Prefer":"resolution=merge-duplicates,return=minimal"},
             timeout=15
         )
