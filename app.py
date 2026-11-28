@@ -659,12 +659,9 @@ window.addEventListener('pageshow',function(event){
 })();
 </script>
 <script src="/static/cyrus-rebuild.js?v=2" defer></script>
-{{ theme_toggle|safe }}
 <script>
 (function(){const root=document.documentElement,key="cyrus-theme";let theme="night";try{theme=localStorage.getItem(key)==="day"?"day":"night";}catch(e){}root.dataset.theme=theme;
-const btn=document.getElementById("cyrus-theme-toggle");if(!btn)return;
-function paint(){btn.textContent=root.dataset.theme==="day"?"☾":"☼";btn.setAttribute("aria-label",root.dataset.theme==="day"?"فعال‌کردن تم شب":"فعال‌کردن تم روز");btn.title=btn.getAttribute("aria-label");}
-paint();btn.addEventListener("click",function(){theme=root.dataset.theme==="day"?"night":"day";root.dataset.theme=theme;try{localStorage.setItem(key,theme);}catch(e){}paint();});
+const selector=document.getElementById("cyrus-appearance-theme");if(selector){selector.value=theme;selector.addEventListener("change",function(){theme=this.value==="day"?"day":"night";root.dataset.theme=theme;try{localStorage.setItem(key,theme);}catch(e){}});}
 })();
 </script>
 </body>
@@ -711,7 +708,7 @@ def page(content):
             active = "current" if current == href or (href == "/home" and current == "/") else ""
             links += f'<a class="{active}" href="{href}" aria-label="{label}"><span class="nav-icon" aria-hidden="true">{icon}</span><span>{label}</span></a>'
         nav = f'<style>.bottom{{height:58px;padding:4px 3px calc(4px + env(safe-area-inset-bottom));background:rgba(5,12,22,.97);border-top:1px solid #263c51;box-shadow:0 -8px 28px #0003}}.bottom a{{gap:3px;font-size:10px;color:#91a6b9;transition:color .18s,background .18s}}.bottom a>span:not(.nav-icon){{font-size:10px;line-height:1.15}}.bottom a .nav-icon{{font-size:20px;line-height:1;font-family:serif;display:grid;place-items:center}}.bottom a .nav-icon svg{{width:20px;height:20px;display:block;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}}.bottom a.current{{color:#e5bd69;border-bottom:0;background:linear-gradient(0deg,#d6a84a19,transparent)}}.bottom a.current .nav-icon{{transform:translateY(-2px);filter:drop-shadow(0 2px 5px #c79b3b55)}}.bottom a.current:after{{content:"";position:absolute;bottom:0;width:32px;height:3px;border-radius:3px 3px 0 0;background:#d8b45f}}.bottom a{{position:relative}}</style><nav class="bottom">{links}</nav>'
-    theme_toggle = '<button type="button" class="cyrus-theme-toggle" id="cyrus-theme-toggle" style="position:fixed;right:14px;bottom:calc(68px + env(safe-area-inset-bottom));z-index:40" aria-label="تغییر تم">☼</button>' if session.get("access_token") else ""
+    theme_toggle = ""
     return render_template_string(BASE, content=content, nav=nav, header=header, theme_toggle=theme_toggle)
 
 def auth_request(path, data):
@@ -6944,6 +6941,14 @@ def settings():
           </button>
         </section>
         <section class="setting-buttons">
+          <section class="s-button" style="cursor:default;grid-template-columns:42px minmax(0,1fr) 118px">
+            <span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9Z"/><path d="M16 3v4M14 5h4"/></svg></span>
+            <span class="button-title">نمایش و تم</span>
+            <select id="cyrus-appearance-theme" aria-label="انتخاب تم" style="grid-column:3;grid-row:1;background:#14283b;color:#edf2f7;border:1px solid #34516a;border-radius:9px;padding:8px;font:inherit;max-width:118px">
+              <option value="night">تم شب</option>
+              <option value="day">تم روز</option>
+            </select>
+          </section>
           <form id="setting-avatar-upload" class="setting-avatar-hidden" method="post" action="/profile/avatar" enctype="multipart/form-data"><input id="setting-avatar-file" type="file" name="avatar" accept="image/jpeg,image/png,image/webp" required></form>
           {avatar_notice}
           <a class="s-button" href="/settings/chat"><span class="buttons-icons"><svg viewBox="0 0 24 24"><path d="M4 5h16v12H9l-5 4V5Z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="button-title">تنظیمات گفتگو</span><span>‹</span></a>
