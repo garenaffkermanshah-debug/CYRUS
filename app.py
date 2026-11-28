@@ -382,7 +382,7 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=4">
+<link rel="stylesheet" href="/static/cyrus-rebuild.css?v=5">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1288,17 +1288,31 @@ def register():
                 error = data.get("msg", data.get("message", "ارسال کد انجام نشد؛ تنظیمات ایمیل را بررسی کنید"))
 
     content = f"""
-    <main class="container"><div class="card">
-      <h2>پیوستن به CYRUS</h2>
-      <p class="muted">ساخت حساب با کد یک‌بارمصرف ایمیلی؛ بدون گذرواژه</p>
-      <p class="error">{html.escape(str(error))}</p>
-      <form method="post">
-        <input name="username" placeholder="نام کاربری" required minlength="3" maxlength="24" autocomplete="username">
-        <input name="email" type="email" placeholder="ایمیل" required maxlength="254" autocomplete="email">
-        <button>ارسال کد تأیید</button>
-      </form>
-      <p class="muted"><a class="form-link" href="/login">قبلاً حساب ساخته‌اید؟ ورود</a></p>
-    </div></main>"""
+    <main class="cyrus-auth cyrus-auth-register">
+      <section class="auth-intro">
+        <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
+        <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
+        <p class="auth-kicker">همراه تازهٔ پارسی</p>
+        <h1>به جمع ما<br><em>خوش آمدید</em></h1>
+        <p class="auth-description">حساب خود را بسازید و با دوستان، خانواده و همراهانتان در ارتباط بمانید.</p>
+        <div class="auth-feature"><span>✦</span><div><b>شروعی ساده و امن</b><small>ثبت‌نام با ایمیل و کد تأیید</small></div></div>
+      </section>
+      <section class="auth-panel">
+        <div class="auth-panel-head"><span class="auth-step">ایجاد حساب</span><h2>عضویت در CYRUS</h2><p>نام کاربری و ایمیل خود را وارد کنید.</p></div>
+        <p class="error">{html.escape(str(error))}</p>
+        <form method="post" class="auth-form">
+          <label for="auth-username">نام کاربری</label>
+          <input id="auth-username" name="username" placeholder="نام دلخواه شما" required minlength="3" maxlength="24" autocomplete="username">
+          <label for="auth-email">نشانی ایمیل</label>
+          <input id="auth-email" name="email" type="email" placeholder="name@example.com" required maxlength="254" autocomplete="email" dir="ltr">
+          <button class="auth-submit">ارسال کد تأیید <span>←</span></button>
+        </form>
+        <div class="auth-divider"><span>یا</span></div>
+        <a class="auth-secondary" href="/login">حساب دارید؟ ورود <span>←</span></a>
+        <p class="auth-legal">کد تأیید فقط برای تکمیل ثبت‌نام شما ارسال می‌شود.</p>
+      </section>
+      <footer class="auth-footer">CYRUS <span>·</span> پیوند پارسیان · شکوه هخامنشی</footer>
+    </main>"""
     return page(content)
 
 
@@ -1377,23 +1391,26 @@ def verify_email():
                         error = "کد نادرست است؛ مطمئن شوید کد را برای همین ایمیل و از آخرین پیام CYRUS وارد می‌کنید."
 
     content = f"""
-    <main class="container"><div class="card">
-      <h2>تأیید ایمیل</h2>
-      <p class="muted">کد یک‌بارمصرف به این نشانی ارسال شد:</p>
-      <p class="muted" dir="ltr">{html.escape(email)}</p>
-      <p class="muted">درود، همراه پارسی! کد را از ایمیل CYRUS وارد کنید.</p>
-      <p class="error">{html.escape(error)}</p>
-      <p class="muted" style="color:#9bd6b0">{html.escape(notice)}</p>
-      <form method="post">
-        <input name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="کد یک‌بارمصرف" required autocomplete="one-time-code" dir="ltr">
-        <button>تأیید و ورود</button>
-      </form>
-      <form method="post">
-        <input type="hidden" name="resend" value="1">
-        <button type="submit" style="background:#172a3d;color:#d9e6f1;border:1px solid #304a63">ارسال دوباره کد</button>
-      </form>
-      <p class="muted"><a class="form-link" href="/login">تغییر ایمیل / بازگشت</a></p>
-    </div></main>"""
+    <main class="cyrus-auth cyrus-auth-verify">
+      <section class="auth-intro">
+        <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
+        <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
+        <p class="auth-kicker">یک گام تا ورود</p><h1>ایمیل شما،<br><em>کلید پیوندها</em></h1>
+        <p class="auth-description">کد یک‌بارمصرف را از پیام ارسالی CYRUS بردارید و در کادر روبه‌رو وارد کنید.</p>
+      </section>
+      <section class="auth-panel">
+        <div class="auth-panel-head"><span class="auth-step">تأیید هویت</span><h2>کد ایمیل را وارد کنید</h2><p>کد ارسال‌شده به این نشانی:</p><strong class="auth-email" dir="ltr">{html.escape(email)}</strong></div>
+        <p class="error">{html.escape(error)}</p><p class="auth-notice">{html.escape(notice)}</p>
+        <form method="post" class="auth-form">
+          <label for="auth-token">کد یک‌بارمصرف</label>
+          <input id="auth-token" class="auth-code" name="token" inputmode="numeric" pattern="[0-9]{{6,8}}" minlength="6" maxlength="8" placeholder="000000" required autocomplete="one-time-code" dir="ltr">
+          <button class="auth-submit">تأیید و ورود <span>←</span></button>
+        </form>
+        <form method="post" class="auth-resend"><input type="hidden" name="resend" value="1"><button type="submit">ارسال دوباره کد</button></form>
+        <a class="auth-secondary" href="/login">تغییر ایمیل / بازگشت <span>←</span></a>
+      </section>
+      <footer class="auth-footer">CYRUS <span>·</span> پیوند پارسیان · شکوه هخامنشی</footer>
+    </main>"""
     return page(content)
 
 
@@ -1437,16 +1454,29 @@ def login():
                     error = "ارسال کد ورود انجام نشد؛ دوباره تلاش کنید."
 
     content = f"""
-    <main class="container"><div class="card">
-      <h2>ورود به CYRUS</h2>
-      <p class="muted">کد یک‌بارمصرف به ایمیل حساب شما ارسال می‌شود؛ نیازی به رمز عبور نیست.</p>
-      <p class="error">{html.escape(error)}</p>
-      <form method="post">
-        <input name="email" type="email" placeholder="ایمیل" required maxlength="254" autocomplete="email">
-        <button>ارسال کد ورود</button>
-      </form>
-      <p class="muted"><a class="form-link" href="/register">ساخت حساب جدید</a></p>
-    </div></main>
+    <main class="cyrus-auth">
+      <section class="auth-intro">
+        <div class="auth-brand"><img src="/static/cyrus-cylinder.jpg" alt=""><div><strong>CYRUS</strong><small>پیوند پارسیان</small></div></div>
+        <div class="auth-hero-mark" aria-hidden="true"><span>𓆃</span><i></i><b></b></div>
+        <p class="auth-kicker">پیام‌رسان پارسی</p>
+        <h1>گفت‌وگو،<br><em>با شکوهی ماندگار</em></h1>
+        <p class="auth-description">با همراهان خود پیوندی امن و ساده بسازید؛ هر گفت‌وگو، نزدیک‌تر از همیشه.</p>
+        <div class="auth-feature"><span>✦</span><div><b>ورود امن با کد یک‌بارمصرف</b><small>بدون نیاز به گذرواژه</small></div></div>
+      </section>
+      <section class="auth-panel">
+        <div class="auth-panel-head"><span class="auth-step">خوش بازگشتید</span><h2>ورود به حساب</h2><p>برای دریافت کد ورود، ایمیل حساب خود را وارد کنید.</p></div>
+        <p class="error">{html.escape(error)}</p>
+        <form method="post" class="auth-form">
+          <label for="auth-email">نشانی ایمیل</label>
+          <input id="auth-email" name="email" type="email" placeholder="name@example.com" required maxlength="254" autocomplete="email" dir="ltr">
+          <button class="auth-submit">ارسال کد ورود <span>←</span></button>
+        </form>
+        <div class="auth-divider"><span>یا</span></div>
+        <a class="auth-secondary" href="/register">ساخت حساب جدید <span>←</span></a>
+        <p class="auth-legal">با ورود به CYRUS، تجربه‌ای ساده و امن از پیام‌رسانی را آغاز می‌کنید.</p>
+      </section>
+      <footer class="auth-footer">CYRUS <span>·</span> پیوند پارسیان · شکوه هخامنشی</footer>
+    </main>
     """
     return page(content)
 
