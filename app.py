@@ -1453,16 +1453,16 @@ def verify_email():
         </form>
         <form method="post" class="auth-resend"><input type="hidden" name="resend" value="1"><button id="cyrus-resend-button" type="submit" disabled>ارسال دوباره کد (۶۰)</button></form>
         <script>
-        (function(){
+        (function(){{
           const button=document.getElementById('cyrus-resend-button');
           if(!button)return;
           let seconds=Math.max(0,Math.floor(60-({time.time()}-Number({float(session.get("cyrus_otp_sent_at", 0) or 0)}))));
-          const update=function(){
-            if(seconds>0){button.disabled=true;button.textContent='ارسال دوباره کد ('+seconds+')';seconds-=1;window.setTimeout(update,1000);}
-            else{button.disabled=false;button.textContent='ارسال دوباره کد';}
-          };
+          const update=function(){{
+            if(seconds>0){{button.disabled=true;button.textContent='ارسال دوباره کد ('+seconds+')';seconds-=1;window.setTimeout(update,1000);}}
+            else{{button.disabled=false;button.textContent='ارسال دوباره کد';}}
+          }};
           update();
-        })();
+        }})();
         </script>
         <a class="auth-secondary" href="/login">تغییر ایمیل / بازگشت <span>←</span></a>
       </section>
