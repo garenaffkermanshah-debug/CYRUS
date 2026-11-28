@@ -160,3 +160,95 @@ html[data-theme="pasargad"] .cyrus-auth,html[data-theme="pasargad"] .auth-intro,
 html[data-theme="pasargad"] .auth-intro *,html[data-theme="pasargad"] .auth-panel *,html[data-theme="pasargad"] .cyrus-welcome *,html[data-theme="pasargad"] .cps-main *,html[data-theme="pasargad"] .cps-section *,html[data-theme="pasargad"] .tg-section *,html[data-theme="pasargad"] .tg-field *{color:#f3e5b7!important}
 html[data-theme="pasargad"] .auth-submit,html[data-theme="pasargad"] .welcome-primary,html[data-theme="pasargad"] .cps-action{background:#238d9b!important;color:#fff!important}
 html[data-theme="pasargad"] .welcome-secondary,html[data-theme="pasargad"] .auth-footer a,html[data-theme="pasargad"] .form-link{color:#69d5dc!important}
+
+
+/* CYRUS targeted cleanup: keep ordinary profile/settings rows neutral.
+   Royal blue is reserved for explicit public group/channel join actions. */
+.cyrus-settings-page .setting-information-container .setting-info{
+  background:#0e1b29!important;
+  background-image:none!important;
+  border:1px solid #1d3042!important;
+  color:#edf2f7!important;
+  box-shadow:none!important;
+}
+.cyrus-settings-page .setting-information-container .setting-info .info{
+  color:#edf2f7!important;
+}
+.cyrus-settings-page .setting-information-container .setting-info .smal-title{
+  color:#8fa4b7!important;
+}
+.cyrus-settings-page .setting-buttons .s-button,
+.cyrus-settings-page .setting-buttons button.s-button,
+.cyrus-settings-page .setting-buttons a.s-button{
+  background:#0e1b29!important;
+  background-image:none!important;
+  border:1px solid #1d3042!important;
+  color:#edf2f7!important;
+  box-shadow:none!important;
+}
+.cyrus-settings-page .setting-buttons .s-button .button-title{
+  color:#edf2f7!important;
+}
+.cyrus-settings-page .setting-buttons .s-button .buttons-icons{
+  background:#152b3e!important;
+}
+.cyrus-settings-page .setting-buttons .s-button:hover{
+  background:#142638!important;
+  border-color:#2b455b!important;
+}
+.cyrus-settings-page input:not([type="file"]):not([type="hidden"]),
+.cyrus-settings-page textarea{
+  background:#07121e!important;
+  background-image:none!important;
+  border-color:#30485e!important;
+  color:#edf2f7!important;
+  box-shadow:none!important;
+}
+.search-result .action:not(.cyrus-join-action){
+  background:#172b40!important;
+  background-image:none!important;
+  color:#a9bfd3!important;
+  border:1px solid #29435a!important;
+  box-shadow:none!important;
+}
+.search-result .action.cyrus-join-action{
+  background:var(--button-blue,#55a9f5)!important;
+  background-image:none!important;
+  color:#fff!important;
+  border:1px solid #6ab8fa!important;
+  box-shadow:0 3px 10px #1688f522!important;
+}
+#cyrus-search-recent{
+  margin:0 12px 8px!important;
+  padding:6px 10px 8px!important;
+  border:0!important;
+  background:transparent!important;
+}
+#cyrus-search-recent .section-title{
+  display:block!important;
+  margin:0 0 4px!important;
+  padding:3px 0!important;
+  background:transparent!important;
+  border:0!important;
+  color:#91a9bd!important;
+  font-size:11px!important;
+  text-align:right!important;
+}
+#cyrus-search-recent-list{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:6px!important;
+}
+#cyrus-search-recent-list>div{
+  padding:5px 9px!important;
+  margin:0!important;
+  border:1px solid #20384f!important;
+  border-radius:12px!important;
+  background:#0e2033!important;
+  color:#a9bfd3!important;
+  font-size:11px!important;
+}
+#cyrus-search-recent-list a{
+  color:inherit!important;
+  text-decoration:none!important;
+}
