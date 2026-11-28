@@ -109,3 +109,14 @@ body:has(.cyrus-welcome) .container{display:none!important}
 
 .welcome-photo-credit{display:inline-block;margin-top:5px;font-size:8px;line-height:1.5;color:#71869a!important;text-decoration:none;opacity:.65}
 .welcome-photo-credit:hover{opacity:1}
+
+/* CYRUS compact mobile group settings form controls */
+.tg-room-id-row{display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;width:100%!important}
+.tg-room-id-row input{display:block!important;width:auto!important;min-width:0!important;max-width:100%!important;flex:1 1 0!important;box-sizing:border-box!important;height:38px!important}
+.tg-room-id-row button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:58px!important;flex:0 0 auto!important;height:38px!important}
+.tg-add-member-card form{display:flex!important;flex-direction:row!important;align-items:center!important;gap:8px!important;width:100%!important}
+.tg-add-member-card input{display:block!important;width:auto!important;min-width:0!important;max-width:100%!important;flex:1 1 0!important;box-sizing:border-box!important;height:40px!important}
+.tg-add-member-card button{display:inline-flex!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:72px!important;flex:0 0 auto!important;height:40px!important}
+.auth-brand img{display:none!important}
+.cyrus-auth-register .auth-hero-mark{display:none!important}
+.cyrus-auth .auth-brand{margin-bottom:28px}
