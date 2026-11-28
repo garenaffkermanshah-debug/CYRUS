@@ -602,7 +602,8 @@ window.addEventListener('pageshow',function(event){
   if(roomMenu&&!roomMenu.hidden){roomMenu.hidden=true;closed=true;}
   if(openMessage){openMessage.classList.remove('context-open');const m=openMessage.querySelector('.message-context');if(m)m.setAttribute('aria-hidden','true');openMessage.setAttribute('aria-expanded','false');closed=true;}
   if(closed){try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(_e){}return;}
-  if(/^\\/chat\\/[^/]+/.test(location.pathname)){location.replace('/home');return;}\n  const a=read();if(a[a.length-1]===path)a.pop();
+  if(/^\/chat\/[^/]+/.test(location.pathname)){location.replace('/home');return;}
+  const a=read();if(a[a.length-1]===path)a.pop();
   let target=a.pop();write(a);
   if(!target||target===path)target=parentFallback();
   location.replace(target);
