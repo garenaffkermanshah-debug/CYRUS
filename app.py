@@ -2045,7 +2045,7 @@ def contacts():
                 pass
         safe_id=html.escape(uid,quote=True)
         actions = (
-            '<form method="post" action="/user/'+safe_id+'/contact/remove" onsubmit="return confirm(\\'این مخاطب از فهرست خویشان حذف شود؟\\')"><button class="contact-remove" type="submit">حذف</button></form>'
+            '<form method="post" action="/user/'+safe_id+'/contact/remove" onsubmit="return confirm(&quot;این مخاطب از فهرست خویشان حذف شود؟&quot;)"><button class="contact-remove" type="submit">حذف</button></form>'
             if is_contact else
             '<form method="post" action="/user/'+safe_id+'/contact"><button type="submit">افزودن</button></form>'
         )
