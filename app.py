@@ -24,7 +24,7 @@ if not _session_key:
 
 app.secret_key = _session_key
 # نشست‌ها کوتاه‌تر و کوکی در استقرار HTTPS فقط از مسیر امن ارسال می‌شود.
-app.permanent_session_lifetime = timedelta(days=30)
+app.permanent_session_lifetime = timedelta(days=365)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.getenv("COOKIE_SECURE", "1").strip().lower() not in ("0", "false", "no", "off")
@@ -1399,6 +1399,8 @@ def verify_email():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    if session.get("access_token") and session.get("user_id"):
+        return redirect("/home")
     error = ""
     if request.method == "POST":
         email = str(request.form.get("email") or "").strip().lower()
@@ -3731,7 +3733,7 @@ async function cyrusToggleVoiceRecord(b){
         if(!panel)return;
         const opening=panel.style.display==="none"||!panel.style.display;
         if(!opening){{panel.style.display="none";return;}}
-        panel.hidden=false;panel.style.display="block";panel.style.position="fixed";
+        panel.hidden=false;panel.hidden=false;panel.style.display="block";panel.style.position="fixed";
         panel.style.left="12px";panel.style.right="12px";
         panel.style.bottom="calc(88px + env(safe-area-inset-bottom))";
         panel.style.width="auto";panel.style.maxWidth="520px";
@@ -3739,7 +3741,7 @@ async function cyrusToggleVoiceRecord(b){
         panel.style.zIndex="9999";panel.style.background="#102235";
         panel.style.border="1px solid #34516a";panel.style.borderRadius="16px";
         panel.style.boxShadow="0 12px 32px #0009";
-        if(input)input.focus({{preventScroll:true}});
+        // Keep the keyboard closed while the emoji tray is opening.
       }}
       function cyrusInsertEmoji(emoji,closePanel=true) {{
         const input=document.querySelector('.send-box input[name="content"]');
