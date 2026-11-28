@@ -83,3 +83,9 @@ body:has(.cyrus-welcome) .container{display:none!important}
 .cyrus-welcome .welcome-brand{margin-bottom:clamp(20px,5vh,42px)}
 .cyrus-welcome h1{margin-bottom:24px}
 @media(max-width:760px){.welcome-signature{min-height:118px;margin-bottom:18px}.cyrus-welcome h1{margin-bottom:22px}}
+
+
+/* Login page: keep the Achaemenid glyph, remove its irritating square frame */
+.cyrus-auth:has(.auth-main-title) .auth-hero-mark{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;outline:0!important}
+.cyrus-auth:has(.auth-main-title) .auth-hero-mark i,
+.cyrus-auth:has(.auth-main-title) .auth-hero-mark b{display:none!important}
