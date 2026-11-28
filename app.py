@@ -2254,7 +2254,7 @@ def public_user_profile(user_id):
         .profile-media-tabs button.active{{color:#69b9f7;border-bottom:2px solid #3297df}}
         .profile-media-content{{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:9px;align-items:start;padding:14px;background:#0d1722}}\n        .profile-media-content[hidden]{{display:none}}\n        .profile-history-card img{{width:100px;height:100px;object-fit:cover;border-radius:10px}}\n        .profile-history-video{{width:100%;max-width:320px;border-radius:12px}}\n        .profile-history-file{{display:block;width:100%;padding:12px;background:#111e2b;border-radius:10px;color:#80c1f0;text-decoration:none;overflow-wrap:anywhere}}\n        .profile-history-audio{{max-width:100%}}\n        .profile-history-empty{{width:100%;text-align:center;color:#8fa5b8;font-size:12px;padding:18px}}
         .profile-blocked-note{{margin:12px 0 0;color:#f1aeb4;font-size:12px;text-align:center}}
-        .profile-share-button{{display:block;margin:12px auto 0;padding:10px 18px;border:1px solid #31516b;border-radius:10px;background:#172b3d;color:#9bd0f5}}
+        .profile-share-button{{display:table;width:auto!important;min-width:0;min-height:34px;margin:9px auto 0;padding:7px 12px;border:1px solid #31516b;border-radius:8px;background:#172b3d;color:#9bd0f5;font-size:11px;line-height:1.2}}
         .profile-contact-edit{{margin-top:12px;background:#111e2b;border:1px solid #263b50;border-radius:12px;overflow:hidden}}
         .profile-contact-edit summary{{padding:14px;text-align:center;color:#82bfe8;cursor:pointer;list-style:none}}
         .profile-contact-edit summary::-webkit-details-marker{{display:none}}
