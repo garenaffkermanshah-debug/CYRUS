@@ -707,7 +707,7 @@ def auth_request(path, data):
 @app.route("/")
 def splash():
     if session.get("access_token"):
-        return redirect(url_for("home"))
+        return redirect("/home")
     return render_template("splash.html")
 
 @app.route("/home")
@@ -3728,11 +3728,10 @@ async function cyrusToggleVoiceRecord(b){
       function cyrusToggleEmoji(event) {{
         if(event){{event.preventDefault();event.stopPropagation();}}
         const panel=document.getElementById("cyrusEmojiPanel");
-        const input=document.querySelector('.send-box input[name="content"]');
         if(!panel)return;
         const opening=panel.style.display==="none"||!panel.style.display;
         if(!opening){{panel.style.display="none";return;}}
-        panel.style.display="block";panel.style.position="fixed";
+        panel.hidden=false;panel.style.display="block";panel.style.position="fixed";
         panel.style.left="12px";panel.style.right="12px";
         panel.style.bottom="calc(88px + env(safe-area-inset-bottom))";
         panel.style.width="auto";panel.style.maxWidth="520px";
