@@ -3268,7 +3268,7 @@ def chat(conversation_id):
           {sender_label_html}{reply_preview}{forwarded_label}{pinned_label}
           <div class="message-body">{body}</div>
           {reaction_badges_html}
-          <small>{stamp}{edited_label} {read_status_html}</small>
+          <small><span class="message-time" data-created-at="{message_created_iso}">{stamp}</span>{edited_label} {read_status_html}</small>
           {controls}
           {edit_form}
         </div>"""
@@ -3749,6 +3749,7 @@ async function cyrusToggleVoiceRecord(b){
             }}
           }}));
         }}
+        document.querySelectorAll(".message-time[data-created-at]").forEach(el=>{{try{{const dt=new Date(el.dataset.createdAt);if(!Number.isNaN(dt.getTime()))el.textContent=dt.toLocaleTimeString("fa-IR",{{hour:"2-digit",minute:"2-digit"}});}}catch(e){{}}}});
         const picker=document.getElementById("cyrusFullEmojiPicker");
         if(picker){{
           const insertPickedEmoji=function(event){{
