@@ -590,9 +590,17 @@ window.addEventListener('pageshow',function(event){
  const remember=()=>{const a=read();if(a[a.length-1]!==path)a.push(path);write(a);};
  window.cyrusGoBack=function(){
   const overlay=document.querySelector('.setting-edit-overlay.open,.setting-avatar-editor.open,[role="dialog"].open');
-  if(overlay){overlay.classList.remove('open');return;}
-  const menus=[...document.querySelectorAll('.tg-chat-menu:not([hidden]),.composer-attach-menu:not([hidden]),.cyrus-message-menu:not([hidden]),.message-context.open')];
-  if(menus.length){menus.forEach(m=>{m.hidden=true;m.classList.remove('open');});return;}
+  if(overlay){overlay.classList.remove('open');try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(_e){}return;}
+  const emoji=document.getElementById('cyrusEmojiPanel');
+  const attach=document.getElementById('cyrusAttachMenu');
+  const roomMenu=document.getElementById('cyrusRoomMenu');
+  const openMessage=document.querySelector('.message.context-open');
+  let closed=false;
+  if(emoji&&emoji.style.display!=='none'){emoji.style.display='none';closed=true;}
+  if(attach&&!attach.hidden){attach.hidden=true;closed=true;}
+  if(roomMenu&&!roomMenu.hidden){roomMenu.hidden=true;closed=true;}
+  if(openMessage){openMessage.classList.remove('context-open');const m=openMessage.querySelector('.message-context');if(m)m.setAttribute('aria-hidden','true');openMessage.setAttribute('aria-expanded','false');closed=true;}
+  if(closed){try{history.pushState({cyrusBackTrap:true},'',location.href);}catch(_e){}return;}
   const a=read();if(a[a.length-1]===path)a.pop();
   let target=a.pop();write(a);
   if(!target||target===path)target=parentFallback();
@@ -600,7 +608,7 @@ window.addEventListener('pageshow',function(event){
  };
  document.addEventListener('click',function(e){
   const link=e.target.closest('a[href]');
-  if(!link||e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey||link.target==='_blank'||link.hasAttribute('download'))return;
+  if(!link||link.classList.contains('chat-back')||e.defaultPrevented||e.button!==0||e.ctrlKey||e.metaKey||e.shiftKey||e.altKey||link.target==='_blank'||link.hasAttribute('download'))return;
   try{const u=new URL(link.href,location.href);if(u.origin===location.origin&&u.pathname+u.search!==path)remember();}catch(_e){}
  },true);
  document.addEventListener('submit',function(e){if(e.target&&e.target.matches('form'))remember();},true);
