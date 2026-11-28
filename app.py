@@ -1101,6 +1101,7 @@ def home():
       <p class="error">{html.escape(error)}</p>
     </div>
     """
+    content = content.replace('<div class="tabs">', '<div class="tabs"><a class="tab" href="/stories">داستان‌ها</a>')
     return page(content)
 
 
@@ -6810,6 +6811,9 @@ def settings():
     """
     return page(content)
 
+
+from cyrus_stories import register_story_routes
+register_story_routes(app, URL, KEY, ADMIN_KEY, page)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False)
