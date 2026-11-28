@@ -1009,7 +1009,7 @@ def home():
         rows += f"""
         <div class="chat-row cyrus-chat-row" data-room-id="{room_id}" data-unread="{unread}" data-title="{html.escape(str(room_title), quote=True)}" data-search="{html.escape(str(room_title) + " " + preview + " " + search_extra, quote=True).lower()}"
              role="link" tabindex="0" aria-label="بازکردن گفتگوی {html.escape(str(room_title), quote=True)}"
-             onclick="if(!event.target.closest('.cyrus-chat-actions'))window.location.href='/chat/{room_id}'"
+             onclick="if(!event.target.closest('.cyrus-chat-actions')&&!this.classList.contains('remove-open'))window.location.href='/chat/{room_id}'"
              onkeydown="if(event.key==='Enter'||event.key===' '){{event.preventDefault();window.location.href='/chat/{room_id}'}}"
              style="cursor:pointer">
           {avatar_html}
@@ -1022,6 +1022,7 @@ def home():
             <button type="button" class="cyrus-archive-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusArchiveToggle(this)">آرشیو</button>
             <button type="button" class="cyrus-pin-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusTogglePinned(this)">سنجاق</button>
             <button type="button" class="cyrus-mute-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusToggleMuted(this)">بی‌صدا</button>
+            <button type="button" class="cyrus-read-chat" data-room-id="{room_id}" role="menuitem" onclick="event.stopPropagation();cyrusMarkChatRead(this)">خوانده‌شده</button>
             <form method="post" action="/chat/{room_id}/remove" class="cyrus-remove-chat" onclick="event.stopPropagation()" onsubmit='event.stopPropagation();return confirm("این گفتگو فقط از فهرست شما حذف شود؟ پیام‌ها و حساب مخاطب حذف نمی‌شوند.")'>
               <button type="submit" role="menuitem">حذف گفتگو</button>
             </form>
@@ -1106,6 +1107,16 @@ def home():
       function cyrusWriteSet(key,set){{localStorage.setItem(key,JSON.stringify(Array.from(set)));}}
       function cyrusTogglePinned(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_PIN_KEY),enabled=!set.has(id);enabled?set.add(id):set.delete(id);cyrusWriteSet(CYRUS_PIN_KEY,set);cyrusApplyListTools();cyrusPersistChatPref(id,'pinned',enabled);}}
       function cyrusToggleMuted(button){{const id=button.dataset.roomId,set=cyrusReadSet(CYRUS_MUTE_KEY),enabled=!set.has(id);enabled?set.add(id):set.delete(id);cyrusWriteSet(CYRUS_MUTE_KEY,set);cyrusApplyListTools();cyrusPersistChatPref(id,'muted',enabled);}}
+      async function cyrusMarkChatRead(button){{
+        const id=button.dataset.roomId;
+        button.disabled=true;button.textContent='در حال ثبت…';
+        try{{
+          const response=await fetch('/chat/mark-read',{{method:'POST',credentials:'same-origin',headers:{{'Content-Type':'application/json','X-Requested-With':'XMLHttpRequest'}},body:JSON.stringify({{conversation_id:id}})}});
+          if(!response.ok)throw new Error('mark read failed');
+          const row=button.closest('.cyrus-chat-row');if(row){{row.dataset.unread='0';row.querySelector('.unread-badge')?.remove();row.classList.remove('cyrus-is-unread');row.classList.remove('remove-open');}}
+          cyrusApplyListTools();
+        }}catch(error){{button.disabled=false;button.textContent='خوانده‌شده';alert('علامت‌گذاری انجام نشد؛ اتصال را بررسی کن.');}}
+      }}
       function cyrusApplyListTools(){{
         const rows=Array.from(document.querySelectorAll('.cyrus-chat-row'));
         const pins=cyrusReadSet(CYRUS_PIN_KEY),mutes=cyrusReadSet(CYRUS_MUTE_KEY);
@@ -1208,6 +1219,46 @@ def home():
     """
 
     return page(content)
+
+
+@app.route("/chat/mark-read", methods=["POST"])
+def cyrus_mark_chat_read():
+    if not session.get("access_token"):
+        return Response('{"error":"unauthorized"}', status=401, mimetype="application/json")
+    data = request.get_json(silent=True) or {}
+    conversation_id = str(data.get("conversation_id") or "").strip()
+    try:
+        uuid.UUID(conversation_id)
+    except ValueError:
+        return Response('{"error":"invalid_conversation"}', status=400, mimetype="application/json")
+    uid = str(session.get("user_id") or "")
+    headers = {
+        "apikey": KEY,
+        "Authorization": "Bearer " + session["access_token"],
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal"
+    }
+    try:
+        member = requests.get(
+            URL + "/rest/v1/cyrus_members",
+            params={"select":"conversation_id", "conversation_id":"eq."+conversation_id, "user_id":"eq."+uid, "limit":"1"},
+            headers=headers, timeout=15
+        )
+        if not member.ok:
+            return Response('{"error":"membership_check_failed"}', status=502, mimetype="application/json")
+        if not member.json():
+            return Response('{"error":"not_a_member"}', status=403, mimetype="application/json")
+        saved = requests.patch(
+            URL + "/rest/v1/cyrus_members",
+            params={"conversation_id":"eq."+conversation_id, "user_id":"eq."+uid},
+            json={"last_read_at":datetime.now(timezone.utc).isoformat()},
+            headers=headers, timeout=15
+        )
+        if not saved.ok:
+            return Response('{"error":"mark_read_failed"}', status=502, mimetype="application/json")
+        return Response('{"saved":true}', mimetype="application/json")
+    except Exception:
+        return Response('{"error":"mark_read_server_error"}', status=502, mimetype="application/json")
 
 
 @app.route("/chat/preferences", methods=["GET", "POST"])
