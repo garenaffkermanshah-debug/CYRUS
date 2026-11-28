@@ -3729,8 +3729,9 @@ async function cyrusToggleVoiceRecord(b){
         if(panel&&closePanel)panel.style.display="none";
       }}
       document.addEventListener('DOMContentLoaded',function(){{
-        window.scrollTo(0,document.body.scrollHeight);
-        window.addEventListener("load",()=>{{if(!new URLSearchParams(location.search).has("message"))window.scrollTo(0,document.body.scrollHeight);}},{{once:true}});setTimeout(()=>{{if(!new URLSearchParams(location.search).has("message"))window.scrollTo(0,document.body.scrollHeight);}},180);
+        const jumpParams=new URLSearchParams(location.search);const preserveHistory=jumpParams.has("before")||jumpParams.has("message");
+        function cyrusScrollToLatest(){{if(preserveHistory)return;const area=document.querySelector(".messages-area");const rows=area?[...area.querySelectorAll(".message[data-message-id]")]:[];const last=rows[rows.length-1];if(last)last.scrollIntoView({{behavior:"auto",block:"end"}});window.scrollTo({{top:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),behavior:"auto"}});if(area)area.scrollTop=area.scrollHeight;}}
+        cyrusScrollToLatest();window.addEventListener("load",()=>{{cyrusScrollToLatest();}},{{once:true}});[120,350,800].forEach(ms=>setTimeout(cyrusScrollToLatest,ms));
        document.querySelectorAll(".message[data-message-id]").forEach(node=>{{let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>55&&Math.abs(dx)>Math.abs(dy)*1.15){{e.preventDefault();const replyButton=node.querySelector('.context-actions button[onclick^="cyrusReply"]');if(replyButton)cyrusReply(replyButton);else cyrusReply({{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}});return;}}if(Math.abs(dx)<12&&Math.abs(dy)<12){{const now=Date.now();if(node._cyrusTapAt&&now-node._cyrusTapAt<360){{node._cyrusTapAt=0;e.preventDefault();cyrusCloseMessageMenus(false);cyrusSaveReaction(node,"❤️");}}else node._cyrusTapAt=now;}}}},{{passive:false}});}});
        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
         if(deepLinkedMessage) {{
