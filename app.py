@@ -169,7 +169,7 @@ def cyrus_get_account_security(user_id):
         return None, "missing_admin_key"
     try:
         r = requests.get(URL + "/rest/v1/cyrus_account_security",
-            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until,pending_password_hash,pending_expires_at","user_id":"eq."+str(user_id),"limit":"1"},
+            params={"select":"user_id,two_factor_enabled,password_hash,failed_attempts,locked_until,pending_password_hash,pending_expires_at,app_lock_pin_hash,app_lock_enabled","user_id":"eq."+str(user_id),"limit":"1"},
             headers=cyrus_admin_api_headers(), timeout=12)
         if not r.ok:
             return None, "security_lookup_failed"
@@ -189,6 +189,15 @@ def cyrus_save_account_security(user_id, payload):
         return r.ok
     except Exception:
         return False
+
+def cyrus_get_privacy_settings(user_id):
+    if not ADMIN_KEY or not user_id: return None
+    d={"last_seen_visibility":"everyone","profile_photo_visibility":"everyone","calls_visibility":"everyone","groups_visibility":"everyone","forward_link_enabled":True}
+    try:
+        r=requests.get(URL+"/rest/v1/cyrus_privacy_settings",params={"select":"last_seen_visibility,profile_photo_visibility,calls_visibility,groups_visibility,forward_link_enabled","user_id":"eq."+str(user_id),"limit":"1"},headers=cyrus_admin_api_headers(),timeout=12)
+        if r.ok and r.json(): d.update(r.json()[0])
+        return d
+    except Exception: return None
 
 def cyrus_upload_room_avatar(room_id, file_obj, access_token):
     if not file_obj or not file_obj.filename:
@@ -2399,6 +2408,7 @@ def privacy_security():
     if security_error:
         return page('<main class="container card"><p>وضعیت امنیتی حساب دریافت نشد؛ دوباره تلاش کنید.</p><a href="/settings">بازگشت</a></main>'), 502
     two_factor_enabled = bool(security and security.get("two_factor_enabled"))
+    privacy_settings = cyrus_get_privacy_settings(session.get("user_id")) or {"last_seen_visibility":"everyone","profile_photo_visibility":"everyone","calls_visibility":"everyone","groups_visibility":"everyone","forward_link_enabled":True}
     two_factor_row = (
         '<form class="cps-row" method="post" action="/privacy-security/2fa">'
         '<input type="hidden" name="action" value="disable"><span class="cps-icon">✓</span>'
@@ -2454,10 +2464,13 @@ def privacy_security():
       </style>
       <header class="cps-head"><a href="/settings" aria-label="بازگشت">‹</a><h1>حریم خصوصی و امنیت</h1></header>
       <section class="cps-account"><strong>حریم خصوصی حساب CYRUS</strong><p>تنظیم کن چه کسانی بتوانند اطلاعات و راه‌های ارتباطی تو را ببینند. گزینه‌های این صفحه در همین مرورگر ذخیره می‌شوند.</p></section>
-      <section class="cps-section">
-        <h2 class="cps-title">حریم خصوصی</h2>
-        <p class="cps-note">تنظیمات محدودسازی نمایش آخرین بازدید، تصویر پروفایل و دعوت‌پذیری هنوز به کنترل‌های سرور متصل نیستند؛ برای جلوگیری از نمایش گزینه‌های غیرواقعی، این کنترل‌ها در نسخهٔ اول فعال نشده‌اند.</p>
-      </section>
+      <section class="cps-section"><h2 class="cps-title">حریم خصوصی</h2>
+<div class="cps-row"><span class="cps-icon">◷</span><span class="cps-main"><span class="cps-name">آخرین بازدید</span></span><select class="cps-select" data-privacy="last_seen_visibility"><option value="everyone">همه</option><option value="contacts">خویشان</option><option value="nobody">هیچ‌کس</option></select></div>
+<div class="cps-row"><span class="cps-icon">◉</span><span class="cps-main"><span class="cps-name">تصویر پروفایل</span></span><select class="cps-select" data-privacy="profile_photo_visibility"><option value="everyone">همه</option><option value="contacts">خویشان</option><option value="nobody">هیچ‌کس</option></select></div>
+<div class="cps-row"><span class="cps-icon">☎</span><span class="cps-main"><span class="cps-name">تماس‌ها</span></span><select class="cps-select" data-privacy="calls_visibility"><option value="everyone">همه</option><option value="contacts">خویشان</option><option value="nobody">هیچ‌کس</option></select></div>
+<div class="cps-row"><span class="cps-icon">♧</span><span class="cps-main"><span class="cps-name">گروه‌ها و دعوت‌ها</span></span><select class="cps-select" data-privacy="groups_visibility"><option value="everyone">همه</option><option value="contacts">خویشان</option><option value="nobody">هیچ‌کس</option></select></div>
+<label class="cps-row"><span class="cps-icon">↗</span><span class="cps-main"><span class="cps-name">پیوند فوروارد پیام</span></span><input class="cps-switch" type="checkbox" data-privacy="forward_link_enabled"></label>
+<p class="cps-note" id="cps-privacy-status">تنظیمات در حساب ذخیره می‌شوند.</p></section><style>.cps-select{max-width:95px;min-width:80px;background:#263847;color:#eaf0f5;border:1px solid #405566;border-radius:9px;padding:8px 5px;font:12px Tahoma}</style>
       <section class="cps-section">
         <h2 class="cps-title">امنیت</h2>
         <label class="cps-row"><span class="cps-icon">⌁</span><span class="cps-main"><span class="cps-name">قفل برنامه</span><span class="cps-value">قفل با رمز عبور هنوز در دسترس نیست</span></span><input class="cps-switch" type="checkbox" disabled aria-label="قفل برنامه"></label>
@@ -2468,12 +2481,15 @@ def privacy_security():
       
       <div class="cps-sheet-bg" id="cps-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="cps-sheet-title"><section class="cps-sheet"><h2 id="cps-sheet-title"></h2><p id="cps-sheet-desc"></p><div id="cps-sheet-options"></div><button type="button" id="cps-sheet-save">ذخیره</button></section></div>
       <script>
-      (function(){
-        document.getElementById("cps-sessions").addEventListener("click",async()=>{if(!confirm("نشست‌های دیگر حساب از سیستم خارج شوند؟"))return;try{const r=await fetch("/privacy-security/sessions/logout-others",{method:"POST",credentials:"same-origin",headers:{"X-Requested-With":"fetch"}});const j=await r.json();alert(j.ok?"نشست‌های دیگر خارج شدند.":"خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.");}catch(e){alert("ارتباط با سرور برقرار نشد.");}});
+      (function(){const initial=__CYRUS_PRIVACY_SETTINGS__,status=document.getElementById("cps-privacy-status");
+      document.querySelectorAll("[data-privacy]").forEach(el=>{const key=el.dataset.privacy;el.type==="checkbox"?(el.checked=!!initial[key]):(el.value=initial[key]||"everyone");
+      el.addEventListener("change",async()=>{status.textContent="در حال ذخیره…";try{const r=await fetch("/privacy-security/preferences",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({[key]:el.type==="checkbox"?el.checked:el.value})});const j=await r.json();status.textContent=j.ok?"ذخیره شد ✓":"ذخیره نشد؛ دوباره تلاش کن";}catch(e){status.textContent="ارتباط با سرور برقرار نشد";}});});
+      document.getElementById("cps-sessions").addEventListener("click",async()=>{if(!confirm("نشست‌های دیگر حساب از سیستم خارج شوند؟"))return;try{const r=await fetch("/privacy-security/sessions/logout-others",{method:"POST",credentials:"same-origin",headers:{"X-Requested-With":"fetch"}});const j=await r.json();alert(j.ok?"نشست‌های دیگر خارج شدند.":"خروج نشست‌ها انجام نشد؛ دوباره تلاش کنید.");}catch(e){alert("ارتباط با سرور برقرار نشد.");}});
       })();
-      </script>   </main>
+      </script>t>   </main>
     """
     content = content.replace("__CYRUS_2FA_ROW__", two_factor_row)
+    content = content.replace("__CYRUS_PRIVACY_SETTINGS__", json_module.dumps(privacy_settings, ensure_ascii=False))
     return page(content)
 
 
@@ -2487,6 +2503,25 @@ def logout_other_sessions():
     except Exception:
         return {"ok": False}, 502
 
+
+@app.route("/privacy-security/preferences", methods=["POST"])
+def save_privacy_preferences():
+    if not session.get("access_token"): return jsonify(ok=False),401
+    data=request.get_json(silent=True) or {}; allowed={"last_seen_visibility","profile_photo_visibility","calls_visibility","groups_visibility"}; payload={}
+    for key in allowed:
+        if key in data:
+            value=str(data[key])
+            if value not in ("everyone","contacts","nobody"): return jsonify(ok=False,error="invalid_value"),400
+            payload[key]=value
+    if "forward_link_enabled" in data:
+        if not isinstance(data["forward_link_enabled"],bool): return jsonify(ok=False,error="invalid_value"),400
+        payload["forward_link_enabled"]=data["forward_link_enabled"]
+    if not payload:return jsonify(ok=False,error="empty"),400
+    payload.update({"user_id":str(session.get("user_id")),"updated_at":datetime.now(timezone.utc).isoformat()})
+    try:
+        r=requests.post(URL+"/rest/v1/cyrus_privacy_settings",json=payload,headers={**cyrus_admin_api_headers(),"Prefer":"resolution=merge-duplicates,return=minimal"},timeout=15)
+        return jsonify(ok=r.ok),(200 if r.ok else 502)
+    except Exception:return jsonify(ok=False),502
 
 @app.route("/privacy-security/2fa", methods=["POST"])
 def manage_account_two_factor():
