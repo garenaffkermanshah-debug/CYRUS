@@ -3739,6 +3739,8 @@ async function cyrusToggleVoiceRecord(b){
         if(panel&&closePanel)panel.style.display="none";
       }}
       document.addEventListener('DOMContentLoaded',function(){{
+        function cyrusPresencePing(){{if(document.visibilityState==="hidden")return;fetch("/presence/ping",{{method:"POST",credentials:"same-origin",headers:{{"X-Requested-With":"XMLHttpRequest"}}}}).catch(()=>{{}});}}
+        cyrusPresencePing();setInterval(cyrusPresencePing,60000);document.addEventListener("visibilitychange",()=>{{if(document.visibilityState==="visible")cyrusPresencePing();}});
         const jumpParams=new URLSearchParams(location.search);const preserveHistory=jumpParams.has("before")||jumpParams.has("message");
         function cyrusScrollToLatest(){{if(preserveHistory)return;const area=document.querySelector(".messages-area");const rows=area?[...area.querySelectorAll(".message[data-message-id]")]:[];const last=rows[rows.length-1];if(last)last.scrollIntoView({{behavior:"auto",block:"end"}});window.scrollTo({{top:Math.max(document.documentElement.scrollHeight,document.body.scrollHeight),behavior:"auto"}});if(area)area.scrollTop=area.scrollHeight;}}
         cyrusScrollToLatest();window.addEventListener("load",()=>{{cyrusScrollToLatest();}},{{once:true}});[120,350,800].forEach(ms=>setTimeout(cyrusScrollToLatest,ms));
