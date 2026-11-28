@@ -3221,13 +3221,9 @@ def chat(conversation_id):
                             age_seconds = max(0, (now_dt - seen_dt.astimezone(timezone.utc)).total_seconds())
                             if age_seconds <= 300:
                                 room_last_seen = "آنلاین"
-                            elif age_seconds < 7 * 86400:
-                                # نمایش فقط ساعت؛ تاریخ امروز یا تاریخ کامل در سربرگ چت نیاید.
-                                room_last_seen = "آخرین بازدید " + seen_local.strftime("%H:%M")
-                            elif age_seconds < 30 * 86400:
-                                room_last_seen = "آخرین بازدید یک هفته پیش"
                             else:
-                                room_last_seen = "مدتی پیش"
+                                # در سربرگ گفتگوی خصوصی فقط ساعت آخرین بازدید نشان داده شود؛ بدون تاریخ.
+                                room_last_seen = "آخرین بازدید " + seen_local.strftime("%H:%M")
                         except (TypeError, ValueError, OverflowError):
                             room_last_seen = "آخرین بازدید نامشخص"
                     # Pair-level RPC checks both directions despite private block-table RLS.
@@ -3603,14 +3599,14 @@ async function cyrusToggleVoiceRecord(b){
         const start=input.selectionStart===null?input.value.length:input.selectionStart;
         const end=input.selectionEnd===null?start:input.selectionEnd;
         input.value=input.value.slice(0,start)+emoji+input.value.slice(end);
-        input.focus();input.setSelectionRange(start+emoji.length,start+emoji.length);
+        input.focus({{preventScroll:true}});input.setSelectionRange(start+emoji.length,start+emoji.length);
         input.dispatchEvent(new Event("input",{{bubbles:true}}));
         if(panel&&closePanel)panel.style.display="none";
       }}
       document.addEventListener('DOMContentLoaded',function(){{
         window.scrollTo(0,document.body.scrollHeight);
         window.addEventListener("load",()=>{{if(!new URLSearchParams(location.search).has("message"))window.scrollTo(0,document.body.scrollHeight);}},{{once:true}});setTimeout(()=>{{if(!new URLSearchParams(location.search).has("message"))window.scrollTo(0,document.body.scrollHeight);}},180);
-       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>65&&Math.abs(dx)>Math.abs(dy)*1.35){{const b={{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}};cyrusReply(b);}}}},{{passive:true}});}});
+       document.querySelectorAll(".message[data-message-id]").forEach(node=>{{let sx=0,sy=0;node.addEventListener("touchstart",e=>{{const t=e.touches&&e.touches[0];if(t){{sx=t.clientX;sy=t.clientY;}}}},{{passive:true}});node.addEventListener("touchend",e=>{{const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-sx,dy=t.clientY-sy;if(dx>55&&Math.abs(dx)>Math.abs(dy)*1.15){{e.preventDefault();const replyButton=node.querySelector('.context-actions button[onclick^="cyrusReply"]');if(replyButton)cyrusReply(replyButton);else cyrusReply({{dataset:{{id:node.dataset.messageId,content:node.dataset.content||""}}}});}}}},{{passive:false}});}});
        const deepLinkedMessage=new URLSearchParams(window.location.search).get('message');
         if(deepLinkedMessage) {{
           requestAnimationFrame(()=>requestAnimationFrame(()=>{{
@@ -3628,10 +3624,23 @@ async function cyrusToggleVoiceRecord(b){
           }}));
         }}
         const picker=document.getElementById("cyrusFullEmojiPicker");
-        if(picker)picker.addEventListener("emoji-click",function(event){{
-          const value=event.detail&&event.detail.unicode;
-          if(value)cyrusInsertEmoji(value,false);
-        }});
+        if(picker){{
+          const insertPickedEmoji=function(event){{
+            const value=event.detail&&event.detail.unicode;
+            if(value){{event.stopPropagation();cyrusInsertEmoji(value,false);}}
+          }};
+          picker.addEventListener("emoji-click",insertPickedEmoji);
+          if(window.customElements)customElements.whenDefined("emoji-picker").then(()=>{{
+            if(!picker.dataset.cyrusEmojiReady){{
+              picker.dataset.cyrusEmojiReady="1";
+              picker.addEventListener("emoji-click",insertPickedEmoji);
+            }}
+          }});
+          picker.addEventListener("pointerdown",function(){{
+            const input=document.querySelector('.send-box input[name="content"]');
+            if(input)input.focus({{preventScroll:true}});
+          }},{{capture:true}});
+        }}}}
         const form=document.querySelector(".send-box");
         if(form){{
           const input=form.querySelector('input[name="content"]');
@@ -3703,7 +3712,7 @@ async function cyrusToggleVoiceRecord(b){
         // انتخاب متن باقی‌مانده از لمس قبلی نباید منوی پیام را در موبایل مسدود کند.
         if(event.type!=='click'&&window.getSelection&&String(window.getSelection()).trim())return;
         const clickedId=message&&message.dataset.messageId;
-        if(event.type==='click'&&clickedId&&cyrusSelectedMessages.size) {{
+        if(event.type==='click'&&clickedId&&cyrusSelectedMessages.size&&event.shiftKey) {{
           const rows=[...document.querySelectorAll('.message[data-message-id]')];
           const anchorIndex=rows.findIndex(row=>row.dataset.messageId===cyrusSelectionAnchorId);
           const targetIndex=rows.findIndex(row=>row.dataset.messageId===clickedId);
