@@ -4413,7 +4413,7 @@ async function cyrusToggleVoiceRecord(b){
         const size=Math.max(12,Math.min(22,Number(p.size)||16));
         const radius=p.bubble===false?'5px':'16px';
         document.documentElement.style.setProperty('--cyrus-chat-font-size',size+'px','important');
-        document.querySelectorAll('.message .message-body').forEach(el=>{el.style.setProperty('font-size',size+'px','important');el.style.setProperty('line-height','1.55','important');});
+        document.querySelectorAll('.message .message-body').forEach(el=>{el.style.setProperty('font-size',size+'px','important');el.style.setProperty('line-height','1.55','important');el.querySelectorAll('*').forEach(child=>child.style.setProperty('font-size',size+'px','important'));});
         document.querySelectorAll('.message').forEach(el=>el.style.setProperty('border-radius',radius,'important'));
         const walls={
           default:'linear-gradient(180deg,rgba(7,16,27,.76),rgba(5,12,21,.9))',
@@ -6769,7 +6769,7 @@ def chat_settings():
           <button class="tgcs-wall" data-wall="slate" aria-label="خاکستری" aria-pressed="false" style="background:linear-gradient(160deg,#252c35,#56616e,#171d25)"></button>
           <button class="tgcs-wall" data-wall="pasargad" aria-label="تم پاسارگاد" aria-pressed="false" title="تم پاسارگاد" style="background:linear-gradient(145deg,#092c3c 0%,#176a78 42%,#c9a45b 43%,#e7d29a 48%,#102d40 49%,#061a2b 100%)"></button>
           <label class="tgcs-wall" for="tgcs-custom-color" title="انتخاب رنگ دلخواه" style="background:conic-gradient(red,yellow,lime,aqua,blue,magenta,red);display:grid;place-items:center;color:#fff;font-size:18px">✎</label>
-          <input id="tgcs-custom-color" type="color" value="#142638" aria-label="رنگ دلخواه پس‌زمینه" style="width:44px;height:44px;padding:2px;border:1px solid #52606d;border-radius:10px;background:transparent;align-self:center>
+          <input id="tgcs-custom-color" type="color" value="#142638" aria-label="رنگ دلخواه پس‌زمینه" style="width:44px;height:44px;padding:2px;border:1px solid #52606d;border-radius:10px;background:transparent;align-self:center">
           <button type="button" class="tgcs-wall" id="tgcs-gallery-open" aria-label="انتخاب عکس از گالری" title="انتخاب عکس از گالری" style="background:#263747;color:#e8edf4;font-size:23px;display:grid;place-items:center">＋</button>
           <button type="button" class="tgcs-wall" id="tgcs-gallery-remove" aria-label="حذف عکس شخصی" title="حذف عکس شخصی" style="background:#263747;color:#e8edf4;font-size:15px;display:grid;place-items:center">×</button>
           <input id="tgcs-gallery-file" type="file" accept="image/*" hidden>
