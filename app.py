@@ -382,7 +382,7 @@ BASE = """
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-verifyclean1">
+<link rel="stylesheet" href="/static/cyrus-auth.css?v=20261128-homepolish1">
 <link rel="stylesheet" href="/static/cyrus-rebuild.css?v=6">
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#0d1722">
@@ -1019,12 +1019,31 @@ def home():
     <div class="container">
 
       <style>
-        .top{{height:66px;padding:8px 16px}}
+        /* CYRUS home: clean premium navy/gold chat list */
+        .top{{height:70px;padding:10px 18px;box-sizing:border-box;background:linear-gradient(180deg,#0b1c2b,#0a1724)!important;border-bottom:1px solid #d5b66d24;box-shadow:0 8px 28px #0002}}
         .top .emblem,.top .sub,.top-actions a[href="/settings"]{{display:none!important}}
         .top .brand{{gap:0}}
-        .top .logo{{font-family:Tahoma,Arial,sans-serif;font-size:23px;letter-spacing:2px}}
+        .top .logo{{font-family:Tahoma,Arial,sans-serif;font-size:24px;letter-spacing:2.5px;color:#e8c879!important;text-shadow:0 2px 18px #d9b86622}}
         .top-actions{{gap:0}}
-        .top-actions a[href="/search"]{{font-size:29px;padding:8px}}
+        .top-actions a[href="/search"]{{font-size:27px;padding:8px 10px;color:#e8c879!important;border:1px solid #d9b86630;border-radius:14px;background:#d9b8660a}}
+        body:has(#cyrus-main-chat-list){{background:#071321!important}}
+        body:has(#cyrus-main-chat-list) .container{{background:transparent!important;max-width:760px;margin:0 auto;border:0!important;box-shadow:none!important}}
+        body:has(#cyrus-main-chat-list) .tabs{{display:flex;gap:7px;overflow-x:auto;padding:13px 14px 12px;background:linear-gradient(180deg,#0b1b2a,#091725);border-bottom:1px solid #d9b86616;scrollbar-width:none}}
+        body:has(#cyrus-main-chat-list) .tabs::-webkit-scrollbar{{display:none}}
+        body:has(#cyrus-main-chat-list) .tabs .tab{{flex:0 0 auto;min-height:36px;display:flex;align-items:center;justify-content:center;gap:7px;padding:0 15px;border:1px solid #d5b66d22;border-radius:13px;background:#102337;color:#9eb3c5;font-size:12px;white-space:nowrap;text-decoration:none;transition:background .18s,border-color .18s}}
+        body:has(#cyrus-main-chat-list) .tabs .tab.active{{background:linear-gradient(135deg,#d9b96f,#b68b3d);border-color:#e8ca85;color:#15202b;font-weight:700;box-shadow:0 5px 18px #b58b3d22}}
+        body:has(#cyrus-main-chat-list) .chat-list{{padding:7px 10px 22px;background:transparent}}
+        body:has(#cyrus-main-chat-list) .cyrus-chat-row{{min-height:72px;padding:10px 12px;border-bottom:1px solid #ffffff0b;border-radius:15px;margin:3px 0;background:linear-gradient(100deg,#102235b8,#0b1927a8);gap:12px;transition:background .18s,transform .18s}}
+        body:has(#cyrus-main-chat-list) .cyrus-chat-row:active{{background:#173047;transform:scale(.995)}}
+        body:has(#cyrus-main-chat-list) .cyrus-chat-row .avatar{{width:48px;height:48px;min-width:48px;flex:0 0 48px;font-size:20px;border:1px solid #d9b86635;box-shadow:0 5px 18px #0003}}
+        body:has(#cyrus-main-chat-list) .cyrus-chat-row .chat-name{{font-size:14px;font-weight:700;color:#e8edf3;line-height:1.55}}
+        body:has(#cyrus-main-chat-list) .cyrus-chat-row .chat-preview{{font-size:12px;color:#8ea4b7;line-height:1.6}}
+        body:has(#cyrus-main-chat-list) .cyrus-chat-row .unread-badge{{background:linear-gradient(135deg,#d9b96f,#b68b3d);color:#15202b;font-weight:700;box-shadow:0 3px 12px #b58b3d25}}
+        body:has(#cyrus-main-chat-list) .cyrus-list-tools{{display:none!important}}
+        body:has(#cyrus-main-chat-list) .empty{{margin:28px 14px;padding:38px 20px;border:1px solid #d9b86622;border-radius:22px;background:linear-gradient(145deg,#102337cc,#0a1724cc);text-align:center}}
+        body:has(#cyrus-main-chat-list) .empty h3{{color:#e5c57d;font-size:17px}}
+        body:has(#cyrus-main-chat-list) .empty p{{color:#8ea4b7;font-size:12px;line-height:1.9}}
+        @media(max-width:600px){{body:has(#cyrus-main-chat-list) .chat-list{{padding:5px 8px 18px}}body:has(#cyrus-main-chat-list) .cyrus-chat-row{{min-height:68px;padding:9px 10px;border-radius:13px}}body:has(#cyrus-main-chat-list) .cyrus-chat-row .avatar{{width:44px;height:44px;min-width:44px;flex-basis:44px}}}}
         .cyrus-real-avatar{{overflow:hidden;padding:0}}
         .cyrus-real-avatar img{{width:100%;height:100%;object-fit:cover;border-radius:50%}}
         .cyrus-chat-row .avatar{{font-weight:bold;color:#fff;cursor:pointer}}
